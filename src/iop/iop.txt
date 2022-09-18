@@ -1,0 +1,58 @@
+
+/*
+                        IOP for Zero over K batched arguments
+                            without linearisation
+
+                P                                                           V
+
+Round1:          
+
+a. Collect a SET of all different queries 
+by iterating queries of virtual oracles
+
+b. Assign matching rotations to each concrete oracle
+
+b. Mask(if needed) witness oracles with
+degree = num_of_different_rotations
+
+d. commit to all witness oracles [W] 
+            
+                    --------> send commitments to [W] <--------     
+                                                                        
+                                                                    a. sample separation challenge
+                    
+                    --------> send separation challenge <--------
+
+Round2: 
+
+a. compute degree Q_DEG = of qoutient polynomial as 
+max(vo.compute_degree for vo in virtual_oracles) - degree of vanishing poly
+
+b. compute extension domain given Q_DEG
+
+c. compute evals_at_coset_of_extended_domain for each oracle
+
+d. instantiate quotient by instantiating each of the oracles
+and separating them with separation_challenge
+
+e. split quotient on chunks of srs_size, [Qi]
+// TODO: consider aslo blinding quotient (recent plonk bug)
+
+d. commit [Qi]
+
+                        --------> send commitments to [Qi] <--------
+                                                                                a. sample evaluation challenge
+
+
+
+Round 3:
+
+Compute batched openings at each w * evaluation_challenge
+For each concrete oracle we store queries made to it's possible to map 
+how to batch concrete oracles
+
+
+                        --------> send commitments to [Qi] <--------
+*/
+
+
