@@ -5,6 +5,7 @@ use crate::concrete_oracle::OracleType;
 
 use self::query::VirtualQuery;
 pub mod query;
+pub mod expression;
 
 // Note: VirtualOracle trait is very undeterministic and lightweight such that different usecases
 // can be built on top of this prover
