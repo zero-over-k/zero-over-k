@@ -122,58 +122,7 @@ impl<F: PrimeField> ProverConcreteOracle<F> {
     pub fn compute_extended_evals(&mut self, extended_domain: GeneralEvaluationDomain<F>) {
         self.evals_at_coset_of_extended_domain = Some(extended_domain.coset_fft(&self.poly));
     }
-
-    pub fn query_in_instantiation_context(
-        &self,
-        rotation: &Rotation,
-        row: usize,
-        scaling_ratio: usize,
-        extended_domain_size: usize,
-    ) -> Result<F, Error> {
-        if let Some(evals) = &self.evals_at_coset_of_extended_domain {
-            if rotation.degree == 0 {
-                return Ok(evals[row]);
-            }
-
-            let eval = match &rotation.sign {
-                Sign::Plus => evals[(row + rotation.degree * scaling_ratio) % extended_domain_size],
-                // TODO: test negative rotations
-                Sign::Minus => {
-                    let index = row as i64 - (rotation.degree * scaling_ratio) as i64;
-                    if index >= 0 {
-                        evals[index as usize]
-                    } else {
-                        let move_from_end =
-                            (rotation.degree * scaling_ratio - row) % extended_domain_size;
-                        evals[extended_domain_size - move_from_end]
-                    }
-                }
-            };
-            return Ok(eval);
-        } else {
-            return Err(Error::ExtendedEvalsMissing);
-        }
-    }
-
-    pub fn query_in_opening_context(
-        &self,
-        rotation: &Rotation,
-        challenge: &F,
-        domain_size: usize,
-    ) -> Result<F, Error> {
-        let domain = GeneralEvaluationDomain::<F>::new(domain_size).unwrap();
-        if rotation.degree == 0 {
-            return Ok(self.poly.evaluate(challenge));
-        }
-
-        let mut omega = domain.element(rotation.degree);
-        if rotation.sign == Sign::Minus {
-            omega = omega.inverse().unwrap();
-        }
-
-        Ok(self.poly.evaluate(&(omega * challenge)))
-    }
-
+    
     pub fn get_degree(&self) -> usize {
         self.poly.degree()
     }
