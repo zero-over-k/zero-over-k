@@ -14,10 +14,7 @@ pub struct Rotation {
 
 impl Rotation {
     pub fn new(degree: usize, sign: Sign) -> Self {
-        Self {
-            degree,
-            sign,
-        }
+        Self { degree, sign }
     }
 
     // most common case is to use just curr, next and prev rotations

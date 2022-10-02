@@ -1,4 +1,7 @@
-use std::{cmp::max, ops::{Neg, Add, Sub, Mul}};
+use std::{
+    cmp::max,
+    ops::{Add, Mul, Neg, Sub},
+};
 
 use ark_ff::{Field, PrimeField};
 
@@ -112,15 +115,16 @@ impl<F: PrimeField> Expression<F> {
     ) -> usize {
         match self {
             Expression::Constant(_) => 0,
-            Expression::Witness(query) => {
-                wtns_fn(query)
-            },
-            Expression::Instance(query) => {
-                instance_fn(query)
-            },
+            Expression::Witness(query) => wtns_fn(query),
+            Expression::Instance(query) => instance_fn(query),
             Expression::Negated(poly) => poly.degree(wtns_fn, instance_fn),
-            Expression::Sum(a, b) => max(a.degree(wtns_fn, instance_fn), b.degree(wtns_fn, instance_fn)),
-            Expression::Product(a, b) => a.degree(wtns_fn, instance_fn) + b.degree(wtns_fn, instance_fn),
+            Expression::Sum(a, b) => max(
+                a.degree(wtns_fn, instance_fn),
+                b.degree(wtns_fn, instance_fn),
+            ),
+            Expression::Product(a, b) => {
+                a.degree(wtns_fn, instance_fn) + b.degree(wtns_fn, instance_fn)
+            }
             Expression::Scaled(poly, _) => poly.degree(wtns_fn, instance_fn),
         }
     }
@@ -163,7 +167,10 @@ impl<F: Field> Mul<F> for Expression<F> {
 
 #[cfg(test)]
 mod test {
-    use crate::{vo::query::{Rotation, WitnessQuery, InstanceQuery, Query}, concrete_oracle::{ProverConcreteOracle, OracleType}};
+    use crate::{
+        concrete_oracle::{OracleType, ProverConcreteOracle},
+        vo::query::{InstanceQuery, Query, Rotation, WitnessQuery},
+    };
 
     use super::Expression;
     use ark_bls12_381::Fr as F;
@@ -175,73 +182,73 @@ mod test {
         let mut rng = test_rng();
 
         let o1 = ProverConcreteOracle {
-            label: "o1".to_string(), 
+            label: "o1".to_string(),
             poly: DensePolynomial::<F>::rand(10, &mut rng),
-            evals_at_coset_of_extended_domain: None, 
+            evals_at_coset_of_extended_domain: None,
             oracle_type: OracleType::Witness,
             queried_rotations: vec![],
-            should_mask: false
+            should_mask: false,
         };
 
         let o2 = ProverConcreteOracle {
-            label: "o2".to_string(), 
+            label: "o2".to_string(),
             poly: DensePolynomial::<F>::rand(10, &mut rng),
-            evals_at_coset_of_extended_domain: None, 
+            evals_at_coset_of_extended_domain: None,
             oracle_type: OracleType::Witness,
             queried_rotations: vec![],
-            should_mask: false
+            should_mask: false,
         };
 
         let o3 = ProverConcreteOracle {
-            label: "o3".to_string(), 
+            label: "o3".to_string(),
             poly: DensePolynomial::<F>::rand(10, &mut rng),
-            evals_at_coset_of_extended_domain: None, 
+            evals_at_coset_of_extended_domain: None,
             oracle_type: OracleType::Witness,
             queried_rotations: vec![],
-            should_mask: false
+            should_mask: false,
         };
 
         let o4 = ProverConcreteOracle {
-            label: "o4".to_string(), 
+            label: "o4".to_string(),
             poly: DensePolynomial::<F>::rand(10, &mut rng),
-            evals_at_coset_of_extended_domain: None, 
+            evals_at_coset_of_extended_domain: None,
             oracle_type: OracleType::Instance,
             queried_rotations: vec![],
-            should_mask: false
+            should_mask: false,
         };
 
         let o5 = ProverConcreteOracle {
-            label: "o5".to_string(), 
+            label: "o5".to_string(),
             poly: DensePolynomial::<F>::rand(10, &mut rng),
-            evals_at_coset_of_extended_domain: None, 
+            evals_at_coset_of_extended_domain: None,
             oracle_type: OracleType::Instance,
             queried_rotations: vec![],
-            should_mask: false
+            should_mask: false,
         };
 
         let q1 = WitnessQuery {
-            index: 0, 
-            rotation: Rotation::curr()
+            index: 0,
+            rotation: Rotation::curr(),
         };
 
         let q2 = WitnessQuery {
-            index: 1, 
-            rotation: Rotation::curr()
+            index: 1,
+            rotation: Rotation::curr(),
         };
 
         let q3 = WitnessQuery {
-            index: 2, 
-            rotation: Rotation::curr()
+            index: 2,
+            rotation: Rotation::curr(),
         };
 
         let q4 = InstanceQuery {
-            index: 0, 
-            rotation: Rotation::curr()
+            index: 0,
+            rotation: Rotation::curr(),
         };
 
         let q5 = InstanceQuery {
-            index: 1, 
-            rotation: Rotation::curr()
+            index: 1,
+            rotation: Rotation::curr(),
         };
 
         let wtns_queries = vec![q1, q2, q3];
@@ -276,18 +283,17 @@ mod test {
         // let scaled_fn = |p: DensePolynomial<F>, x: F| &p * x;
 
         // let eval_poly = expr.evaluate::<DensePolynomial<F>>(
-        //     &wtns_oracles, 
-        //     &instance_oracles, 
-        //     &constant_fn, 
-        //     &wtns_fn, 
-        //     &instance_fn, 
-        //     &negated_fn, 
-        //     &sum_fn, 
-        //     &product_fn, 
+        //     &wtns_oracles,
+        //     &instance_oracles,
+        //     &constant_fn,
+        //     &wtns_fn,
+        //     &instance_fn,
+        //     &negated_fn,
+        //     &sum_fn,
+        //     &product_fn,
         //     &scaled_fn
         // );
 
         // assert_eq!(poly_by_hand, eval_poly);
-
     }
 }

@@ -8,7 +8,7 @@ use ark_poly::{
     UVPolynomial,
 };
 
-use ark_poly_commit::QuerySet;
+use ark_poly_commit::{LabeledPolynomial, QuerySet};
 use ark_std::rand::Rng;
 
 pub trait QuerySetProvider<F: PrimeField> {
@@ -21,8 +21,8 @@ pub trait QuerySetProvider<F: PrimeField> {
 }
 #[derive(Debug)]
 pub enum QueryPoint<F: PrimeField> {
-    Omega(usize), 
-    Challenge(F)
+    Omega(usize),
+    Challenge(F),
 }
 
 type ScalingRatio = usize;
@@ -38,7 +38,7 @@ impl<F: PrimeField> QueryPoint<F> {
         match self {
             Self::Omega(row) => {
                 let _ = std::mem::replace(row, new_row);
-            }, 
+            }
             Self::Challenge(_) => {
                 panic!("Wrong point type")
             }
@@ -46,12 +46,12 @@ impl<F: PrimeField> QueryPoint<F> {
     }
 }
 
-impl<F: PrimeField> QueryContext<F> {   
+impl<F: PrimeField> QueryContext<F> {
     pub fn replace_omega(&mut self, new_row: usize) {
         match self {
             Self::Instantiation(_, _, point) => {
                 point.replace_omega(new_row);
-            }, 
+            }
             Self::Opening(_, _) => {
                 panic!("Wrong context")
             }
@@ -82,7 +82,6 @@ pub trait Queriable<F: PrimeField> {
 
 // TODO: add shared functionalities in trait
 pub trait ConcreteOracle {}
-
 
 #[derive(PartialEq, PartialOrd, Eq, Ord, Clone)]
 pub enum OracleType {
@@ -122,9 +121,14 @@ impl<F: PrimeField> ProverConcreteOracle<F> {
     pub fn compute_extended_evals(&mut self, extended_domain: GeneralEvaluationDomain<F>) {
         self.evals_at_coset_of_extended_domain = Some(extended_domain.coset_fft(&self.poly));
     }
-    
+
     pub fn get_degree(&self) -> usize {
         self.poly.degree()
+    }
+
+    pub fn to_labeled(&self) -> LabeledPolynomial<F, DensePolynomial<F>> {
+        // for now keep degree bound and hiding bound to None
+        LabeledPolynomial::new(self.label.clone(), self.poly.clone(), None, None)
     }
 }
 
@@ -138,17 +142,21 @@ impl<F: PrimeField> Queriable<F> for ProverConcreteOracle<F> {
                             if rotation.degree == 0 {
                                 return evals[*row];
                             }
-                
+
                             let eval = match &rotation.sign {
-                                Sign::Plus => evals[(row + rotation.degree * scaling_ratio) % extended_domain_size],
+                                Sign::Plus => {
+                                    evals[(row + rotation.degree * scaling_ratio)
+                                        % extended_domain_size]
+                                }
                                 // TODO: test negative rotations
                                 Sign::Minus => {
-                                    let index = *row as i64 - (rotation.degree * scaling_ratio) as i64;
+                                    let index =
+                                        *row as i64 - (rotation.degree * scaling_ratio) as i64;
                                     if index >= 0 {
                                         evals[index as usize]
                                     } else {
-                                        let move_from_end =
-                                            (rotation.degree * scaling_ratio - row) % extended_domain_size;
+                                        let move_from_end = (rotation.degree * scaling_ratio - row)
+                                            % extended_domain_size;
                                         evals[extended_domain_size - move_from_end]
                                     }
                                 }
@@ -158,32 +166,30 @@ impl<F: PrimeField> Queriable<F> for ProverConcreteOracle<F> {
                             // return Err(Error::ExtendedEvalsMissing);
                             panic!("Extended Evals Missing")
                         }
-                    }, 
+                    }
                     QueryPoint::Challenge(_) => {
                         panic!("Can't evaluate at challenge in instantiation context");
                     }
                 }
-            }, 
-            QueryContext::Opening(domain_size, point) => {
-                match point {
-                    QueryPoint::Omega(_) => {
-                        panic!("Can't evaluate at row_i in opening context");
-                    }, 
-                    QueryPoint::Challenge(challenge) => {
-                        let domain = GeneralEvaluationDomain::<F>::new(*domain_size).unwrap();
-                        if rotation.degree == 0 {
-                            return self.poly.evaluate(&challenge);
-                        }
-                
-                        let mut omega = domain.element(rotation.degree);
-                        if rotation.sign == Sign::Minus {
-                            omega = omega.inverse().unwrap();
-                        }
-                
-                        self.poly.evaluate(&(omega * challenge))
-                    }
-                }
             }
+            QueryContext::Opening(domain_size, point) => match point {
+                QueryPoint::Omega(_) => {
+                    panic!("Can't evaluate at row_i in opening context");
+                }
+                QueryPoint::Challenge(challenge) => {
+                    let domain = GeneralEvaluationDomain::<F>::new(*domain_size).unwrap();
+                    if rotation.degree == 0 {
+                        return self.poly.evaluate(&challenge);
+                    }
+
+                    let mut omega = domain.element(rotation.degree);
+                    if rotation.sign == Sign::Minus {
+                        omega = omega.inverse().unwrap();
+                    }
+
+                    self.poly.evaluate(&(omega * challenge))
+                }
+            },
         }
     }
 }
