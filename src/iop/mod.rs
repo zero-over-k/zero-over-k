@@ -36,7 +36,7 @@ impl<F: PrimeField> IOPforPolyIdentity<F> {
                     evals_at_coset_of_extended_domain: None,
                     oracle_type: OracleType::Witness,
                     queried_rotations: vec![],
-                    should_mask: true, // TODO: keep masking try by default for wtns
+                    should_mask: true, // TODO: keep masking true by default for wtns
                 }
             } else {
                 ProverConcreteOracle {
@@ -45,7 +45,7 @@ impl<F: PrimeField> IOPforPolyIdentity<F> {
                     evals_at_coset_of_extended_domain: None,
                     oracle_type: OracleType::Witness,
                     queried_rotations: vec![],
-                    should_mask: true, // TODO: keep masking try by default for wtns
+                    should_mask: true, // TODO: keep masking true by default for wtns
                 }
             };
 
@@ -101,31 +101,31 @@ mod test {
     };
     use ark_bls12_381::Fr as F;
 
-    #[test]
-    fn simple_creation_test() {
-        let q1 = VirtualQuery {
-            index: 0, 
-            rotation: Rotation::curr(), 
-            oracle_type: OracleType::Witness
-        };
+    // #[test]
+    // fn simple_creation_test() {
+    //     let q1 = VirtualQuery {
+    //         index: 0, 
+    //         rotation: Rotation::curr(), 
+    //         oracle_type: OracleType::Witness
+    //     };
 
-        let q2 = VirtualQuery {
-            index: 1, 
-            rotation: Rotation::curr(), 
-            oracle_type: OracleType::Witness
-        };
+    //     let q2 = VirtualQuery {
+    //         index: 1, 
+    //         rotation: Rotation::curr(), 
+    //         oracle_type: OracleType::Witness
+    //     };
 
-        // TODO: skip any meaningful checks, plan is to have this implemented 
-        // through Expressions similar to halo2
+    //     // TODO: skip any meaningful checks, plan is to have this implemented 
+    //     // through Expressions similar to halo2
 
-        let mul_vo = GenericVO::new(
-            &vec![q1, q2], 
-            |wtns_degrees: &Vec<usize>, instance_degrees: &Vec<usize>| {
-                wtns_degrees[0] + wtns_degrees[1]
-            }, 
-            |x: F, wtns_evals: &Vec<F>, instance_evals: &Vec<F>| {
-                wtns_evals[0] * instance_evals[1]
-            }
-        );
-    }
+    //     let mul_vo = GenericVO::new(
+    //         &vec![q1, q2], 
+    //         |wtns_degrees: &Vec<usize>, instance_degrees: &Vec<usize>| {
+    //             wtns_degrees[0] + wtns_degrees[1]
+    //         }, 
+    //         |x: F, wtns_evals: &Vec<F>, instance_evals: &Vec<F>| {
+    //             wtns_evals[0] * instance_evals[1]
+    //         }
+    //     );
+    // }
 }

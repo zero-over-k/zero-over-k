@@ -8,7 +8,7 @@ use ark_poly::{
 use ark_std::rand::Rng;
 
 use crate::{
-    concrete_oracle::{OracleType, ProverConcreteOracle},
+    concrete_oracle::{OracleType, ProverConcreteOracle, QueryContext, QueryPoint, Queriable},
     error::Error,
     iop::{verifier::VerifierFirstMsg, IOPforPolyIdentity},
     vo::{
@@ -76,7 +76,7 @@ impl<F: PrimeField> IOPforPolyIdentity<F> {
         }
 
         // 3. Mask wtns oracles
-        for oracle in &mut state.witness_oracles {
+        for oracle in state.witness_oracles.iter_mut() {
             oracle.mask(&state.vanishing_polynomial, rng);
         }
 
@@ -88,20 +88,26 @@ impl<F: PrimeField> IOPforPolyIdentity<F> {
         state: &mut ProverState<F>,
         srs_size: usize,
     ) -> Result<(), Error> {
+
+        let wnts_get_degree_fn = |query: &WitnessQuery| {
+            let oracle = &state.witness_oracles[query.get_index()];
+            oracle.get_degree()
+        };
+
+        let instance_get_degree_fn = |query: &InstanceQuery| {
+            let oracle = &state.instance_oracles[query.get_index()];
+            oracle.get_degree()
+        };
+
         // 1. compute quotient degree
         let mut max_degree = 0;
         for vo in state.vos {
-            let wtns_degrees: Vec<usize> = vo.get_wtns_queries().iter().map(|query| {
-                state.witness_oracles[query.index].get_degree()
-            }).collect();
-
-            let instance_degrees: Vec<usize> = vo.get_instance_queries().iter().map(|query| {
-                state.instance_oracles[query.index].get_degree()
-            }).collect();
-
-            let vo_degree = vo.compute_degree(&wtns_degrees, &instance_degrees);
+            let vo_degree = vo.get_expression().degree(
+                &wnts_get_degree_fn, 
+                &instance_get_degree_fn
+            );
             max_degree = max(max_degree, vo_degree);
-        }   
+        }
 
         let quotient_degree = max_degree - state.vanishing_polynomial.degree();
 
@@ -125,39 +131,30 @@ impl<F: PrimeField> IOPforPolyIdentity<F> {
         .collect();
 
         let mut nominator_evals = vec![F::zero(); extended_domain.size()];
+
+        let mut query_context = QueryContext::Instantiation(scaling_ratio, extended_domain.size(), QueryPoint::<F>::Omega(0));
+
         for i in 0..extended_domain.size() {
+            query_context.replace_omega(i);
             for (vo_index, vo) in state.vos.iter().enumerate() {
-                let wtns_evals = vo
-                    .get_wtns_queries()
-                    .iter()
-                    .map(|query| {
-                        IOPforPolyIdentity::query_concrete_oracle_in_instantiation(
-                            state,
-                            query,
-                            i,
-                            scaling_ratio,
-                            extended_domain.size(),
-                        )
-                    })
-                    .collect::<Result<Vec<F>, Error>>()?;
 
-                let instance_evals = vo
-                    .get_instance_queries()
-                    .iter()
-                    .map(|query| {
-                        IOPforPolyIdentity::query_concrete_oracle_in_instantiation(
-                            state,
-                            query,
-                            i,
-                            scaling_ratio,
-                            extended_domain.size(),
-                        )
-                    })
-                    .collect::<Result<Vec<F>, Error>>()?;
+                let vo_evaluation = vo.get_expression().evaluate::<F>(
+                    &|x: F| x, 
+                    &|query: &WitnessQuery| { 
+                        let oracle = &state.witness_oracles[query.get_index()];
+                        oracle.query(&query.rotation, &query_context)
+                    }, 
+                    &|query: &InstanceQuery| {
+                        let oracle = &state.instance_oracles[query.get_index()];
+                        oracle.query(&query.rotation, &query_context)
+                    },
+                    &|x: F| -x, 
+                    &|x: F, y: F| x + y, 
+                    &|x: F, y: F| x * y, 
+                    &|x: F, y: F| x * y
+                );
 
-                let x = extended_domain.element(i);
-                let vo_constraint = vo.constraint_function(x, &wtns_evals, &instance_evals);
-                nominator_evals[i] += powers_of_alpha[vo_index] * vo_constraint;
+                nominator_evals[i] += powers_of_alpha[vo_index] * vo_evaluation;
             }
         }
 
@@ -181,78 +178,5 @@ impl<F: PrimeField> IOPforPolyIdentity<F> {
         );
 
         Ok(())
-    }
-
-    fn query_concrete_oracle_in_instantiation(
-        state: &ProverState<F>,
-        query: &impl Query,
-        row: usize,
-        scaling_ratio: usize,
-        extended_domain_size: usize,
-    ) -> Result<F, Error> {
-        let index = query.get_index();
-        let query_result: Result<F, Error> = match query.get_type() {
-            OracleType::Witness => {
-                if index > state.witness_oracles.len() {
-                    return Err(Error::WtnsQueryIndexOutOfBounds(index));
-                }
-
-                state.witness_oracles[index].query_in_instantiation_context(
-                    &query.get_rotation(),
-                    row,
-                    scaling_ratio,
-                    extended_domain_size,
-                )
-            }
-            OracleType::Instance => {
-                if index > state.instance_oracles.len() {
-                    return Err(Error::InstanceQueryIndexOutOfBounds(index));
-                }
-
-                state.instance_oracles[index].query_in_instantiation_context(
-                    &query.get_rotation(),
-                    row,
-                    scaling_ratio,
-                    extended_domain_size,
-                )
-            }
-        };
-
-        query_result
-    }
-
-    fn query_concrete_oracle_in_opening(
-        state: &ProverState<F>,
-        query: &impl Query,
-        challenge: &F,
-        domain_size: usize,
-    ) -> Result<F, Error> {
-        let index = query.get_index();
-        let query_result: Result<F, Error> = match query.get_type() {
-            OracleType::Witness => {
-                if index > state.witness_oracles.len() {
-                    return Err(Error::WtnsQueryIndexOutOfBounds(index));
-                }
-
-                state.witness_oracles[index].query_in_opening_context(
-                    &query.get_rotation(),
-                    challenge,
-                    domain_size,
-                )
-            }
-            OracleType::Instance => {
-                if index > state.instance_oracles.len() {
-                    return Err(Error::InstanceQueryIndexOutOfBounds(index));
-                }
-
-                state.instance_oracles[index].query_in_opening_context(
-                    &query.get_rotation(),
-                    challenge,
-                    domain_size,
-                )
-            }
-        };
-
-        query_result
     }
 }

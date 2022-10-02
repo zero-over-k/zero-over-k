@@ -3,11 +3,11 @@ use query::{InstanceQuery, WitnessQuery};
 
 use crate::concrete_oracle::OracleType;
 
-use self::query::VirtualQuery;
+use self::{query::VirtualQuery, expression::Expression};
 pub mod query;
 pub mod expression;
 
-// Note: VirtualOracle trait is very undeterministic and lightweight such that different usecases
+// Note: VirtualOracle trait is very lightweight such that different use-cases
 // can be built on top of this prover
 
 /// Trait for specifying Virtual Oracle that should be included in batched zero over K check
@@ -18,12 +18,8 @@ pub trait VirtualOracle<F: PrimeField> {
     /// Returns instance queries given virtual queries and assignment
     fn get_instance_queries(&self) -> &[InstanceQuery];
 
-    /// TODO: this we want to automate with Abstract Syntax tree
-    /// Hardcoded implementation for degree calculation
-    fn compute_degree(&self, wtns_degrees: &Vec<usize>, instance_degrees: &Vec<usize>) -> usize;
-
-    /// VO encodes constraint that must go to zero
-    fn constraint_function(&self, x: F, wtns_evals: &Vec<F>, instance_evals: &Vec<F>) -> F;
+    /// Returns expression that combines concrete oracles
+    fn get_expression(&self) -> &Expression<F>;
 }
 
 pub struct GenericVO<F: PrimeField> {
@@ -32,15 +28,16 @@ pub struct GenericVO<F: PrimeField> {
     instance_indices: Option<Vec<usize>>, 
     wtns_queries: Vec<WitnessQuery>, 
     instance_queries: Vec<InstanceQuery>, 
-    degree_func: fn (wtns_degrees: &Vec<usize>, instance_degrees: &Vec<usize>) -> usize,
-    constraint_function: fn (x: F, wtns_evals: &Vec<F>, instance_evals: &Vec<F>) -> F
+    expression: Option<Expression<F>>,
+    expression_func: fn (wnts_queries: &[Expression<F>], instance_queries: &[Expression<F>]) -> Expression<F>,
 }
 
 impl<F: PrimeField> GenericVO<F> {
     pub fn new(
         virtual_queries: &Vec<VirtualQuery>, 
         degree_func: fn (wtns_degrees: &Vec<usize>, instance_degrees: &Vec<usize>) -> usize,
-        constraint_function: fn (x: F, wtns_evals: &Vec<F>, instance_evals: &Vec<F>) -> F
+        constraint_function: fn (x: F, wtns_evals: &Vec<F>, instance_evals: &Vec<F>) -> F,
+        expression_func: fn (wnts_queries: &[Expression<F>], instance_queries: &[Expression<F>]) -> Expression<F>,
     ) -> Self {
         Self {
             virtual_queries: virtual_queries.clone(), 
@@ -48,8 +45,8 @@ impl<F: PrimeField> GenericVO<F> {
             instance_indices: None, 
             wtns_queries: vec![], 
             instance_queries: vec![], 
-            degree_func,
-            constraint_function
+            expression: None,
+            expression_func,
         }
     }
 
@@ -60,6 +57,11 @@ impl<F: PrimeField> GenericVO<F> {
                 OracleType::Instance => self.instance_queries.push(InstanceQuery { index: instance_indices[vq.index], rotation: vq.rotation.clone() })
             }
         }
+
+        let wtns_expressions: Vec<Expression<F>> = self.wtns_queries.iter().map(|query| Expression::<F>::Witness(query.clone())).collect();
+        let instance_expressions: Vec<Expression<F>>  = self.instance_queries.iter().map(|query| Expression::<F>::Instance(query.clone())).collect();
+
+        self.expression = Some((self.expression_func)(&wtns_expressions, &instance_expressions));
 
         self.witness_indices = Some(witness_indices);
         self.instance_indices = Some(instance_indices);
@@ -75,12 +77,12 @@ impl<F: PrimeField> VirtualOracle<F> for GenericVO<F> {
         &self.instance_queries
     }
 
-    fn compute_degree(&self, wtns_degrees: &Vec<usize>, instance_degrees: &Vec<usize>) -> usize {
-        (self.degree_func)(wtns_degrees, instance_degrees)
-    }
-
-    fn constraint_function(&self, x: F, wtns_evals: &Vec<F>, instance_evals: &Vec<F>) -> F {
-        (self.constraint_function)(x, wtns_evals, instance_evals)
+    // panics if expression is not defined before proving started
+    fn get_expression(&self) -> &Expression<F> {
+        match self.expression.as_ref() {
+            None => panic!("Expression is not defined"), 
+            Some(expression) => return expression
+        }
     }
 }
 

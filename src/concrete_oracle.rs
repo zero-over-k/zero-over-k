@@ -19,6 +19,70 @@ pub trait QuerySetProvider<F: PrimeField> {
         domain_size: usize,
     ) -> QuerySet<F>;
 }
+#[derive(Debug)]
+pub enum QueryPoint<F: PrimeField> {
+    Omega(usize), 
+    Challenge(F)
+}
+
+type ScalingRatio = usize;
+type ExtendedDomainSize = usize;
+type DomainSize = usize;
+pub enum QueryContext<F: PrimeField> {
+    Instantiation(ScalingRatio, ExtendedDomainSize, QueryPoint<F>),
+    Opening(DomainSize, QueryPoint<F>),
+}
+
+impl<F: PrimeField> QueryPoint<F> {
+    pub fn replace_omega(&mut self, new_row: usize) {
+        match self {
+            Self::Omega(row) => {
+                let _ = std::mem::replace(row, new_row);
+            }, 
+            Self::Challenge(_) => {
+                panic!("Wrong point type")
+            }
+        }
+    }
+}
+
+impl<F: PrimeField> QueryContext<F> {   
+    pub fn replace_omega(&mut self, new_row: usize) {
+        match self {
+            Self::Instantiation(_, _, point) => {
+                point.replace_omega(new_row);
+            }, 
+            Self::Opening(_, _) => {
+                panic!("Wrong context")
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::QueryPoint;
+    use ark_bls12_381::Fr as F;
+
+    #[test]
+    fn test_replace() {
+        let mut point = QueryPoint::<F>::Omega(1);
+
+        for i in 0..5 {
+            point.replace_omega(i);
+        }
+
+        println!("{:?}", point);
+    }
+}
+
+pub trait Queriable<F: PrimeField> {
+    fn query(&self, rotation: &Rotation, context: &QueryContext<F>) -> F;
+}
+
+// TODO: add shared functionalities in trait
+pub trait ConcreteOracle {}
+
 
 #[derive(PartialEq, PartialOrd, Eq, Ord, Clone)]
 pub enum OracleType {
@@ -112,6 +176,66 @@ impl<F: PrimeField> ProverConcreteOracle<F> {
 
     pub fn get_degree(&self) -> usize {
         self.poly.degree()
+    }
+}
+
+impl<F: PrimeField> Queriable<F> for ProverConcreteOracle<F> {
+    fn query(&self, rotation: &Rotation, context: &QueryContext<F>) -> F {
+        match context {
+            QueryContext::Instantiation(scaling_ratio, extended_domain_size, point) => {
+                match point {
+                    QueryPoint::Omega(row) => {
+                        if let Some(evals) = &self.evals_at_coset_of_extended_domain {
+                            if rotation.degree == 0 {
+                                return evals[*row];
+                            }
+                
+                            let eval = match &rotation.sign {
+                                Sign::Plus => evals[(row + rotation.degree * scaling_ratio) % extended_domain_size],
+                                // TODO: test negative rotations
+                                Sign::Minus => {
+                                    let index = *row as i64 - (rotation.degree * scaling_ratio) as i64;
+                                    if index >= 0 {
+                                        evals[index as usize]
+                                    } else {
+                                        let move_from_end =
+                                            (rotation.degree * scaling_ratio - row) % extended_domain_size;
+                                        evals[extended_domain_size - move_from_end]
+                                    }
+                                }
+                            };
+                            return eval;
+                        } else {
+                            // return Err(Error::ExtendedEvalsMissing);
+                            panic!("Extended Evals Missing")
+                        }
+                    }, 
+                    QueryPoint::Challenge(_) => {
+                        panic!("Can't evaluate at challenge in instantiation context");
+                    }
+                }
+            }, 
+            QueryContext::Opening(domain_size, point) => {
+                match point {
+                    QueryPoint::Omega(_) => {
+                        panic!("Can't evaluate at row_i in opening context");
+                    }, 
+                    QueryPoint::Challenge(challenge) => {
+                        let domain = GeneralEvaluationDomain::<F>::new(*domain_size).unwrap();
+                        if rotation.degree == 0 {
+                            return self.poly.evaluate(&challenge);
+                        }
+                
+                        let mut omega = domain.element(rotation.degree);
+                        if rotation.sign == Sign::Minus {
+                            omega = omega.inverse().unwrap();
+                        }
+                
+                        self.poly.evaluate(&(omega * challenge))
+                    }
+                }
+            }
+        }
     }
 }
 
