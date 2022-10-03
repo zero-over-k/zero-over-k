@@ -417,8 +417,9 @@ where
             quotient_eval += powers_of_alpha[vo_index] * vo_evaluation;
         }
 
+        let x_n = verifier_second_msg.xi.pow([srs_size as u64, 0, 0, 0]);
         let powers_of_x: Vec<F> = successors(Some(F::one()), |x_i| {
-            Some(*x_i * verifier_second_msg.xi)
+            Some(*x_i * x_n)
         })
         .take(quotient_chunks.len())
         .collect();
