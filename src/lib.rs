@@ -116,9 +116,6 @@ where
         // --------------------------------------------------------------------
         // Second round
 
-        println!("prosla prva runda");
-
-
         let prover_second_oracles = IOPforPolyIdentity::prover_second_round(
             &verifier_first_msg,
             &mut prover_state,
@@ -140,8 +137,6 @@ where
         let (verifier_second_msg, verifier_state) =
             IOPforPolyIdentity::verifier_second_round(verifier_state, &mut fs_rng);
         // --------------------------------------------------------------------
-
-        println!("ovde");
 
         // Gather prover polynomials in one vector.
         let polynomials: Vec<_> = first_oracles_labeled

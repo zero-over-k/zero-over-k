@@ -1,8 +1,8 @@
 use std::{cmp::max, collections::BTreeSet, iter::successors};
 
-use ark_ff::PrimeField;
+use ark_ff::{PrimeField, Zero};
 use ark_poly::{
-    univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, Polynomial,
+    univariate::{DensePolynomial, DenseOrSparsePolynomial}, EvaluationDomain, GeneralEvaluationDomain, Polynomial,
     UVPolynomial,
 };
 use ark_poly_commit::LabeledPolynomial;
@@ -142,6 +142,9 @@ impl<F: PrimeField> IOPforPolyIdentity<F> {
         // 2. Compute extended domain
         let extended_domain = GeneralEvaluationDomain::new(quotient_degree).unwrap();
         let scaling_ratio = extended_domain.size() / state.domain.size();
+
+        println!("scaling ratio: {}", scaling_ratio);
+        println!("ext domain: {}", extended_domain.size());
 
         // 3. Compute extended evals of each oracle
         for oracle in &mut state.witness_oracles {

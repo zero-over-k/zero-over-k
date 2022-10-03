@@ -1,7 +1,8 @@
 #[cfg(test)]
 mod test {
     use ark_bls12_381::{Fr, Bls12_381};
-    use ark_ff::Field;
+    use ark_ff::{Field, Zero};
+    use ark_poly::Polynomial;
     use ark_poly::{univariate::DensePolynomial, UVPolynomial, GeneralEvaluationDomain, EvaluationDomain};
     use ark_poly_commit::marlin_pc::MarlinKZG10;
     use ark_std::test_rng;
@@ -42,12 +43,15 @@ mod test {
         let a_evals = domain.fft(&a_poly);
         let b_evals = domain.fft(&b_poly);
 
-        let c_evals = a_evals.iter().zip(b_evals.iter()).map(|(&a, b)| {
-            a * b.inverse().unwrap()
+        let c_evals = a_evals.iter().zip(b_evals.iter()).map(|(&a, &b)| {
+            a * b
         }).collect::<Vec<_>>();
 
-
         let c_poly = DensePolynomial::from_coefficients_slice(&domain.ifft(&c_evals));
+
+        for elem in domain.elements() {
+            assert_eq!(a_poly.evaluate(&elem) * b_poly.evaluate(&elem) - c_poly.evaluate(&elem), F::zero());
+        }
 
         let a = ProverConcreteOracle {
             label: "a".to_string(),
