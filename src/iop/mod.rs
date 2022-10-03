@@ -26,7 +26,7 @@ mod test {
         concrete_oracle::OracleType,
         vo::{
             query::{Rotation, VirtualQuery},
-            GenericVO, VirtualOracle,
+            VirtualOracle,
         },
     };
     use ark_bls12_381::Fr as F;

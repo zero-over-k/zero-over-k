@@ -7,7 +7,7 @@ use ark_ff::{Field, PrimeField};
 
 use crate::concrete_oracle::{ProverConcreteOracle, QueryContext};
 
-use super::query::{InstanceQuery, WitnessQuery};
+use super::query::{InstanceQuery, Query, WitnessQuery};
 
 #[derive(Clone)]
 pub enum Expression<F> {
@@ -165,6 +165,18 @@ impl<F: Field> Mul<F> for Expression<F> {
     }
 }
 
+impl<F: Field> From<WitnessQuery> for Expression<F> {
+    fn from(query: WitnessQuery) -> Self {
+        Self::Witness(query)
+    }
+}
+
+impl<F: Field> From<InstanceQuery> for Expression<F> {
+    fn from(query: InstanceQuery) -> Self {
+        Self::Instance(query)
+    }
+}
+
 #[cfg(test)]
 mod test {
     use crate::{
@@ -265,35 +277,5 @@ mod test {
         let i2 = Expression::<F>::Instance(instance_queries[1].clone());
 
         let expr = (w1 + w2) * w3 - (i1 * i2);
-
-        // assert_eq!(expr.degree(&wtns_oracles, &instance_oracles), 20);
-
-        // let poly_by_hand = &(&(o1.poly.clone() + o2.poly.clone()) * &o3.poly) - &(&o4.poly * &o5.poly);
-
-        // let constant_fn = |a: F| DensePolynomial::<F>::from_coefficients_slice(&[a]);
-        // let wtns_fn = |q: &WitnessQuery, oracles: &[&ProverConcreteOracle<F>]| {
-        //     oracles[q.get_index()].poly.clone()
-        // };
-        // let instance_fn = |q: &InstanceQuery, oracles: &[&ProverConcreteOracle<F>]| {
-        //     oracles[q.get_index()].poly.clone()
-        // };
-        // let negated_fn = |p: DensePolynomial<F>| -p;
-        // let sum_fn = |a: DensePolynomial<F>, b: DensePolynomial<F>| a + b;
-        // let product_fn = |a: DensePolynomial<F>, b: DensePolynomial<F>| &a * &b;
-        // let scaled_fn = |p: DensePolynomial<F>, x: F| &p * x;
-
-        // let eval_poly = expr.evaluate::<DensePolynomial<F>>(
-        //     &wtns_oracles,
-        //     &instance_oracles,
-        //     &constant_fn,
-        //     &wtns_fn,
-        //     &instance_fn,
-        //     &negated_fn,
-        //     &sum_fn,
-        //     &product_fn,
-        //     &scaled_fn
-        // );
-
-        // assert_eq!(poly_by_hand, eval_poly);
     }
 }

@@ -194,7 +194,7 @@ impl<F: PrimeField> Queriable<F> for ProverConcreteOracle<F> {
     }
 }
 
-impl<F: PrimeField> QuerySetProvider<F> for ProverConcreteOracle<F> {
+impl<F: PrimeField> QuerySetProvider<F> for &ProverConcreteOracle<F> {
     fn get_query_set(
         &self,
         opening_challenge_label: &str,

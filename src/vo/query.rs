@@ -1,12 +1,12 @@
 use crate::concrete_oracle::OracleType;
 
-#[derive(PartialEq, PartialOrd, Eq, Ord, Clone)]
+#[derive(PartialEq, PartialOrd, Eq, Ord, Clone, Copy)]
 pub enum Sign {
     Plus,
     Minus,
 }
 /// Rotation can be positive or negative for an arbitrary degree
-#[derive(PartialEq, PartialOrd, Eq, Ord, Clone)]
+#[derive(PartialEq, PartialOrd, Eq, Ord, Clone, Copy)]
 pub struct Rotation {
     pub(crate) degree: usize,
     pub(crate) sign: Sign,
@@ -66,7 +66,7 @@ pub trait Query {
 }
 
 /// Witness query is concrete query of an witness oracle given the assignment
-#[derive(PartialEq, PartialOrd, Eq, Ord, Clone)]
+#[derive(PartialEq, PartialOrd, Eq, Ord, Clone, Copy)]
 pub struct WitnessQuery {
     pub(crate) index: usize,
     pub(crate) rotation: Rotation,
@@ -93,7 +93,7 @@ impl Query for WitnessQuery {
 }
 
 /// Instance query is concrete query of an instance oracle given the assignment
-#[derive(PartialEq, PartialOrd, Eq, Ord, Clone)]
+#[derive(PartialEq, PartialOrd, Eq, Ord, Clone, Copy)]
 pub struct InstanceQuery {
     pub(crate) index: usize,
     pub(crate) rotation: Rotation,

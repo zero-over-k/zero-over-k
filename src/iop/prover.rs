@@ -13,30 +13,10 @@ use crate::{
     iop::error::Error,
     iop::{verifier::VerifierFirstMsg, IOPforPolyIdentity},
     vo::{
-        query::{InstanceQuery, Query, WitnessQuery},
+        query::{InstanceQuery, Query, Rotation, WitnessQuery},
         VirtualOracle,
     },
 };
-
-pub struct ProverFirstOracles<F: PrimeField> {
-    pub labeled_witness_oracles: Vec<LabeledPolynomial<F, DensePolynomial<F>>>,
-}
-
-impl<F: PrimeField> ProverFirstOracles<F> {
-    pub fn iter(&self) -> impl Iterator<Item = &LabeledPolynomial<F, DensePolynomial<F>>> {
-        self.labeled_witness_oracles.iter()
-    }
-}
-
-pub struct ProverSecondOracles<F: PrimeField> {
-    pub quotient_chunks: Vec<LabeledPolynomial<F, DensePolynomial<F>>>,
-}
-
-impl<F: PrimeField> ProverSecondOracles<F> {
-    pub fn iter(&self) -> impl Iterator<Item = &LabeledPolynomial<F, DensePolynomial<F>>> {
-        self.quotient_chunks.iter()
-    }
-}
 
 // Note: To keep flexible vanishing polynomial should not be strictly domain.vanishing_polynomial
 // For example consider https://hackmd.io/1DaroFVfQwySwZPHMoMdBg?view where we remove some roots from Zh
@@ -48,14 +28,41 @@ pub struct ProverState<'a, F: PrimeField> {
     pub(crate) vos: &'a Vec<Box<dyn VirtualOracle<F>>>,
     pub(crate) domain: GeneralEvaluationDomain<F>,
     pub(crate) vanishing_polynomial: DensePolynomial<F>,
-    pub(crate) quotient_chunks: Option<Vec<DensePolynomial<F>>>,
 }
 
 impl<F: PrimeField> IOPforPolyIdentity<F> {
+    // NOTE: consider having indexed concrete oracles by initializing evals_at_coset_of_extended_domain (ex. selector polynomials)
+    pub fn init_prover<'a>(
+        concrete_oracles: &[ProverConcreteOracle<F>],
+        vos: &'a Vec<Box<dyn VirtualOracle<F>>>,
+        domain_size: usize,
+        vanishing_polynomial: &DensePolynomial<F>,
+    ) -> ProverState<'a, F> {
+        let mut witness_oracles = vec![];
+        let mut instance_oracles = vec![];
+
+        // TODO: consider keeping pointers to oracle in state
+        for oracle in concrete_oracles {
+            match oracle.oracle_type {
+                OracleType::Witness => witness_oracles.push(oracle.clone()), 
+                OracleType::Instance => instance_oracles.push(oracle.clone())
+            }
+        }
+
+        let domain = GeneralEvaluationDomain::new(domain_size).unwrap();
+
+        ProverState {
+            witness_oracles: witness_oracles.clone(),
+            instance_oracles: instance_oracles.clone(),
+            vos: vos,
+            domain,
+            vanishing_polynomial: vanishing_polynomial.clone(),
+        }
+    }
     pub fn prover_first_round<'a, R: Rng>(
         state: &'a mut ProverState<F>,
         rng: &mut R,
-    ) -> Result<ProverFirstOracles<F>, Error> {
+    ) -> Result<Vec<ProverConcreteOracle<F>>, Error> {
         // 1. Get all different witness queries
         let wtns_queries: BTreeSet<WitnessQuery> = state
             .vos
@@ -101,22 +108,14 @@ impl<F: PrimeField> IOPforPolyIdentity<F> {
             oracle.mask(&state.vanishing_polynomial, rng);
         }
 
-        let prover_first_oracles = ProverFirstOracles {
-            labeled_witness_oracles: state
-                .witness_oracles
-                .iter()
-                .map(|oracle| oracle.to_labeled())
-                .collect(),
-        };
-
-        Ok(prover_first_oracles)
+        Ok(state.witness_oracles.clone())
     }
 
     pub fn prover_second_round(
         verifier_msg: &VerifierFirstMsg<F>,
         state: &mut ProverState<F>,
         srs_size: usize,
-    ) -> Result<ProverSecondOracles<F>, Error> {
+    ) -> Result<Vec<ProverConcreteOracle<F>>, Error> {
         let wnts_get_degree_fn = |query: &WitnessQuery| {
             let oracle = &state.witness_oracles[query.get_index()];
             oracle.get_degree()
@@ -200,24 +199,35 @@ impl<F: PrimeField> IOPforPolyIdentity<F> {
         let quotient =
             DensePolynomial::from_coefficients_slice(&extended_domain.coset_ifft(&quotient_evals));
 
-        let quotient_chunks: Vec<DensePolynomial<F>> = quotient
+        let quotient_chunks: Vec<ProverConcreteOracle<F>> = quotient
             .coeffs
             .chunks(srs_size)
-            .map(|chunk| DensePolynomial::from_coefficients_slice(chunk))
+            .enumerate()
+            .map(|(i, chunk)| {
+                let poly = DensePolynomial::from_coefficients_slice(chunk);
+                ProverConcreteOracle {
+                    label: format!("t_{}", i).to_string(),
+                    poly,
+                    evals_at_coset_of_extended_domain: None,
+                    oracle_type: OracleType::Witness,
+                    queried_rotations: vec![Rotation::curr()],
+                    should_mask: false,
+                }
+            })
             .collect();
 
-        state.quotient_chunks = Some(quotient_chunks.clone());
+        // state.quotient_chunks = Some(quotient_chunks.clone());
 
-        let prover_second_oracles = ProverSecondOracles {
-            quotient_chunks: quotient_chunks
-                .iter()
-                .enumerate()
-                .map(|(i, chunk)| {
-                    LabeledPolynomial::new(format!("t_{}", i), chunk.clone(), None, None)
-                })
-                .collect(),
-        };
+        // let prover_second_oracles = ProverSecondOracles {
+        //     quotient_chunks: quotient_chunks
+        //         .iter()
+        //         .enumerate()
+        //         .map(|(i, chunk)| {
+        //             LabeledPolynomial::new(format!("t_{}", i), chunk.clone(), None, None)
+        //         })
+        //         .collect(),
+        // };
 
-        Ok(prover_second_oracles)
+        Ok(quotient_chunks)
     }
 }

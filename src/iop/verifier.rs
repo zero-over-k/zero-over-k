@@ -69,8 +69,8 @@ impl<F: PrimeField> IOPforPolyIdentity<F> {
     /// Gets query set for batch poly commit
     pub fn get_query_set<'a>(
         state: &VerifierState<'a, F>,
-        queried_oracles: &Vec<impl QuerySetProvider<F>>,
-    ) {
+        queried_oracles: impl Iterator<Item = impl QuerySetProvider<F>>,
+    ) -> QuerySet<F> {
         let VerifierSecondMsg { xi, label } = state
             .second_round_msg
             .expect("State should include second round message when building query set");
@@ -79,5 +79,7 @@ impl<F: PrimeField> IOPforPolyIdentity<F> {
         for queried_oracle in queried_oracles {
             query_set.extend(queried_oracle.get_query_set(label, xi, state.domain.size()));
         }
+
+        query_set
     }
 }
