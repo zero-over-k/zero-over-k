@@ -1,3 +1,5 @@
+use std::{collections::{BTreeSet, BTreeMap}, marker::PhantomData};
+
 use crate::{
     error::Error,
     vo::query::{Rotation, Sign},
@@ -99,7 +101,7 @@ pub struct ProverConcreteOracle<F: PrimeField> {
     pub(crate) poly: DensePolynomial<F>,
     pub(crate) evals_at_coset_of_extended_domain: Option<Vec<F>>,
     pub(crate) oracle_type: OracleType,
-    pub(crate) queried_rotations: Vec<Rotation>,
+    pub(crate) queried_rotations: BTreeSet<Rotation>,
     pub(crate) should_mask: bool,
 }
 
@@ -115,7 +117,7 @@ impl<F: PrimeField> ProverConcreteOracle<F> {
 
     pub fn register_rotation(&mut self, rotation: Rotation) {
         // TOTO: maybe we should check for rotation uniqueness also here
-        self.queried_rotations.push(rotation);
+        self.queried_rotations.insert(rotation);
     }
 
     pub fn compute_extended_evals(&mut self, extended_domain: GeneralEvaluationDomain<F>) {
@@ -214,13 +216,13 @@ impl<F: PrimeField> QuerySetProvider<F> for &ProverConcreteOracle<F> {
                     Sign::Plus => {
                         let omega = domain.element(rotation.degree);
                         let point_label =
-                            format!("omega^{}_{}", rotation.degree, opening_challenge_label);
+                            format!("omega_{}_{}", rotation.degree, opening_challenge_label);
                         (omega, point_label)
                     }
                     Sign::Minus => {
                         let omega = domain.element(rotation.degree).inverse().unwrap();
                         let point_label =
-                            format!("omega^(-{})_{}", rotation.degree, opening_challenge_label);
+                            format!("omega_-{}_{}", rotation.degree, opening_challenge_label);
                         (omega, point_label)
                     }
                 };
@@ -229,6 +231,124 @@ impl<F: PrimeField> QuerySetProvider<F> for &ProverConcreteOracle<F> {
                 query_set.insert((self.label.clone(), (point_label, point)));
             }
         }
+        query_set
+    }
+}
+
+pub struct VerifierConcreteOracle<F: PrimeField> {
+    pub(crate) label: String,
+    pub(crate) queried_rotations: BTreeSet<Rotation>,
+    pub(crate) should_mask: bool,
+    pub(crate) eval_at_rotation: BTreeMap<F, Rotation>,
+    pub(crate) evals_at_challenges: BTreeMap<F, F>,
+}
+
+impl<F: PrimeField> VerifierConcreteOracle<F> {
+    pub fn new(label: String, should_mask: bool) -> Self {
+        Self {
+            label,
+            should_mask,
+            queried_rotations: BTreeSet::new(),
+            eval_at_rotation: BTreeMap::new(),
+            evals_at_challenges: BTreeMap::new(),
+        }
+    }
+
+    pub fn register_rotation(&mut self, rotation: Rotation) {
+        self.queried_rotations.insert(rotation);
+    }
+
+    // TODO: probably remove
+    pub fn register_eval_at_rotation(&mut self, eval: F, rotation: Rotation) {
+        let prev_rotation = self.eval_at_rotation.insert(eval, rotation);
+        if !prev_rotation.is_none() {
+            panic!("Same eval already registered for rotation {:?}", prev_rotation);
+        }
+    }
+
+    pub fn register_eval_at_challenge(&mut self, challenge: F, eval: F) {
+        let prev_eval = self.evals_at_challenges.insert(challenge, eval);
+        if !prev_eval.is_none() {
+            panic!("Same eval already registered for challenge {}", challenge);
+        }
+    }
+
+    pub fn get_degree(&self, domain_size: usize) -> usize {
+        if self.should_mask {
+            domain_size + self.queried_rotations.len()
+        } else {
+            domain_size - 1
+        }
+    }
+}
+
+impl<F: PrimeField> Queriable<F> for VerifierConcreteOracle<F> {
+    fn query(&self, rotation: &Rotation, context: &QueryContext<F>) -> F {
+        match context {
+            QueryContext::Instantiation(_, _, _) => {
+                panic!("Can't evaluate verifier oracle in instantiation challenge")
+            }
+            QueryContext::Opening(domain_size, point) => match point {
+                QueryPoint::Omega(_) => {
+                    panic!("Can't evaluate at row_i in opening context");
+                }
+                QueryPoint::Challenge(opening_challenge) => {
+                    let domain = GeneralEvaluationDomain::<F>::new(*domain_size).unwrap();
+
+                    let mut omega = domain.element(rotation.degree);
+                    if rotation.sign == Sign::Minus {
+                        omega = omega.inverse().unwrap();
+                    }
+
+                    let challenge = omega * opening_challenge;
+
+                    match self.evals_at_challenges.get(&challenge) {
+                        Some(eval) => *eval, 
+                        None => panic!("No eval at challenge: {} of oracle {}", challenge, self.label)
+                    }
+                }
+            },
+        }
+    }
+}
+
+impl<F: PrimeField> QuerySetProvider<F> for &VerifierConcreteOracle<F> {
+    fn get_query_set(
+        &self,
+        opening_challenge_label: &str,
+        opening_challenge: F,
+        domain_size: usize,
+    ) -> QuerySet<F> {
+        let mut query_set = QuerySet::new();
+
+        for rotation in &self.queried_rotations {
+            if rotation.degree == 0 {
+                query_set.insert((
+                    self.label.clone(),
+                    (opening_challenge_label.into(), opening_challenge),
+                ));
+            } else {
+                let domain = GeneralEvaluationDomain::<F>::new(domain_size).unwrap();
+                let (omega, point_label) = match &rotation.sign {
+                    Sign::Plus => {
+                        let omega = domain.element(rotation.degree);
+                        let point_label =
+                            format!("omega_{}_{}", rotation.degree, opening_challenge_label);
+                        (omega, point_label)
+                    }
+                    Sign::Minus => {
+                        let omega = domain.element(rotation.degree).inverse().unwrap();
+                        let point_label =
+                            format!("omega_-{}_{}", rotation.degree, opening_challenge_label);
+                        (omega, point_label)
+                    }
+                };
+
+                let point = omega * opening_challenge;
+                query_set.insert((self.label.clone(), (point_label, point)));
+            }
+        }
+
         query_set
     }
 }

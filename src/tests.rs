@@ -1,20 +1,28 @@
 #[cfg(test)]
 mod test {
-    use ark_bls12_381::{Fr, Bls12_381};
+    use std::collections::BTreeSet;
+
+    use ark_bls12_381::{Bls12_381, Fr};
     use ark_ff::{Field, Zero};
     use ark_poly::Polynomial;
-    use ark_poly::{univariate::DensePolynomial, UVPolynomial, GeneralEvaluationDomain, EvaluationDomain};
+    use ark_poly::{
+        univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, UVPolynomial,
+    };
     use ark_poly_commit::marlin_pc::MarlinKZG10;
+    use ark_poly_commit::PCCommitterKey;
     use ark_std::test_rng;
     use rand_chacha::ChaChaRng;
-    use ark_poly_commit::PCCommitterKey;
 
-    use blake2::Blake2s;
-    use crate::PIL;
+    use crate::concrete_oracle::VerifierConcreteOracle;
     use crate::rng::{FiatShamirRng, SimpleHashFiatShamirRng};
+    use crate::PIL;
+    use blake2::Blake2s;
 
     use crate::vo::VirtualOracle;
-    use crate::{concrete_oracle::{ProverConcreteOracle, OracleType}, vo::{precompiled::mul::MulVO}};
+    use crate::{
+        concrete_oracle::{OracleType, ProverConcreteOracle},
+        vo::precompiled::mul::MulVO,
+    };
 
     type F = Fr;
     type FS = SimpleHashFiatShamirRng<Blake2s, ChaChaRng>;
@@ -22,11 +30,9 @@ mod test {
 
     type PilInstance = PIL<F, PC, FS>;
 
-    // TODO: make sure to test quotient splitting
-
     #[test]
     fn test_simple_mul() {
-        let max_degree = 30;
+        let max_degree = 17;
         let mut rng = test_rng();
 
         let srs = PilInstance::universal_setup(max_degree, &mut rng).unwrap();
@@ -43,14 +49,19 @@ mod test {
         let a_evals = domain.fft(&a_poly);
         let b_evals = domain.fft(&b_poly);
 
-        let c_evals = a_evals.iter().zip(b_evals.iter()).map(|(&a, &b)| {
-            a * b
-        }).collect::<Vec<_>>();
+        let c_evals = a_evals
+            .iter()
+            .zip(b_evals.iter())
+            .map(|(&a, &b)| a * b)
+            .collect::<Vec<_>>();
 
         let c_poly = DensePolynomial::from_coefficients_slice(&domain.ifft(&c_evals));
 
         for elem in domain.elements() {
-            assert_eq!(a_poly.evaluate(&elem) * b_poly.evaluate(&elem) - c_poly.evaluate(&elem), F::zero());
+            assert_eq!(
+                a_poly.evaluate(&elem) * b_poly.evaluate(&elem) - c_poly.evaluate(&elem),
+                F::zero()
+            );
         }
 
         let a = ProverConcreteOracle {
@@ -58,8 +69,8 @@ mod test {
             poly: a_poly,
             evals_at_coset_of_extended_domain: None,
             oracle_type: OracleType::Witness,
-            queried_rotations: vec![],
-            should_mask: false,
+            queried_rotations: BTreeSet::new(),
+            should_mask: true,
         };
 
         let b = ProverConcreteOracle {
@@ -67,8 +78,8 @@ mod test {
             poly: b_poly,
             evals_at_coset_of_extended_domain: None,
             oracle_type: OracleType::Witness,
-            queried_rotations: vec![],
-            should_mask: false,
+            queried_rotations: BTreeSet::new(),
+            should_mask: true,
         };
 
         let c = ProverConcreteOracle {
@@ -76,18 +87,30 @@ mod test {
             poly: c_poly,
             evals_at_coset_of_extended_domain: None,
             oracle_type: OracleType::Instance,
-            queried_rotations: vec![],
+            queried_rotations: BTreeSet::new(),
             should_mask: false,
         };
 
         let mut mul_vo = MulVO::<F>::new();
         mul_vo.configure(&[0, 1], &[0]);
 
-        let concrete_oracles = [a, b, c];
+        let concrete_oracles = [a, b, c.clone()];
 
         let vos: Vec<Box<dyn VirtualOracle<F>>> = vec![Box::new(mul_vo)];
 
-        let _ = PilInstance::prove(&pk, &concrete_oracles, &vos, domain_size, &domain.vanishing_polynomial().into(), &mut rng).unwrap();
+        let proof = PilInstance::prove(
+            &pk,
+            &concrete_oracles,
+            &vos,
+            domain_size,
+            &domain.vanishing_polynomial().into(),
+            &mut rng,
+        )
+        .unwrap();
 
+        let a_verifier = VerifierConcreteOracle::new("a".to_string(), true);
+        let b_verifier = VerifierConcreteOracle::new("b".to_string(), true);
+
+        let _ = PilInstance::verify(&vk, proof, &mut [a_verifier, b_verifier], &mut [c], &vos, domain_size, &domain.vanishing_polynomial().into(), pk.committer_key.max_degree(), &mut rng).unwrap();
     }
 }

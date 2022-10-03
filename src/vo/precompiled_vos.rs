@@ -2,7 +2,11 @@ use ark_ff::PrimeField;
 
 use crate::concrete_oracle::OracleType;
 
-use super::{query::{VirtualQuery, WitnessQuery, InstanceQuery}, expression::Expression, VirtualOracle};
+use super::{
+    expression::Expression,
+    query::{InstanceQuery, VirtualQuery, WitnessQuery},
+    VirtualOracle,
+};
 
 pub struct MulVO<F: PrimeField> {
     virtual_queries: [VirtualQuery; 3],
@@ -25,7 +29,7 @@ impl<F: PrimeField> MulVO<F> {
         }
     }
 
-    // TODO: consider abstracting 
+    // TODO: consider abstracting
     pub fn configure(&mut self, witness_indices: Vec<usize>, instance_indices: Vec<usize>) {
         self.witness_indices = Some(vec![]);
         self.instance_indices = Some(vec![]);

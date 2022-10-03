@@ -2,8 +2,8 @@ use std::{cmp::max, collections::BTreeSet, iter::successors};
 
 use ark_ff::{PrimeField, Zero};
 use ark_poly::{
-    univariate::{DensePolynomial, DenseOrSparsePolynomial}, EvaluationDomain, GeneralEvaluationDomain, Polynomial,
-    UVPolynomial,
+    univariate::{DenseOrSparsePolynomial, DensePolynomial},
+    EvaluationDomain, GeneralEvaluationDomain, Polynomial, UVPolynomial,
 };
 use ark_poly_commit::LabeledPolynomial;
 use ark_std::rand::Rng;
@@ -44,8 +44,8 @@ impl<F: PrimeField> IOPforPolyIdentity<F> {
         // TODO: consider keeping pointers to oracle in state
         for oracle in concrete_oracles {
             match oracle.oracle_type {
-                OracleType::Witness => witness_oracles.push(oracle.clone()), 
-                OracleType::Instance => instance_oracles.push(oracle.clone())
+                OracleType::Witness => witness_oracles.push(oracle.clone()),
+                OracleType::Instance => instance_oracles.push(oracle.clone()),
             }
         }
 
@@ -136,15 +136,14 @@ impl<F: PrimeField> IOPforPolyIdentity<F> {
         }
 
         let quotient_degree = max_degree - state.vanishing_polynomial.degree();
-        println!("quotient_degree {}", quotient_degree);
-
+        // println!("quotient_degree {}", quotient_degree);
 
         // 2. Compute extended domain
         let extended_domain = GeneralEvaluationDomain::new(quotient_degree).unwrap();
         let scaling_ratio = extended_domain.size() / state.domain.size();
 
-        println!("scaling ratio: {}", scaling_ratio);
-        println!("ext domain: {}", extended_domain.size());
+        // println!("scaling ratio: {}", scaling_ratio);
+        // println!("ext domain: {}", extended_domain.size());
 
         // 3. Compute extended evals of each oracle
         for oracle in &mut state.witness_oracles {
@@ -211,27 +210,15 @@ impl<F: PrimeField> IOPforPolyIdentity<F> {
             .map(|(i, chunk)| {
                 let poly = DensePolynomial::from_coefficients_slice(chunk);
                 ProverConcreteOracle {
-                    label: format!("t_{}", i).to_string(),
+                    label: format!("quotient_chunk_{}", i).to_string(),
                     poly,
                     evals_at_coset_of_extended_domain: None,
                     oracle_type: OracleType::Witness,
-                    queried_rotations: vec![Rotation::curr()],
+                    queried_rotations: BTreeSet::from([Rotation::curr()]),
                     should_mask: false,
                 }
             })
             .collect();
-
-        // state.quotient_chunks = Some(quotient_chunks.clone());
-
-        // let prover_second_oracles = ProverSecondOracles {
-        //     quotient_chunks: quotient_chunks
-        //         .iter()
-        //         .enumerate()
-        //         .map(|(i, chunk)| {
-        //             LabeledPolynomial::new(format!("t_{}", i), chunk.clone(), None, None)
-        //         })
-        //         .collect(),
-        // };
 
         Ok(quotient_chunks)
     }

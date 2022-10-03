@@ -9,6 +9,8 @@ pub enum Error<E> {
     IOPError(IOPError),
     /// There was an error in the underlying polynomial commitment.
     PolynomialCommitmentError(E),
+    /// Prover sent commitments to more chunks of quotient than needed
+    TooManyChunks
 }
 
 impl<E> From<IOPError> for Error<E> {

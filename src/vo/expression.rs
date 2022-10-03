@@ -179,6 +179,8 @@ impl<F: Field> From<InstanceQuery> for Expression<F> {
 
 #[cfg(test)]
 mod test {
+    use std::collections::BTreeSet;
+
     use crate::{
         concrete_oracle::{OracleType, ProverConcreteOracle},
         vo::query::{InstanceQuery, Query, Rotation, WitnessQuery},
@@ -198,7 +200,7 @@ mod test {
             poly: DensePolynomial::<F>::rand(10, &mut rng),
             evals_at_coset_of_extended_domain: None,
             oracle_type: OracleType::Witness,
-            queried_rotations: vec![],
+            queried_rotations: BTreeSet::new(),
             should_mask: false,
         };
 
@@ -207,7 +209,7 @@ mod test {
             poly: DensePolynomial::<F>::rand(10, &mut rng),
             evals_at_coset_of_extended_domain: None,
             oracle_type: OracleType::Witness,
-            queried_rotations: vec![],
+            queried_rotations: BTreeSet::new(),
             should_mask: false,
         };
 
@@ -216,7 +218,7 @@ mod test {
             poly: DensePolynomial::<F>::rand(10, &mut rng),
             evals_at_coset_of_extended_domain: None,
             oracle_type: OracleType::Witness,
-            queried_rotations: vec![],
+            queried_rotations: BTreeSet::new(),
             should_mask: false,
         };
 
@@ -225,7 +227,7 @@ mod test {
             poly: DensePolynomial::<F>::rand(10, &mut rng),
             evals_at_coset_of_extended_domain: None,
             oracle_type: OracleType::Instance,
-            queried_rotations: vec![],
+            queried_rotations: BTreeSet::new(),
             should_mask: false,
         };
 
@@ -234,7 +236,7 @@ mod test {
             poly: DensePolynomial::<F>::rand(10, &mut rng),
             evals_at_coset_of_extended_domain: None,
             oracle_type: OracleType::Instance,
-            queried_rotations: vec![],
+            queried_rotations: BTreeSet::new(),
             should_mask: false,
         };
 

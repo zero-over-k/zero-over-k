@@ -5,9 +5,10 @@ use crate::concrete_oracle::OracleType;
 
 use self::{expression::Expression, query::VirtualQuery};
 pub mod expression;
-pub mod query;
-pub mod precompiled_vos;
 pub mod precompiled;
+pub mod precompiled_vos;
+pub mod query;
+pub mod error;
 
 // Note: VirtualOracle trait is very lightweight such that different use-cases
 // can be built on top of this prover

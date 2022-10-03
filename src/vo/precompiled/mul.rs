@@ -1,7 +1,13 @@
 use ark_ff::PrimeField;
 
-use crate::{concrete_oracle::OracleType, vo::{query::{VirtualQuery, WitnessQuery, InstanceQuery, Rotation}, expression::Expression, VirtualOracle}};
-
+use crate::{
+    concrete_oracle::OracleType,
+    vo::{
+        expression::Expression,
+        query::{InstanceQuery, Rotation, VirtualQuery, WitnessQuery},
+        VirtualOracle,
+    },
+};
 
 pub struct MulVO<F: PrimeField> {
     virtual_queries: [VirtualQuery; 3],
@@ -31,9 +37,7 @@ impl<F: PrimeField> MulVO<F> {
             rotation: Rotation::curr(),
             oracle_type: OracleType::Instance,
         };
-        let virtual_queries = [
-            q1, q2, q3
-        ];
+        let virtual_queries = [q1, q2, q3];
 
         Self {
             virtual_queries,
@@ -45,7 +49,7 @@ impl<F: PrimeField> MulVO<F> {
         }
     }
 
-    // TODO: consider abstracting 
+    // TODO: consider abstracting
     pub fn configure(&mut self, witness_indices: &[usize; 2], instance_indices: &[usize; 1]) {
         self.witness_indices = Some(vec![]);
         self.instance_indices = Some(vec![]);

@@ -1,12 +1,13 @@
 use crate::concrete_oracle::OracleType;
+use crate::vo::error::Error;
 
-#[derive(PartialEq, PartialOrd, Eq, Ord, Clone, Copy)]
+#[derive(PartialEq, PartialOrd, Eq, Ord, Clone, Copy, Debug)]
 pub enum Sign {
     Plus,
     Minus,
 }
 /// Rotation can be positive or negative for an arbitrary degree
-#[derive(PartialEq, PartialOrd, Eq, Ord, Clone, Copy)]
+#[derive(PartialEq, PartialOrd, Eq, Ord, Clone, Copy, Debug)]
 pub struct Rotation {
     pub(crate) degree: usize,
     pub(crate) sign: Sign,
@@ -36,6 +37,43 @@ impl Rotation {
         Self {
             degree: 1,
             sign: Sign::Minus,
+        }
+    }
+
+    pub fn from_point_label(point_label: &String, opening_challenge_label: &String) -> Result<Self, Error> {
+        let tokens = point_label.split("_").collect::<Vec<&str>>();
+
+        if tokens.len() == 1 {
+            if tokens[0] == opening_challenge_label {
+                return Ok(Rotation::curr())
+            } else {
+                return Err(Error::PointLabelError(point_label.clone()))
+            }
+        } else if tokens.len() == 3 {
+            if tokens[0] != String::from("omega") {
+                return Err(Error::PointLabelError(point_label.clone()));
+            }
+            if tokens[2] != opening_challenge_label {
+                return Err(Error::PointLabelError(point_label.clone()));
+            }
+
+            let degree = i32::from_str_radix(tokens[1], 10).map_err(Error::from_parse_int_error)?;
+
+            let rotation = if degree > 0 {
+                Rotation {
+                    degree: degree as usize, 
+                    sign: Sign::Plus
+                }
+            } else {
+                Rotation {
+                    degree: (-1 * degree) as usize, 
+                    sign: Sign::Minus
+                }
+            };
+
+            return Ok(rotation)
+        } else {
+            return Err(Error::PointLabelError(point_label.clone()))
         }
     }
 }
@@ -118,3 +156,49 @@ impl Query for InstanceQuery {
         self.rotation.clone()
     }
 }
+
+#[cfg(test)]
+mod test {
+    use crate::vo::query::Sign;
+
+    use super::Rotation;
+
+    #[test]
+    fn test_no_rotation() {
+        let opening_challenge_label = String::from("xi");
+        let point_label = String::from("xi");
+
+        let rotation = Rotation::from_point_label(&point_label, &opening_challenge_label).unwrap();
+        assert_eq!(rotation, Rotation::curr());
+    }
+
+    #[test]
+    fn test_positive_rotation() {
+        let opening_challenge_label = String::from("xi");
+        let point_label = String::from("omega_5_xi");
+
+        let rotation = Rotation::from_point_label(&point_label, &opening_challenge_label).unwrap();
+        assert_eq!(rotation, Rotation {
+            degree: 5, 
+            sign: Sign::Plus
+        });
+    }
+
+    #[test]
+    fn test_negative_rotation() {
+        let opening_challenge_label = String::from("xi");
+        let point_label = String::from("omega_-5_xi");
+
+        let rotation = Rotation::from_point_label(&point_label, &opening_challenge_label).unwrap();
+        assert_eq!(rotation, Rotation {
+            degree: 5, 
+            sign: Sign::Minus
+        });
+    }
+}
+
+// #[cfg(test)] {
+//     mod test {
+
+//     }
+// }
