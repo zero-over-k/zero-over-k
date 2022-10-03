@@ -32,7 +32,7 @@ mod test {
 
     #[test]
     fn test_simple_mul() {
-        let max_degree = 17;
+        let max_degree = 30;
         let mut rng = test_rng();
 
         let srs = PilInstance::universal_setup(max_degree, &mut rng).unwrap();

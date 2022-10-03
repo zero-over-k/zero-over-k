@@ -429,9 +429,13 @@ where
             t_part += x_i * t_i.query(&Rotation::curr(), &query_context);
         }
 
-        quotient_eval -= t_part;
-        // assert_eq!(quotient_eval, F::zero());
+        t_part *= vanishing_polynomial.evaluate(&verifier_second_msg.xi);
 
+        quotient_eval -= t_part;
+        
+        if quotient_eval != F::zero() {
+            return Err(Error::QuotientNotZero)
+        }
 
         Ok(())
     }
