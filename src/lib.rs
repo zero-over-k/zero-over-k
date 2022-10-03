@@ -5,6 +5,7 @@ use ark_ff::{to_bytes, PrimeField, UniformRand};
 use ark_poly::{univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain};
 use ark_poly_commit::LabeledPolynomial;
 use ark_poly_commit::PCCommitterKey;
+use ark_poly_commit::PCUniversalParams;
 use ark_poly_commit::PolynomialCommitment;
 use ark_std::rand::Rng;
 use ark_std::rand::RngCore;
@@ -53,7 +54,7 @@ where
         // keep all params simple for now
         let (committer_key, verifier_key) = PC::trim(
             &srs,
-            0,
+            srs.max_degree(),
             0,
             None,
         )
@@ -115,10 +116,13 @@ where
         // --------------------------------------------------------------------
         // Second round
 
+        println!("prosla prva runda");
+
+
         let prover_second_oracles = IOPforPolyIdentity::prover_second_round(
             &verifier_first_msg,
             &mut prover_state,
-            pk.committer_key.supported_degree(),
+            pk.committer_key.max_degree(),
         )?;
 
         let second_oracles_labeled: Vec<LabeledPolynomial<F, DensePolynomial<F>>> =
@@ -136,6 +140,8 @@ where
         let (verifier_second_msg, verifier_state) =
             IOPforPolyIdentity::verifier_second_round(verifier_state, &mut fs_rng);
         // --------------------------------------------------------------------
+
+        println!("ovde");
 
         // Gather prover polynomials in one vector.
         let polynomials: Vec<_> = first_oracles_labeled

@@ -136,6 +136,8 @@ impl<F: PrimeField> IOPforPolyIdentity<F> {
         }
 
         let quotient_degree = max_degree - state.vanishing_polynomial.degree();
+        println!("quotient_degree {}", quotient_degree);
+
 
         // 2. Compute extended domain
         let extended_domain = GeneralEvaluationDomain::new(quotient_degree).unwrap();

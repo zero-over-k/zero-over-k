@@ -6,11 +6,13 @@ mod test {
     use ark_poly_commit::marlin_pc::MarlinKZG10;
     use ark_std::test_rng;
     use rand_chacha::ChaChaRng;
+    use ark_poly_commit::PCCommitterKey;
 
     use blake2::Blake2s;
     use crate::PIL;
     use crate::rng::{FiatShamirRng, SimpleHashFiatShamirRng};
 
+    use crate::vo::VirtualOracle;
     use crate::{concrete_oracle::{ProverConcreteOracle, OracleType}, vo::{precompiled::mul::MulVO}};
 
     type F = Fr;
@@ -19,10 +21,11 @@ mod test {
 
     type PilInstance = PIL<F, PC, FS>;
 
+    // TODO: make sure to test quotient splitting
 
     #[test]
     fn test_simple_mul() {
-        let max_degree = 50;
+        let max_degree = 30;
         let mut rng = test_rng();
 
         let srs = PilInstance::universal_setup(max_degree, &mut rng).unwrap();
@@ -78,49 +81,9 @@ mod test {
 
         let concrete_oracles = [a, b, c];
 
-        // let vos = vec![Box::new(mul_vo)];
+        let vos: Vec<Box<dyn VirtualOracle<F>>> = vec![Box::new(mul_vo)];
 
-        // let _ = PilInstance::prove(&pk, &concrete_oracles, &vos, domain_size, &domain.vanishing_polynomial().into(), &mut rng);
-
-    }
-
-    #[test]
-    fn try_it() {
-
-        // Use at least two approaches to make it work.
-        // DON'T add/remove any code line.
-        trait MyTrait {
-            fn f(&self) -> usize;
-        }
-
-        impl MyTrait for u32 {
-            fn f(&self) -> usize {
-                42
-            }
-        }
-
-        impl MyTrait for String {
-            fn f(&self) -> usize {
-                42
-            }
-        }
-
-        fn my_function<'a>(vos: &'a Vec<Box<dyn MyTrait>>) {
-            for vo in vos {
-                vo.f();
-            }
-        }  
-
-        fn main() {
-            // let vos = vec![Box::new(u_32::from(31)), Box::new(String::from("abc"))];
-            // my_function(Box::new(13_u32));
-            // my_function(Box::new(String::from("abc")));
-
-            // let s = String::from("a");
-            // my_function(Box::new(s));
-
-            println!("Success!");
-        }
+        let _ = PilInstance::prove(&pk, &concrete_oracles, &vos, domain_size, &domain.vanishing_polynomial().into(), &mut rng).unwrap();
 
     }
 }
