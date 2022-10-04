@@ -172,7 +172,7 @@ impl<F: PrimeField> IOPforPolyIdentity<F> {
         for i in 0..extended_domain.size() {
             query_context.replace_omega(i);
             for (vo_index, vo) in state.vos.iter().enumerate() {
-                let vo_evaluation = vo.get_expression().evaluate::<F>(
+                let vo_evaluation = vo.get_expression().evaluate(
                     &|x: F| x,
                     &|query: &WitnessQuery| {
                         let oracle = &state.witness_oracles[query.get_index()];

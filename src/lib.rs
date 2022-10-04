@@ -259,8 +259,6 @@ where
             .map(|vo| vo.get_wtns_queries())
             .flatten()
             .map(|query| query.clone())
-            .collect::<Vec<WitnessQuery>>()
-            .iter()
             .map(|wtns_query| wtns_query.clone())
             .collect();
 
@@ -269,8 +267,6 @@ where
             .map(|vo| vo.get_instance_queries())
             .flatten()
             .map(|query| query.clone())
-            .collect::<Vec<InstanceQuery>>()
-            .iter()
             .map(|instance_query| instance_query.clone())
             .collect();
 
@@ -458,7 +454,7 @@ where
 
         let mut quotient_eval = F::zero();
         for (vo_index, vo) in vos.iter().enumerate() {
-            let vo_evaluation = vo.get_expression().evaluate::<F>(
+            let vo_evaluation = vo.get_expression().evaluate(
                 &|x: F| x,
                 &|query: &WitnessQuery| {
                     let oracle = &witness_oracles[query.get_index()];

@@ -307,7 +307,7 @@ mod test {
         let expr_to_linearise = q1 * q2 - q3;
 
         let linearisation_poly = expr_to_linearise
-            .evaluate::<DensePolynomial<F>>(
+            .evaluate(
                 &|x: F| DensePolynomial::from_coefficients_slice(&[x]),
                 &|_: &WitnessQuery| {
                     // let oracle = &state.witness_oracles[query.get_index()];
@@ -423,7 +423,7 @@ mod test {
 
         // TEST THAT comms[5] which corresponds to linearisation - r0 is same as one from verifier linearisation
         let linearisation_derived_from_trait =
-            expr_to_linearise.evaluate::<LinearisationPolyCommitment<F, PC>>(
+            expr_to_linearise.evaluate(
                 &|x: F| LinearisationPolyCommitment::from_const(x),
                 &|_: &WitnessQuery| {
                     // let oracle = &state.witness_oracles[query.get_index()];
