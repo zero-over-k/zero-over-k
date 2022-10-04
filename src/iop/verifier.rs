@@ -1,4 +1,4 @@
-use crate::{concrete_oracle::QuerySetProvider};
+use crate::concrete_oracle::QuerySetProvider;
 use ark_ff::PrimeField;
 use ark_poly::{univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain};
 use ark_poly_commit::QuerySet;

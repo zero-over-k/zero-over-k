@@ -1,41 +1,40 @@
-use std::collections::{BTreeSet, BTreeMap};
+use std::collections::{BTreeMap, BTreeSet};
 use std::iter::successors;
 use std::marker::PhantomData;
 
-use crate::concrete_oracle::{QueryContext, QueryPoint, Queriable};
+use crate::concrete_oracle::{Queriable, QueryContext, QueryPoint};
 use crate::error::Error;
 use crate::vo::linearisation::LinearisationOracleQuery;
-use crate::vo::query::{Rotation, Query};
+use crate::vo::query::{Query, Rotation};
 use ark_ff::{to_bytes, PrimeField, UniformRand};
+use ark_poly::univariate::DensePolynomial;
 use ark_poly::Polynomial;
-use ark_poly::{univariate::DensePolynomial};
+use ark_poly_commit::LabeledCommitment;
 use ark_poly_commit::LabeledPolynomial;
 use ark_poly_commit::PCCommitterKey;
 use ark_poly_commit::PCUniversalParams;
 use ark_poly_commit::PolynomialCommitment;
-use ark_poly_commit::LabeledCommitment;
 use ark_std::rand::Rng;
 use ark_std::rand::RngCore;
+use concrete_oracle::ProverConcreteOracle;
 use concrete_oracle::VerifierConcreteOracle;
-use concrete_oracle::{ProverConcreteOracle};
 use data_structures::Proof;
 use data_structures::ProverKey;
 use data_structures::UniversalSRS;
 use data_structures::VerifierKey;
-use iop::{IOPforPolyIdentity};
+use iop::IOPforPolyIdentity;
 use rng::FiatShamirRng;
 use vo::query::InstanceQuery;
 use vo::query::WitnessQuery;
 use vo::VirtualOracle;
 
-
+pub mod commitment;
 pub mod concrete_oracle;
 mod data_structures;
 pub mod error;
 pub mod iop;
 pub mod rng;
 pub mod vo;
-pub mod commitment;
 
 mod tests;
 
@@ -201,13 +200,16 @@ where
 
         let commitments = vec![
             first_comms.iter().map(|c| c.commitment().clone()).collect(),
-            second_comms.iter().map(|c| c.commitment().clone()).collect()
+            second_comms
+                .iter()
+                .map(|c| c.commitment().clone())
+                .collect(),
         ];
 
         let proof = Proof {
             commitments,
             evaluations: evals,
-            opening_proof
+            opening_proof,
         };
 
         Ok(proof)
@@ -216,17 +218,16 @@ where
     pub fn verify<R: Rng>(
         vk: &VerifierKey<F, PC>,
         proof: Proof<F, PC>,
-        witness_oracles: &mut [VerifierConcreteOracle<F>],
+        witness_oracles: &mut [VerifierConcreteOracle<F, PC>],
         instance_oracles: &mut [ProverConcreteOracle<F>],
         vos: &Vec<Box<dyn VirtualOracle<F>>>,
         domain_size: usize,
         vanishing_polynomial: &DensePolynomial<F>,
-        srs_size: usize, 
+        srs_size: usize,
         zk_rng: &mut R,
     ) -> Result<(), Error<PC::Error>> {
-
         let verifier_init_state =
-        IOPforPolyIdentity::init_verifier(domain_size, vanishing_polynomial);
+            IOPforPolyIdentity::init_verifier(domain_size, vanishing_polynomial);
 
         let mut fs_rng = FS::initialize(&to_bytes![&Self::PROTOCOL_NAME].unwrap()); // TODO: add &pk.vk, &public oracles to transcript
 
@@ -267,17 +268,16 @@ where
             instance_oracles[query.index].register_rotation(query.rotation.clone());
         }
 
-        let wtns_degree_fn = |query: &WitnessQuery| {
-            witness_oracles[query.index].get_degree(domain_size)
-        };
+        let wtns_degree_fn =
+            |query: &WitnessQuery| witness_oracles[query.index].get_degree(domain_size);
 
-        let instance_degree_fn = |query: &InstanceQuery| {
-            instance_oracles[query.index].get_degree()
-        };
+        let instance_degree_fn = |query: &InstanceQuery| instance_oracles[query.index].get_degree();
 
         let mut max_degree = 0;
         for vo in vos {
-            let vo_degree = vo.get_expression().degree(&wtns_degree_fn, &instance_degree_fn);
+            let vo_degree = vo
+                .get_expression()
+                .degree(&wtns_degree_fn, &instance_degree_fn);
 
             max_degree = std::cmp::max(max_degree, vo_degree);
         }
@@ -285,23 +285,28 @@ where
         let quotient_degree = max_degree - vanishing_polynomial.degree();
         // println!("quotient degree {}", quotient_degree);
 
-        let num_of_quotient_chunks = quotient_degree / srs_size + if quotient_degree % srs_size != 0 { 1 } else { 0 };
+        let num_of_quotient_chunks = quotient_degree / srs_size
+            + if quotient_degree % srs_size != 0 {
+                1
+            } else {
+                0
+            };
 
         if num_of_quotient_chunks != proof.commitments[1].len() {
-            return Err(Error::TooManyChunks)
+            return Err(Error::TooManyChunks);
         }
 
-        let mut quotient_chunks = Vec::<VerifierConcreteOracle<F>>::with_capacity(num_of_quotient_chunks);
+        let mut quotient_chunks =
+            Vec::<VerifierConcreteOracle<F, PC>>::with_capacity(num_of_quotient_chunks);
         for i in 0..num_of_quotient_chunks {
-            quotient_chunks.push(
-                VerifierConcreteOracle {
-                    label: format!("quotient_chunk_{}", i).to_string(),
-                    should_mask: false, 
-                    queried_rotations: BTreeSet::from([Rotation::curr()]),
-                    eval_at_rotation: BTreeMap::new(),
-                    evals_at_challenges: BTreeMap::new(),
-                }
-            )
+            quotient_chunks.push(VerifierConcreteOracle {
+                label: format!("quotient_chunk_{}", i).to_string(),
+                should_mask: false,
+                queried_rotations: BTreeSet::from([Rotation::curr()]),
+                eval_at_rotation: BTreeMap::new(),
+                evals_at_challenges: BTreeMap::new(),
+                commitment: None,
+            })
         }
 
         // --------------------------------------------------------------------
@@ -311,10 +316,9 @@ where
         fs_rng.absorb(&to_bytes![first_comms].unwrap());
 
         let (verifier_first_msg, verifier_state) =
-        IOPforPolyIdentity::verifier_first_round(verifier_init_state, &mut fs_rng);
+            IOPforPolyIdentity::verifier_first_round(verifier_init_state, &mut fs_rng);
 
         // --------------------------------------------------------------------
-        
 
         // --------------------------------------------------------------------
         // Second round
@@ -323,54 +327,70 @@ where
         fs_rng.absorb(&to_bytes![second_comms].unwrap());
 
         let (verifier_second_msg, verifier_state) =
-        IOPforPolyIdentity::verifier_second_round(verifier_state, &mut fs_rng);
+            IOPforPolyIdentity::verifier_second_round(verifier_state, &mut fs_rng);
 
         // --------------------------------------------------------------------
 
         fs_rng.absorb(&proof.evaluations);
 
-        let commitment_labels = witness_oracles.iter().chain(quotient_chunks.iter()).map(|oracle| oracle.label.clone());
+        let commitment_labels = witness_oracles
+            .iter()
+            .chain(quotient_chunks.iter())
+            .map(|oracle| oracle.label.clone());
 
-        let commitments: Vec<_> = first_comms.iter()
-        .chain(second_comms.iter())
-        .zip(commitment_labels)
-        .map(|(c, label)| LabeledCommitment::new(label, c.clone(), None))
-        .collect();
+        let commitments: Vec<_> = first_comms
+            .iter()
+            .chain(second_comms.iter())
+            .zip(commitment_labels)
+            .map(|(c, label)| LabeledCommitment::new(label, c.clone(), None))
+            .collect();
 
         let query_set = IOPforPolyIdentity::get_query_set(
             &verifier_state,
-            witness_oracles
-                .iter()
-                .chain(quotient_chunks.iter()),
+            witness_oracles.iter().chain(quotient_chunks.iter()),
         );
 
         // println!("query set: {:?}", query_set);
 
         assert_eq!(query_set.len(), proof.evaluations.len());
 
-        let wtns_oracle_label_index_mapping = witness_oracles.iter().enumerate().map(|(i, oracle)| (oracle.label.clone(), i)).collect::<BTreeMap<String, usize>>();
-        let quotient_chunks_label_index_mapping = quotient_chunks.iter().enumerate().map(|(i, oracle)| (oracle.label.clone(), i)).collect::<BTreeMap<String, usize>>();
+        let wtns_oracle_label_index_mapping = witness_oracles
+            .iter()
+            .enumerate()
+            .map(|(i, oracle)| (oracle.label.clone(), i))
+            .collect::<BTreeMap<String, usize>>();
+        let quotient_chunks_label_index_mapping = quotient_chunks
+            .iter()
+            .enumerate()
+            .map(|(i, oracle)| (oracle.label.clone(), i))
+            .collect::<BTreeMap<String, usize>>();
 
         let quotient_chunk_regex = regex::Regex::new(r"^quotient_chunk_\d+$").unwrap();
         // ((poly_label, point), &evaluation)
-        let evaluations: BTreeMap<(String, F), F> = query_set.iter().zip(proof.evaluations.iter()).map(|((poly_label, (point_label, point)), &evaluation)| {
+        let evaluations: BTreeMap<(String, F), F> =
+            query_set
+                .iter()
+                .zip(proof.evaluations.iter())
+                .map(|((poly_label, (point_label, point)), &evaluation)| {
+                    if quotient_chunk_regex.is_match(&poly_label) {
+                        match quotient_chunks_label_index_mapping.get(poly_label) {
+                            Some(index) => quotient_chunks[*index]
+                                .register_eval_at_challenge(*point, evaluation),
+                            None => panic!("Missing quotient chunk: {}", poly_label),
+                        };
+                    } else {
+                        match wtns_oracle_label_index_mapping.get(poly_label) {
+                            Some(index) => witness_oracles[*index]
+                                .register_eval_at_challenge(*point, evaluation),
+                            None => panic!("Missing poly: {}", poly_label),
+                        };
+                    }
 
-            if quotient_chunk_regex.is_match(&poly_label) {
-                match quotient_chunks_label_index_mapping.get(poly_label) {
-                    Some(index) => quotient_chunks[*index].register_eval_at_challenge(*point, evaluation), 
-                    None => panic!("Missing quotient chunk: {}", poly_label)
-                };
-            } else {
-                match wtns_oracle_label_index_mapping.get(poly_label) {
-                    Some(index) => witness_oracles[*index].register_eval_at_challenge(*point, evaluation), 
-                    None => panic!("Missing poly: {}", poly_label)
-                };
-            }
+                    // println!("point_label: {} point: {}", point_label, point);
 
-            // println!("point_label: {} point: {}", point_label, point);
-
-            ((poly_label.clone(), point.clone()), evaluation)
-        }).collect();
+                    ((poly_label.clone(), point.clone()), evaluation)
+                })
+                .collect();
 
         // println!("evaluations: {:?}", evaluations);
 
@@ -388,9 +408,8 @@ where
         .map_err(Error::from_pc_err)?;
         assert_eq!(res, true);
 
-        let query_context = QueryContext::Opening( 
-            domain_size, QueryPoint::Challenge(verifier_second_msg.xi)
-        );
+        let query_context =
+            QueryContext::Opening(domain_size, QueryPoint::Challenge(verifier_second_msg.xi));
 
         let powers_of_alpha: Vec<F> = successors(Some(F::one()), |alpha_i| {
             Some(*alpha_i * verifier_first_msg.alpha)
@@ -414,20 +433,16 @@ where
                 &|x: F, y: F| x + y,
                 &|x: F, y: F| x * y,
                 &|x: F, y: F| x * y,
-
-                &|_: &LinearisationOracleQuery| panic!("Not allowed in this ctx")
+                &|_: &LinearisationOracleQuery| panic!("Not allowed in this ctx"),
             );
 
             quotient_eval += powers_of_alpha[vo_index] * vo_evaluation;
         }
 
         let x_n = verifier_second_msg.xi.pow([srs_size as u64, 0, 0, 0]);
-        let powers_of_x: Vec<F> = successors(Some(F::one()), |x_i| {
-            Some(*x_i * x_n)
-        })
-        .take(quotient_chunks.len())
-        .collect();
-
+        let powers_of_x: Vec<F> = successors(Some(F::one()), |x_i| Some(*x_i * x_n))
+            .take(quotient_chunks.len())
+            .collect();
 
         let mut t_part = F::zero();
         for (&x_i, t_i) in powers_of_x.iter().zip(quotient_chunks.iter()) {
@@ -437,9 +452,9 @@ where
         t_part *= vanishing_polynomial.evaluate(&verifier_second_msg.xi);
 
         quotient_eval -= t_part;
-        
+
         if quotient_eval != F::zero() {
-            return Err(Error::QuotientNotZero)
+            return Err(Error::QuotientNotZero);
         }
 
         Ok(())

@@ -1,9 +1,9 @@
 use std::{cmp::max, collections::BTreeSet, iter::successors};
 
-use ark_ff::{PrimeField};
+use ark_ff::PrimeField;
 use ark_poly::{
-    univariate::{DensePolynomial},
-    EvaluationDomain, GeneralEvaluationDomain, Polynomial, UVPolynomial,
+    univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, Polynomial,
+    UVPolynomial,
 };
 use ark_std::rand::Rng;
 
@@ -12,8 +12,9 @@ use crate::{
     iop::error::Error,
     iop::{verifier::VerifierFirstMsg, IOPforPolyIdentity},
     vo::{
+        linearisation::{LinearisationOracleQuery, LinearisationQueryContext},
         query::{InstanceQuery, Query, Rotation, WitnessQuery},
-        VirtualOracle, linearisation::{LinearisationQueryContext, LinearisationOracleQuery},
+        VirtualOracle,
     },
 };
 
@@ -184,8 +185,7 @@ impl<F: PrimeField> IOPforPolyIdentity<F> {
                     &|x: F, y: F| x + y,
                     &|x: F, y: F| x * y,
                     &|x: F, y: F| x * y,
-
-                    &|_: &LinearisationOracleQuery| panic!("Not allowed in this ctx")
+                    &|_: &LinearisationOracleQuery| panic!("Not allowed in this ctx"),
                 );
 
                 nominator_evals[i] += powers_of_alpha[vo_index] * vo_evaluation;

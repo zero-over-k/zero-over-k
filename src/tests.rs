@@ -3,7 +3,7 @@ mod test {
     use std::collections::BTreeSet;
 
     use ark_bls12_381::{Bls12_381, Fr};
-    use ark_ff::{Zero};
+    use ark_ff::Zero;
     use ark_poly::Polynomial;
     use ark_poly::{
         univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, UVPolynomial,
@@ -14,7 +14,7 @@ mod test {
     use rand_chacha::ChaChaRng;
 
     use crate::concrete_oracle::VerifierConcreteOracle;
-    use crate::rng::{SimpleHashFiatShamirRng};
+    use crate::rng::SimpleHashFiatShamirRng;
     use crate::PIL;
     use blake2::Blake2s;
 
@@ -111,7 +111,17 @@ mod test {
         let a_verifier = VerifierConcreteOracle::new("a".to_string(), true);
         let b_verifier = VerifierConcreteOracle::new("b".to_string(), true);
 
-
-        let _ = PilInstance::verify(&vk, proof, &mut [a_verifier, b_verifier], &mut [c], &vos, domain_size, &domain.vanishing_polynomial().into(), pk.committer_key.max_degree(), &mut rng).unwrap();
+        let _ = PilInstance::verify(
+            &vk,
+            proof,
+            &mut [a_verifier, b_verifier],
+            &mut [c],
+            &vos,
+            domain_size,
+            &domain.vanishing_polynomial().into(),
+            pk.committer_key.max_degree(),
+            &mut rng,
+        )
+        .unwrap();
     }
 }

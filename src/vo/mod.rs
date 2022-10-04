@@ -1,13 +1,13 @@
 use ark_ff::PrimeField;
 use query::{InstanceQuery, WitnessQuery};
 
-use self::{expression::Expression};
+use self::expression::Expression;
+pub mod error;
 pub mod expression;
+pub mod linearisation;
 pub mod precompiled;
 pub mod precompiled_vos;
 pub mod query;
-pub mod error;
-pub mod linearisation;
 
 // Note: VirtualOracle trait is very lightweight such that different use-cases
 // can be built on top of this prover

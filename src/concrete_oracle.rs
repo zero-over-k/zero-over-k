@@ -1,15 +1,22 @@
-use std::{collections::{BTreeSet, BTreeMap}};
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{
-    vo::{query::{Rotation, Sign}, linearisation::{LinearisationQueriable, LinearisationQueryResponse, LinearisationQueryContext, LinearisationInfo}}, commitment::HomomorphicCommitment,
+    commitment::HomomorphicCommitment,
+    vo::{
+        linearisation::{
+            LinearisationInfo, LinearisationQueriable, LinearisationQueryContext,
+            LinearisationQueryResponse,
+        },
+        query::{Rotation, Sign},
+    },
 };
-use ark_ff::{PrimeField, Field};
+use ark_ff::{Field, PrimeField};
 use ark_poly::{
     univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, Polynomial,
     UVPolynomial,
 };
 
-use ark_poly_commit::{LabeledPolynomial, QuerySet, PolynomialCommitment};
+use ark_poly_commit::{LabeledPolynomial, PolynomialCommitment, QuerySet};
 use ark_std::rand::Rng;
 
 pub trait QuerySetProvider<F: PrimeField> {
@@ -55,7 +62,7 @@ impl<F: PrimeField> QueryContext<F> {
             }
             Self::Opening(_, _) => {
                 panic!("Wrong context")
-            } 
+            }
         }
     }
 }
@@ -181,7 +188,7 @@ impl<F: PrimeField> Queriable<F> for ProverConcreteOracle<F> {
                     if rotation.degree == 0 {
                         return self.poly.evaluate(&challenge);
                     }
-                    
+
                     let domain = GeneralEvaluationDomain::<F>::new(*domain_size).unwrap();
 
                     let mut omega = domain.element(rotation.degree);
@@ -191,30 +198,37 @@ impl<F: PrimeField> Queriable<F> for ProverConcreteOracle<F> {
 
                     self.poly.evaluate(&(omega * challenge))
                 }
-            }
+            },
         }
     }
 }
 
-impl<F: PrimeField, PC: HomomorphicCommitment<F>> LinearisationQueriable<F, PC> for ProverConcreteOracle<F> {
-    fn query_for_linearisation(&self, rotation: &Rotation, context: &LinearisationQueryContext, info: &LinearisationInfo<F>) -> LinearisationQueryResponse<F, PC> {
+impl<F: PrimeField, PC: HomomorphicCommitment<F>> LinearisationQueriable<F, PC>
+    for ProverConcreteOracle<F>
+{
+    fn query_for_linearisation(
+        &self,
+        rotation: &Rotation,
+        context: &LinearisationQueryContext,
+        info: &LinearisationInfo<F>,
+    ) -> LinearisationQueryResponse<F, PC> {
         match context {
             LinearisationQueryContext::AsEval => {
-                    if rotation.degree == 0 {
-                        let eval = self.poly.evaluate(&info.opening_challenge);
-                        return LinearisationQueryResponse::Opening(eval);
-                    }
-                    
-                    let domain = GeneralEvaluationDomain::<F>::new(info.domain_size).unwrap();
-                    
-                    let mut omega = domain.element(rotation.degree);
-                    if rotation.sign == Sign::Minus {
-                        omega = omega.inverse().unwrap();
-                    }
+                if rotation.degree == 0 {
+                    let eval = self.poly.evaluate(&info.opening_challenge);
+                    return LinearisationQueryResponse::Opening(eval);
+                }
 
-                    let eval = self.poly.evaluate(&(omega * info.opening_challenge));
-                    LinearisationQueryResponse::Opening(eval)
-            },
+                let domain = GeneralEvaluationDomain::<F>::new(info.domain_size).unwrap();
+
+                let mut omega = domain.element(rotation.degree);
+                if rotation.sign == Sign::Minus {
+                    omega = omega.inverse().unwrap();
+                }
+
+                let eval = self.poly.evaluate(&(omega * info.opening_challenge));
+                LinearisationQueryResponse::Opening(eval)
+            }
             LinearisationQueryContext::AsPoly => {
                 if rotation.degree == 0 {
                     return LinearisationQueryResponse::Poly(self.poly.clone());
@@ -230,7 +244,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> LinearisationQueriable<F, PC> 
                 let shifted_poly = shift_dense_poly(&self.poly, &omega);
 
                 LinearisationQueryResponse::Poly(shifted_poly)
-            },
+            }
         }
     }
 }
@@ -274,15 +288,35 @@ impl<F: PrimeField> QuerySetProvider<F> for &ProverConcreteOracle<F> {
     }
 }
 
-pub struct VerifierConcreteOracle<F: PrimeField> {
+pub struct VerifierConcreteOracle<
+    'a,
+    F: PrimeField,
+    PC: PolynomialCommitment<F, DensePolynomial<F>>,
+> {
     pub(crate) label: String,
     pub(crate) queried_rotations: BTreeSet<Rotation>,
     pub(crate) should_mask: bool,
     pub(crate) eval_at_rotation: BTreeMap<F, Rotation>,
     pub(crate) evals_at_challenges: BTreeMap<F, F>,
+    pub(crate) commitment: Option<&'a PC::Commitment>,
 }
 
-impl<F: PrimeField> VerifierConcreteOracle<F> {
+impl<'a, F: PrimeField, PC: PolynomialCommitment<F, DensePolynomial<F>>> Clone for VerifierConcreteOracle<'a, F, PC> {
+    fn clone(&self) -> Self {
+        Self {
+            label: self.label.clone(),
+            queried_rotations: self.queried_rotations.clone(), 
+            should_mask: self.should_mask.clone(), 
+            eval_at_rotation: self.eval_at_rotation.clone(), 
+            evals_at_challenges: self.evals_at_challenges.clone(), 
+            commitment: self.commitment.clone()
+        }
+    }
+}
+
+impl<'a, F: PrimeField, PC: PolynomialCommitment<F, DensePolynomial<F>>>
+    VerifierConcreteOracle<'a, F, PC>
+{
     pub fn new(label: String, should_mask: bool) -> Self {
         Self {
             label,
@@ -290,7 +324,12 @@ impl<F: PrimeField> VerifierConcreteOracle<F> {
             queried_rotations: BTreeSet::new(),
             eval_at_rotation: BTreeMap::new(),
             evals_at_challenges: BTreeMap::new(),
+            commitment: None,
         }
+    }
+
+    pub fn register_commitment(&mut self, c: &'a PC::Commitment) {
+        self.commitment = Some(c)
     }
 
     pub fn register_rotation(&mut self, rotation: Rotation) {
@@ -301,7 +340,10 @@ impl<F: PrimeField> VerifierConcreteOracle<F> {
     pub fn register_eval_at_rotation(&mut self, eval: F, rotation: Rotation) {
         let prev_rotation = self.eval_at_rotation.insert(eval, rotation);
         if !prev_rotation.is_none() {
-            panic!("Same eval already registered for rotation {:?}", prev_rotation);
+            panic!(
+                "Same eval already registered for rotation {:?}",
+                prev_rotation
+            );
         }
     }
 
@@ -321,7 +363,9 @@ impl<F: PrimeField> VerifierConcreteOracle<F> {
     }
 }
 
-impl<F: PrimeField> Queriable<F> for VerifierConcreteOracle<F> {
+impl<'a, F: PrimeField, PC: PolynomialCommitment<F, DensePolynomial<F>>> Queriable<F>
+    for VerifierConcreteOracle<'a, F, PC>
+{
     fn query(&self, rotation: &Rotation, context: &QueryContext<F>) -> F {
         match context {
             QueryContext::Instantiation(_, _, _) => {
@@ -342,8 +386,11 @@ impl<F: PrimeField> Queriable<F> for VerifierConcreteOracle<F> {
                     let challenge = omega * opening_challenge;
 
                     match self.evals_at_challenges.get(&challenge) {
-                        Some(eval) => *eval, 
-                        None => panic!("No eval at challenge: {} of oracle {}", challenge, self.label)
+                        Some(eval) => *eval,
+                        None => panic!(
+                            "No eval at challenge: {} of oracle {}",
+                            challenge, self.label
+                        ),
                     }
                 }
             },
@@ -351,8 +398,15 @@ impl<F: PrimeField> Queriable<F> for VerifierConcreteOracle<F> {
     }
 }
 
-impl<F: PrimeField, PC: HomomorphicCommitment<F>> LinearisationQueriable<F, PC> for VerifierConcreteOracle<F> {
-    fn query_for_linearisation(&self, rotation: &Rotation, context: &LinearisationQueryContext, info: &LinearisationInfo<F>) -> LinearisationQueryResponse<F, PC> {
+impl<'a, F: PrimeField, PC: HomomorphicCommitment<F>> LinearisationQueriable<F, PC>
+    for VerifierConcreteOracle<'a, F, PC>
+{
+    fn query_for_linearisation(
+        &self,
+        rotation: &Rotation,
+        context: &LinearisationQueryContext,
+        info: &LinearisationInfo<F>,
+    ) -> LinearisationQueryResponse<F, PC> {
         match context {
             LinearisationQueryContext::AsEval => {
                 let domain = GeneralEvaluationDomain::<F>::new(info.domain_size).unwrap();
@@ -365,16 +419,28 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> LinearisationQueriable<F, PC> 
                 let challenge = omega * info.opening_challenge;
 
                 match self.evals_at_challenges.get(&challenge) {
-                    Some(eval) => LinearisationQueryResponse::Opening(*eval), 
-                    None => panic!("No eval at challenge: {} of oracle {}", challenge, self.label)
+                    Some(eval) => LinearisationQueryResponse::Opening(*eval),
+                    None => panic!(
+                        "No eval at challenge: {} of oracle {}",
+                        challenge, self.label
+                    ),
                 }
-            },
-            LinearisationQueryContext::AsPoly => panic!("return commitment from here"),
+            }
+            // TODO: Consider working with reference to commitment
+            LinearisationQueryContext::AsPoly => {
+                let commitment = self.commitment.expect(&format!(
+                    "Commitment missing for committed oracle {}",
+                    self.label
+                ));
+                LinearisationQueryResponse::Commitment(commitment.clone())
+            }
         }
     }
 }
 
-impl<F: PrimeField> QuerySetProvider<F> for &VerifierConcreteOracle<F> {
+impl<'a, F: PrimeField, PC: PolynomialCommitment<F, DensePolynomial<F>>> QuerySetProvider<F>
+    for &VerifierConcreteOracle<'a, F, PC>
+{
     fn get_query_set(
         &self,
         opening_challenge_label: &str,
@@ -414,7 +480,6 @@ impl<F: PrimeField> QuerySetProvider<F> for &VerifierConcreteOracle<F> {
         query_set
     }
 }
-
 
 pub fn shift_dense_poly<F: Field>(
     p: &DensePolynomial<F>,

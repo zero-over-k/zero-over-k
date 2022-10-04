@@ -40,14 +40,17 @@ impl Rotation {
         }
     }
 
-    pub fn from_point_label(point_label: &String, opening_challenge_label: &String) -> Result<Self, Error> {
+    pub fn from_point_label(
+        point_label: &String,
+        opening_challenge_label: &String,
+    ) -> Result<Self, Error> {
         let tokens = point_label.split("_").collect::<Vec<&str>>();
 
         if tokens.len() == 1 {
             if tokens[0] == opening_challenge_label {
-                return Ok(Rotation::curr())
+                return Ok(Rotation::curr());
             } else {
-                return Err(Error::PointLabelError(point_label.clone()))
+                return Err(Error::PointLabelError(point_label.clone()));
             }
         } else if tokens.len() == 3 {
             if tokens[0] != String::from("omega") {
@@ -61,19 +64,19 @@ impl Rotation {
 
             let rotation = if degree > 0 {
                 Rotation {
-                    degree: degree as usize, 
-                    sign: Sign::Plus
+                    degree: degree as usize,
+                    sign: Sign::Plus,
                 }
             } else {
                 Rotation {
-                    degree: (-1 * degree) as usize, 
-                    sign: Sign::Minus
+                    degree: (-1 * degree) as usize,
+                    sign: Sign::Minus,
                 }
             };
 
-            return Ok(rotation)
+            return Ok(rotation);
         } else {
-            return Err(Error::PointLabelError(point_label.clone()))
+            return Err(Error::PointLabelError(point_label.clone()));
         }
     }
 }
@@ -178,10 +181,13 @@ mod test {
         let point_label = String::from("omega_5_xi");
 
         let rotation = Rotation::from_point_label(&point_label, &opening_challenge_label).unwrap();
-        assert_eq!(rotation, Rotation {
-            degree: 5, 
-            sign: Sign::Plus
-        });
+        assert_eq!(
+            rotation,
+            Rotation {
+                degree: 5,
+                sign: Sign::Plus
+            }
+        );
     }
 
     #[test]
@@ -190,10 +196,13 @@ mod test {
         let point_label = String::from("omega_-5_xi");
 
         let rotation = Rotation::from_point_label(&point_label, &opening_challenge_label).unwrap();
-        assert_eq!(rotation, Rotation {
-            degree: 5, 
-            sign: Sign::Minus
-        });
+        assert_eq!(
+            rotation,
+            Rotation {
+                degree: 5,
+                sign: Sign::Minus
+            }
+        );
     }
 }
 

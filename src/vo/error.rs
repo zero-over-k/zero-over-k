@@ -2,8 +2,8 @@ use std::num::ParseIntError;
 
 #[derive(Debug)]
 pub enum Error {
-    PointLabelError(String), 
-    IntError(ParseIntError)
+    PointLabelError(String),
+    IntError(ParseIntError),
 }
 
 impl Error {

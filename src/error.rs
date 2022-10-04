@@ -12,7 +12,7 @@ pub enum Error<E> {
     /// Prover sent commitments to more chunks of quotient than needed
     TooManyChunks,
     /// Non zero over K indentity does not hold
-    QuotientNotZero
+    QuotientNotZero,
 }
 
 impl<E> From<IOPError> for Error<E> {
