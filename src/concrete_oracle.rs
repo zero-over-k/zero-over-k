@@ -4,16 +4,16 @@ use crate::{
     commitment::HomomorphicCommitment,
     vo::{
         linearisation::{
-            LinearisationInfo, LinearisationQueriable, LinearisationQueryContext,
-            LinearisationQueryResponse,
+            LinearisationInfo, LinearisationQueriable,
+            LinearisationQueryContext, LinearisationQueryResponse,
         },
         query::{Rotation, Sign},
     },
 };
 use ark_ff::{Field, PrimeField};
 use ark_poly::{
-    univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, Polynomial,
-    UVPolynomial,
+    univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
+    Polynomial, UVPolynomial,
 };
 
 use ark_poly_commit::{LabeledPolynomial, PolynomialCommitment, QuerySet};
@@ -112,7 +112,11 @@ pub struct ProverConcreteOracle<F: PrimeField> {
 }
 
 impl<F: PrimeField> ProverConcreteOracle<F> {
-    pub fn mask<R: Rng>(&mut self, vanishing_polynomial: &DensePolynomial<F>, rng: &mut R) {
+    pub fn mask<R: Rng>(
+        &mut self,
+        vanishing_polynomial: &DensePolynomial<F>,
+        rng: &mut R,
+    ) {
         if !self.should_mask {
             return;
         }
@@ -126,8 +130,12 @@ impl<F: PrimeField> ProverConcreteOracle<F> {
         self.queried_rotations.insert(rotation);
     }
 
-    pub fn compute_extended_evals(&mut self, extended_domain: GeneralEvaluationDomain<F>) {
-        self.evals_at_coset_of_extended_domain = Some(extended_domain.coset_fft(&self.poly));
+    pub fn compute_extended_evals(
+        &mut self,
+        extended_domain: GeneralEvaluationDomain<F>,
+    ) {
+        self.evals_at_coset_of_extended_domain =
+            Some(extended_domain.coset_fft(&self.poly));
     }
 
     pub fn get_degree(&self) -> usize {
@@ -136,36 +144,52 @@ impl<F: PrimeField> ProverConcreteOracle<F> {
 
     pub fn to_labeled(&self) -> LabeledPolynomial<F, DensePolynomial<F>> {
         // for now keep degree bound and hiding bound to None
-        LabeledPolynomial::new(self.label.clone(), self.poly.clone(), None, None)
+        LabeledPolynomial::new(
+            self.label.clone(),
+            self.poly.clone(),
+            None,
+            None,
+        )
     }
 }
 
 impl<F: PrimeField> Queriable<F> for ProverConcreteOracle<F> {
     fn query(&self, rotation: &Rotation, context: &QueryContext<F>) -> F {
         match context {
-            QueryContext::Instantiation(scaling_ratio, extended_domain_size, point) => {
+            QueryContext::Instantiation(
+                scaling_ratio,
+                extended_domain_size,
+                point,
+            ) => {
                 match point {
                     QueryPoint::Omega(row) => {
-                        if let Some(evals) = &self.evals_at_coset_of_extended_domain {
+                        if let Some(evals) =
+                            &self.evals_at_coset_of_extended_domain
+                        {
                             if rotation.degree == 0 {
                                 return evals[*row];
                             }
 
                             let eval = match &rotation.sign {
                                 Sign::Plus => {
-                                    evals[(row + rotation.degree * scaling_ratio)
+                                    evals[(row
+                                        + rotation.degree * scaling_ratio)
                                         % extended_domain_size]
                                 }
                                 // TODO: test negative rotations
                                 Sign::Minus => {
-                                    let index =
-                                        *row as i64 - (rotation.degree * scaling_ratio) as i64;
+                                    let index = *row as i64
+                                        - (rotation.degree * scaling_ratio)
+                                            as i64;
                                     if index >= 0 {
                                         evals[index as usize]
                                     } else {
-                                        let move_from_end = (rotation.degree * scaling_ratio - row)
+                                        let move_from_end = (rotation.degree
+                                            * scaling_ratio
+                                            - row)
                                             % extended_domain_size;
-                                        evals[extended_domain_size - move_from_end]
+                                        evals[extended_domain_size
+                                            - move_from_end]
                                     }
                                 }
                             };
@@ -189,7 +213,9 @@ impl<F: PrimeField> Queriable<F> for ProverConcreteOracle<F> {
                         return self.poly.evaluate(&challenge);
                     }
 
-                    let domain = GeneralEvaluationDomain::<F>::new(*domain_size).unwrap();
+                    let domain =
+                        GeneralEvaluationDomain::<F>::new(*domain_size)
+                            .unwrap();
 
                     let mut omega = domain.element(rotation.degree);
                     if rotation.sign == Sign::Minus {
@@ -219,14 +245,17 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> LinearisationQueriable<F, PC>
                     return LinearisationQueryResponse::Opening(eval);
                 }
 
-                let domain = GeneralEvaluationDomain::<F>::new(info.domain_size).unwrap();
+                let domain =
+                    GeneralEvaluationDomain::<F>::new(info.domain_size)
+                        .unwrap();
 
                 let mut omega = domain.element(rotation.degree);
                 if rotation.sign == Sign::Minus {
                     omega = omega.inverse().unwrap();
                 }
 
-                let eval = self.poly.evaluate(&(omega * info.opening_challenge));
+                let eval =
+                    self.poly.evaluate(&(omega * info.opening_challenge));
                 LinearisationQueryResponse::Opening(eval)
             }
             LinearisationQueryContext::AsPoly => {
@@ -234,7 +263,9 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> LinearisationQueriable<F, PC>
                     return LinearisationQueryResponse::Poly(self.poly.clone());
                 }
 
-                let domain = GeneralEvaluationDomain::<F>::new(info.domain_size).unwrap();
+                let domain =
+                    GeneralEvaluationDomain::<F>::new(info.domain_size)
+                        .unwrap();
 
                 let mut omega = domain.element(rotation.degree);
                 if rotation.sign == Sign::Minus {
@@ -264,18 +295,24 @@ impl<F: PrimeField> QuerySetProvider<F> for &ProverConcreteOracle<F> {
                     (opening_challenge_label.into(), opening_challenge),
                 ));
             } else {
-                let domain = GeneralEvaluationDomain::<F>::new(domain_size).unwrap();
+                let domain =
+                    GeneralEvaluationDomain::<F>::new(domain_size).unwrap();
                 let (omega, point_label) = match &rotation.sign {
                     Sign::Plus => {
                         let omega = domain.element(rotation.degree);
-                        let point_label =
-                            format!("omega_{}_{}", rotation.degree, opening_challenge_label);
+                        let point_label = format!(
+                            "omega_{}_{}",
+                            rotation.degree, opening_challenge_label
+                        );
                         (omega, point_label)
                     }
                     Sign::Minus => {
-                        let omega = domain.element(rotation.degree).inverse().unwrap();
-                        let point_label =
-                            format!("omega_-{}_{}", rotation.degree, opening_challenge_label);
+                        let omega =
+                            domain.element(rotation.degree).inverse().unwrap();
+                        let point_label = format!(
+                            "omega_-{}_{}",
+                            rotation.degree, opening_challenge_label
+                        );
                         (omega, point_label)
                     }
                 };
@@ -301,15 +338,17 @@ pub struct VerifierConcreteOracle<
     pub(crate) commitment: Option<&'a PC::Commitment>,
 }
 
-impl<'a, F: PrimeField, PC: PolynomialCommitment<F, DensePolynomial<F>>> Clone for VerifierConcreteOracle<'a, F, PC> {
+impl<'a, F: PrimeField, PC: PolynomialCommitment<F, DensePolynomial<F>>> Clone
+    for VerifierConcreteOracle<'a, F, PC>
+{
     fn clone(&self) -> Self {
         Self {
             label: self.label.clone(),
-            queried_rotations: self.queried_rotations.clone(), 
-            should_mask: self.should_mask.clone(), 
-            eval_at_rotation: self.eval_at_rotation.clone(), 
-            evals_at_challenges: self.evals_at_challenges.clone(), 
-            commitment: self.commitment.clone()
+            queried_rotations: self.queried_rotations.clone(),
+            should_mask: self.should_mask.clone(),
+            eval_at_rotation: self.eval_at_rotation.clone(),
+            evals_at_challenges: self.evals_at_challenges.clone(),
+            commitment: self.commitment.clone(),
         }
     }
 }
@@ -363,20 +402,24 @@ impl<'a, F: PrimeField, PC: PolynomialCommitment<F, DensePolynomial<F>>>
     }
 }
 
-impl<'a, F: PrimeField, PC: PolynomialCommitment<F, DensePolynomial<F>>> Queriable<F>
-    for VerifierConcreteOracle<'a, F, PC>
+impl<'a, F: PrimeField, PC: PolynomialCommitment<F, DensePolynomial<F>>>
+    Queriable<F> for VerifierConcreteOracle<'a, F, PC>
 {
     fn query(&self, rotation: &Rotation, context: &QueryContext<F>) -> F {
         match context {
             QueryContext::Instantiation(_, _, _) => {
-                panic!("Can't evaluate verifier oracle in instantiation challenge")
+                panic!(
+                    "Can't evaluate verifier oracle in instantiation challenge"
+                )
             }
             QueryContext::Opening(domain_size, point) => match point {
                 QueryPoint::Omega(_) => {
                     panic!("Can't evaluate at row_i in opening context");
                 }
                 QueryPoint::Challenge(opening_challenge) => {
-                    let domain = GeneralEvaluationDomain::<F>::new(*domain_size).unwrap();
+                    let domain =
+                        GeneralEvaluationDomain::<F>::new(*domain_size)
+                            .unwrap();
 
                     let mut omega = domain.element(rotation.degree);
                     if rotation.sign == Sign::Minus {
@@ -398,8 +441,8 @@ impl<'a, F: PrimeField, PC: PolynomialCommitment<F, DensePolynomial<F>>> Queriab
     }
 }
 
-impl<'a, F: PrimeField, PC: HomomorphicCommitment<F>> LinearisationQueriable<F, PC>
-    for VerifierConcreteOracle<'a, F, PC>
+impl<'a, F: PrimeField, PC: HomomorphicCommitment<F>>
+    LinearisationQueriable<F, PC> for VerifierConcreteOracle<'a, F, PC>
 {
     fn query_for_linearisation(
         &self,
@@ -409,7 +452,9 @@ impl<'a, F: PrimeField, PC: HomomorphicCommitment<F>> LinearisationQueriable<F, 
     ) -> LinearisationQueryResponse<F, PC> {
         match context {
             LinearisationQueryContext::AsEval => {
-                let domain = GeneralEvaluationDomain::<F>::new(info.domain_size).unwrap();
+                let domain =
+                    GeneralEvaluationDomain::<F>::new(info.domain_size)
+                        .unwrap();
 
                 let mut omega = domain.element(rotation.degree);
                 if rotation.sign == Sign::Minus {
@@ -438,8 +483,8 @@ impl<'a, F: PrimeField, PC: HomomorphicCommitment<F>> LinearisationQueriable<F, 
     }
 }
 
-impl<'a, F: PrimeField, PC: PolynomialCommitment<F, DensePolynomial<F>>> QuerySetProvider<F>
-    for &VerifierConcreteOracle<'a, F, PC>
+impl<'a, F: PrimeField, PC: PolynomialCommitment<F, DensePolynomial<F>>>
+    QuerySetProvider<F> for &VerifierConcreteOracle<'a, F, PC>
 {
     fn get_query_set(
         &self,
@@ -456,18 +501,24 @@ impl<'a, F: PrimeField, PC: PolynomialCommitment<F, DensePolynomial<F>>> QuerySe
                     (opening_challenge_label.into(), opening_challenge),
                 ));
             } else {
-                let domain = GeneralEvaluationDomain::<F>::new(domain_size).unwrap();
+                let domain =
+                    GeneralEvaluationDomain::<F>::new(domain_size).unwrap();
                 let (omega, point_label) = match &rotation.sign {
                     Sign::Plus => {
                         let omega = domain.element(rotation.degree);
-                        let point_label =
-                            format!("omega_{}_{}", rotation.degree, opening_challenge_label);
+                        let point_label = format!(
+                            "omega_{}_{}",
+                            rotation.degree, opening_challenge_label
+                        );
                         (omega, point_label)
                     }
                     Sign::Minus => {
-                        let omega = domain.element(rotation.degree).inverse().unwrap();
-                        let point_label =
-                            format!("omega_-{}_{}", rotation.degree, opening_challenge_label);
+                        let omega =
+                            domain.element(rotation.degree).inverse().unwrap();
+                        let point_label = format!(
+                            "omega_-{}_{}",
+                            rotation.degree, opening_challenge_label
+                        );
                         (omega, point_label)
                     }
                 };

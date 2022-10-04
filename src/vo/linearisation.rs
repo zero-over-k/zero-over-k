@@ -35,7 +35,8 @@ pub struct LinearisationInfo<F: PrimeField> {
     pub opening_challenge: F,
 }
 
-pub enum LinearisationQueryResponse<F: PrimeField, PC: HomomorphicCommitment<F>> {
+pub enum LinearisationQueryResponse<F: PrimeField, PC: HomomorphicCommitment<F>>
+{
     Opening(F),
     Poly(DensePolynomial<F>),
     Commitment(PC::Commitment),
@@ -51,22 +52,27 @@ pub trait LinearisationQueriable<F: PrimeField, PC: HomomorphicCommitment<F>> {
 }
 
 // We keep const part of linearisation poly separated to spare scalar multiplication for verifier
-pub struct LinearisationPolyCommitment<F: PrimeField, PC: HomomorphicCommitment<F>> {
+pub struct LinearisationPolyCommitment<
+    F: PrimeField,
+    PC: HomomorphicCommitment<F>,
+> {
     pub comm: PC::Commitment,
     pub r0: F,
 }
 
-impl<F: PrimeField, PC: HomomorphicCommitment<F>> LinearisationPolyCommitment<F, PC> {
+impl<F: PrimeField, PC: HomomorphicCommitment<F>>
+    LinearisationPolyCommitment<F, PC>
+{
     pub fn from_const(r0: F) -> Self {
         Self {
-            comm: PC::zero_comm(), 
-            r0
+            comm: PC::zero_comm(),
+            r0,
         }
     }
 
     pub fn from_commitment(c: PC::Commitment) -> Self {
         Self {
-            comm: c, 
+            comm: c,
             r0: F::zero(),
         }
     }
@@ -78,7 +84,9 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> LinearisationPolyCommitment<F,
 
 // TODO: Consider deriving Add, Neg, Mul for PC::Commitment
 
-impl<F: PrimeField, PC: HomomorphicCommitment<F>> Neg for LinearisationPolyCommitment<F, PC> {
+impl<F: PrimeField, PC: HomomorphicCommitment<F>> Neg
+    for LinearisationPolyCommitment<F, PC>
+{
     type Output = Self;
     fn neg(self) -> Self::Output {
         Self {
@@ -88,7 +96,9 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Neg for LinearisationPolyCommi
     }
 }
 
-impl<F: PrimeField, PC: HomomorphicCommitment<F>> Add for LinearisationPolyCommitment<F, PC> {
+impl<F: PrimeField, PC: HomomorphicCommitment<F>> Add
+    for LinearisationPolyCommitment<F, PC>
+{
     type Output = Self;
     fn add(self, rhs: Self) -> Self::Output {
         Self {
@@ -98,7 +108,9 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Add for LinearisationPolyCommi
     }
 }
 
-impl<F: PrimeField, PC: HomomorphicCommitment<F>> Sub for LinearisationPolyCommitment<F, PC> {
+impl<F: PrimeField, PC: HomomorphicCommitment<F>> Sub
+    for LinearisationPolyCommitment<F, PC>
+{
     type Output = Self;
     fn sub(self, rhs: Self) -> Self::Output {
         Self {
@@ -108,7 +120,9 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Sub for LinearisationPolyCommi
     }
 }
 
-impl<F: PrimeField, PC: HomomorphicCommitment<F>> Mul<F> for LinearisationPolyCommitment<F, PC> {
+impl<F: PrimeField, PC: HomomorphicCommitment<F>> Mul<F>
+    for LinearisationPolyCommitment<F, PC>
+{
     type Output = Self;
     fn mul(self, rhs: F) -> Self::Output {
         Self {

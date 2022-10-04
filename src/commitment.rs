@@ -1,17 +1,19 @@
 //! Useful commitment stuff
 use ark_ec::{msm::VariableBaseMSM, AffineCurve, PairingEngine};
-use ark_ff::{Zero, One, PrimeField};
+use ark_ff::{One, PrimeField, Zero};
 use ark_poly::univariate::DensePolynomial;
 use ark_poly_commit::{sonic_pc::SonicKZG10, PolynomialCommitment};
 
 /// A homomorphic polynomial commitment
-pub trait HomomorphicCommitment<F>: PolynomialCommitment<F, DensePolynomial<F>>
+pub trait HomomorphicCommitment<F>:
+    PolynomialCommitment<F, DensePolynomial<F>>
 where
     F: PrimeField,
     Self::VerifierKey: core::fmt::Debug,
 {
     /// Combine a linear combination of homomorphic commitments
-    fn msm(commitments: &[Self::Commitment], scalars: &[F]) -> Self::Commitment;
+    fn msm(commitments: &[Self::Commitment], scalars: &[F])
+        -> Self::Commitment;
 
     fn neg_com(commitment: &Self::Commitment) -> Self::Commitment;
 
@@ -36,7 +38,10 @@ impl<E> HomomorphicCommitment<E::Fr> for KZG10<E>
 where
     E: PairingEngine,
 {
-    fn msm(commitments: &[Self::Commitment], scalars: &[E::Fr]) -> Self::Commitment {
+    fn msm(
+        commitments: &[Self::Commitment],
+        scalars: &[E::Fr],
+    ) -> Self::Commitment {
         let scalars_repr = scalars
             .iter()
             .map(<E::Fr as PrimeField>::into_repr)
@@ -45,7 +50,8 @@ where
         let points_repr = commitments.iter().map(|c| c.0).collect::<Vec<_>>();
 
         ark_poly_commit::kzg10::Commitment::<E>(
-            VariableBaseMSM::multi_scalar_mul(&points_repr, &scalars_repr).into(),
+            VariableBaseMSM::multi_scalar_mul(&points_repr, &scalars_repr)
+                .into(),
         )
     }
 
@@ -53,7 +59,10 @@ where
         ark_poly_commit::kzg10::Commitment::<E>(c.0.mul(-E::Fr::one()).into())
     }
 
-    fn scale_com(commitment: &Self::Commitment, scalar: E::Fr) -> Self::Commitment {
+    fn scale_com(
+        commitment: &Self::Commitment,
+        scalar: E::Fr,
+    ) -> Self::Commitment {
         ark_poly_commit::kzg10::Commitment::<E>(commitment.0.mul(scalar).into())
     }
 
@@ -68,6 +77,4 @@ where
     fn is_zero(c: &Self::Commitment) -> bool {
         c.0.is_zero()
     }
-
-
 }

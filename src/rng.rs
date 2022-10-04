@@ -23,7 +23,9 @@ pub struct SimpleHashFiatShamirRng<D: Digest, R: RngCore + SeedableRng> {
     digest: PhantomData<D>,
 }
 
-impl<D: Digest, R: RngCore + SeedableRng> RngCore for SimpleHashFiatShamirRng<D, R> {
+impl<D: Digest, R: RngCore + SeedableRng> RngCore
+    for SimpleHashFiatShamirRng<D, R>
+{
     #[inline]
     fn next_u32(&mut self) -> u32 {
         self.r.next_u32()
@@ -40,12 +42,16 @@ impl<D: Digest, R: RngCore + SeedableRng> RngCore for SimpleHashFiatShamirRng<D,
     }
 
     #[inline]
-    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), ark_std::rand::Error> {
+    fn try_fill_bytes(
+        &mut self,
+        dest: &mut [u8],
+    ) -> Result<(), ark_std::rand::Error> {
         Ok(self.r.fill_bytes(dest))
     }
 }
 
-impl<D: Digest, R: RngCore + SeedableRng> FiatShamirRng for SimpleHashFiatShamirRng<D, R>
+impl<D: Digest, R: RngCore + SeedableRng> FiatShamirRng
+    for SimpleHashFiatShamirRng<D, R>
 where
     R::Seed: From<[u8; 32]>,
 {
@@ -57,7 +63,8 @@ where
         initial_input
             .write(&mut bytes)
             .expect("failed to convert to bytes");
-        let seed = FromBytes::read(D::digest(&bytes).as_ref()).expect("failed to get [u8; 32]");
+        let seed = FromBytes::read(D::digest(&bytes).as_ref())
+            .expect("failed to get [u8; 32]");
         let r = R::from_seed(<R::Seed>::from(seed));
         Self {
             r,
@@ -75,7 +82,8 @@ where
             .write(&mut bytes)
             .expect("failed to convert to bytes");
         bytes.extend_from_slice(&self.seed);
-        self.seed = FromBytes::read(D::digest(&bytes).as_ref()).expect("failed to get [u8; 32]");
+        self.seed = FromBytes::read(D::digest(&bytes).as_ref())
+            .expect("failed to get [u8; 32]");
         self.r = R::from_seed(<R::Seed>::from(self.seed));
     }
 }
