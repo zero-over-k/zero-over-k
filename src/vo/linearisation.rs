@@ -78,11 +78,13 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>>
     }
 }
 
-impl<F: PrimeField, PC: HomomorphicCommitment<F>> Zero for LinearisationPolyCommitment<F, PC> {
+impl<F: PrimeField, PC: HomomorphicCommitment<F>> Zero
+    for LinearisationPolyCommitment<F, PC>
+{
     fn zero() -> Self {
         Self {
-            comm: PC::zero_comm(), 
-            r0: F::zero()
+            comm: PC::zero_comm(),
+            r0: F::zero(),
         }
     }
 

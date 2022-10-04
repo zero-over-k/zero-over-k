@@ -4,8 +4,9 @@ use crate::{
     concrete_oracle::OracleType,
     vo::{
         expression::Expression,
+        linearisation::{LinearisationOracleQuery, LinearisationQueryContext},
         query::{InstanceQuery, Rotation, VirtualQuery, WitnessQuery},
-        VirtualOracle, LinearisableVirtualOracle, linearisation::{LinearisationOracleQuery, LinearisationQueryContext},
+        LinearisableVirtualOracle, VirtualOracle,
     },
 };
 
@@ -16,7 +17,7 @@ pub struct MulVO<F: PrimeField> {
     wtns_queries: Vec<WitnessQuery>,
     instance_queries: Vec<InstanceQuery>,
     expression: Option<Expression<F>>,
-    linearisation_expression: Option<Expression<F>>
+    linearisation_expression: Option<Expression<F>>,
 }
 
 impl<F: PrimeField> MulVO<F> {
@@ -47,7 +48,7 @@ impl<F: PrimeField> MulVO<F> {
             wtns_queries: vec![],
             instance_queries: vec![],
             expression: None,
-            linearisation_expression: None
+            linearisation_expression: None,
         }
     }
 
@@ -86,24 +87,27 @@ impl<F: PrimeField> MulVO<F> {
         let linearisation_expression = || {
             let a: Expression<F> = LinearisationOracleQuery {
                 index: self.wtns_queries[0].index,
-                rotation: self.wtns_queries[0].rotation, 
-                oracle_type: OracleType::Witness, 
-                ctx: LinearisationQueryContext::AsEval
-            }.into();
+                rotation: self.wtns_queries[0].rotation,
+                oracle_type: OracleType::Witness,
+                ctx: LinearisationQueryContext::AsEval,
+            }
+            .into();
 
             let b: Expression<F> = LinearisationOracleQuery {
                 index: self.wtns_queries[1].index,
-                rotation: self.wtns_queries[1].rotation, 
-                oracle_type: OracleType::Witness, 
-                ctx: LinearisationQueryContext::AsEval
-            }.into();
+                rotation: self.wtns_queries[1].rotation,
+                oracle_type: OracleType::Witness,
+                ctx: LinearisationQueryContext::AsEval,
+            }
+            .into();
 
             let c: Expression<F> = LinearisationOracleQuery {
                 index: self.instance_queries[0].index,
-                rotation: self.instance_queries[0].rotation, 
-                oracle_type: OracleType::Instance, 
-                ctx: LinearisationQueryContext::AsEval
-            }.into();
+                rotation: self.instance_queries[0].rotation,
+                oracle_type: OracleType::Instance,
+                ctx: LinearisationQueryContext::AsEval,
+            }
+            .into();
 
             a * b - c
         };

@@ -2,13 +2,18 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::iter::successors;
 use std::marker::PhantomData;
 
-use crate::concrete_oracle::{Queriable, QueryContext, QueryPoint, QuerySetProvider};
+use crate::concrete_oracle::{
+    OracleType, Queriable, QueryContext, QueryPoint, QuerySetProvider,
+};
 use crate::error::Error;
-use crate::vo::linearisation::LinearisationOracleQuery;
+use crate::vo::linearisation::{
+    LinearisationInfo, LinearisationOracleQuery, LinearisationPolyCommitment,
+    LinearisationQueriable, LinearisationQueryResponse,
+};
 use crate::vo::query::{Query, Rotation};
-use ark_ff::{to_bytes, PrimeField, UniformRand};
+use ark_ff::{to_bytes, PrimeField, UniformRand, Zero};
 use ark_poly::univariate::DensePolynomial;
-use ark_poly::{Polynomial, GeneralEvaluationDomain, EvaluationDomain};
+use ark_poly::{EvaluationDomain, GeneralEvaluationDomain, Polynomial};
 use ark_poly_commit::LabeledCommitment;
 use ark_poly_commit::LabeledPolynomial;
 use ark_poly_commit::PCCommitterKey;
@@ -28,7 +33,7 @@ use iop::IOPforPolyIdentity;
 use rng::FiatShamirRng;
 use vo::query::InstanceQuery;
 use vo::query::WitnessQuery;
-use vo::{VirtualOracle, LinearisableVirtualOracle};
+use vo::{LinearisableVirtualOracle, VirtualOracle};
 
 pub mod commitment;
 pub mod concrete_oracle;
@@ -40,11 +45,7 @@ pub mod vo;
 
 mod tests;
 
-pub struct PIL<
-    F: PrimeField,
-    PC: HomomorphicCommitment<F>,
-    FS: FiatShamirRng,
-> {
+pub struct PIL<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng> {
     _field: PhantomData<F>,
     _pc: PhantomData<PC>,
     _fs: PhantomData<FS>,
@@ -164,13 +165,12 @@ where
         // --------------------------------------------------------------------
         // Third round
 
-        let prover_third_oracles =
-            IOPforPolyIdentity::prover_third_round::<PC>(
-                &verifier_first_msg,
-                &verifier_second_msg,
-                &mut prover_state,
-                pk.committer_key.max_degree(),
-            )?;
+        let prover_third_oracles = IOPforPolyIdentity::prover_third_round::<PC>(
+            &verifier_first_msg,
+            &verifier_second_msg,
+            &mut prover_state,
+            pk.committer_key.max_degree(),
+        )?;
         let third_oracles_labeled: Vec<
             LabeledPolynomial<F, DensePolynomial<F>>,
         > = prover_third_oracles
@@ -178,11 +178,11 @@ where
             .map(|oracle| oracle.to_labeled())
             .collect();
 
-        // let (third_comms, third_comm_rands) =
-        //     PC::commit(&pk.committer_key, &third_oracles_labeled, None)
-        //         .map_err(Error::from_pc_err)?;
+        let (third_comms, third_comm_rands) =
+            PC::commit(&pk.committer_key, &third_oracles_labeled, None)
+                .map_err(Error::from_pc_err)?;
 
-        // fs_rng.absorb(&to_bytes![third_comms].unwrap());
+        fs_rng.absorb(&to_bytes![third_comms].unwrap());
         // --------------------------------------------------------------------
 
         // Gather prover polynomials in one vector.
@@ -205,27 +205,46 @@ where
         let omegas = domain.elements().collect();
         let mut query_set = QuerySet::<F>::new();
         for vo in vos {
-            let q_set_i = vo.get_expression().compute_query_set(
-                &|query: &WitnessQuery| {
-                    let oracle = &prover_state.witness_oracles[query.get_index()];
-                    let point_info = oracle.get_point_info(verifier_second_msg.label, verifier_second_msg.xi, &omegas, query.rotation);
-                    vec![(oracle.label.clone(), point_info)]
-                }
-            );
+            let q_set_i = vo
+                .get_linearisation_expression()
+                .compute_linearisation_query_set(
+                    &|query: &LinearisationOracleQuery| {
+                        let oracle = match query.oracle_type {
+                            concrete_oracle::OracleType::Witness => {
+                                &prover_state.witness_oracles[query.index]
+                            }
+                            concrete_oracle::OracleType::Instance => {
+                                // Do not commit&open to instance
+                                return vec![];
+                            }
+                        };
+
+                        let point_info = oracle.get_point_info(
+                            verifier_second_msg.label,
+                            verifier_second_msg.xi,
+                            &omegas,
+                            query.rotation,
+                        );
+                        vec![(oracle.label.clone(), point_info)]
+                    },
+                );
 
             query_set.extend(q_set_i);
         }
 
-        // assert_eq!(query_set_from_vos, query_set_from_expressions);
-
         // Append quotient chunks queries to query_set
         for chunk in &prover_second_oracles {
-            let point_info = chunk.get_point_info(verifier_second_msg.label, verifier_second_msg.xi, &omegas, Rotation::curr());
+            let point_info = chunk.get_point_info(
+                verifier_second_msg.label,
+                verifier_second_msg.xi,
+                &omegas,
+                Rotation::curr(),
+            );
             query_set.insert((chunk.label.clone(), point_info));
         }
         // END QUERY SET
 
-        // println!("query set: {:?}", query_set);
+        println!("query set: {:?}", query_set);
         // println!("---------------------------");
 
         let evals = ark_poly_commit::evaluate_query_set(
@@ -244,7 +263,6 @@ where
         // END SANITY CHECK
 
         let evals = evals.into_iter().map(|item| item.1).collect::<Vec<F>>();
-
         fs_rng.absorb(&evals);
 
         // TODO: add evaluations in transcript
@@ -405,8 +423,6 @@ where
 
         // --------------------------------------------------------------------
 
-        fs_rng.absorb(&proof.evaluations);
-
         let commitment_labels = witness_oracles
             .iter()
             .chain(quotient_chunks.iter())
@@ -424,25 +440,45 @@ where
         let omegas = domain.elements().collect();
         let mut query_set = QuerySet::<F>::new();
         for vo in vos {
-            let q_set_i = vo.get_expression().compute_query_set(
-                &|query: &WitnessQuery| {
-                    let oracle = &witness_oracles[query.get_index()];
-                    let point_info = oracle.get_point_info(verifier_second_msg.label, verifier_second_msg.xi, &omegas, query.rotation);
-                    vec![(oracle.label.clone(), point_info)]
-                }
-            );
+            let q_set_i = vo
+                .get_linearisation_expression()
+                .compute_linearisation_query_set(
+                    &|query: &LinearisationOracleQuery| {
+                        let oracle = match query.oracle_type {
+                            concrete_oracle::OracleType::Witness => {
+                                &witness_oracles[query.index]
+                            }
+                            concrete_oracle::OracleType::Instance => {
+                                return vec![]
+                            } // Do not commit&open on instance
+                        };
+
+                        let point_info = oracle.get_point_info(
+                            verifier_second_msg.label,
+                            verifier_second_msg.xi,
+                            &omegas,
+                            query.rotation,
+                        );
+                        vec![(oracle.label.clone(), point_info)]
+                    },
+                );
 
             query_set.extend(q_set_i);
         }
 
         // Append quotient chunks queries to query_set
         for chunk in &quotient_chunks {
-            let point_info = chunk.get_point_info(verifier_second_msg.label, verifier_second_msg.xi, &omegas, Rotation::curr());
+            let point_info = chunk.get_point_info(
+                verifier_second_msg.label,
+                verifier_second_msg.xi,
+                &omegas,
+                Rotation::curr(),
+            );
             query_set.insert((chunk.label.clone(), point_info));
         }
         // END QUERY SET
 
-        // println!("query set: {:?}", query_set);
+        println!("query set: {:?}", query_set);
 
         assert_eq!(query_set.len(), proof.evaluations.len());
 
@@ -451,6 +487,7 @@ where
             .enumerate()
             .map(|(i, oracle)| (oracle.label.clone(), i))
             .collect::<BTreeMap<String, usize>>();
+
         let quotient_chunks_label_index_mapping = quotient_chunks
             .iter()
             .enumerate()
@@ -486,7 +523,93 @@ where
             })
             .collect();
 
-        // println!("evaluations: {:?}", evaluations);
+        // BEGIN LINEARISATION POLY
+        let info = LinearisationInfo {
+            domain_size,
+            opening_challenge: verifier_second_msg.xi,
+        };
+
+        let mut linearisation_poly =
+            LinearisationPolyCommitment::<F, PC>::zero();
+
+        for vo in vos {
+            let linearisation_i = vo.get_linearisation_expression().evaluate(
+                &|x: F| LinearisationPolyCommitment::from_const(x),
+                &|_: &WitnessQuery| {
+                    // let oracle = &state.witness_oracles[query.get_index()];
+                    // oracle.query(&query.rotation, &query_context)
+                    panic!("Not allowed here")
+                },
+                &|_: &InstanceQuery| {
+                    // let oracle = &state.instance_oracles[query.get_index()];
+                    // oracle.query(&query.rotation, &query_context)
+                    panic!("Not allowed here")
+                },
+                &|x: LinearisationPolyCommitment<F, PC>| -x,
+                &|x: LinearisationPolyCommitment<F, PC>,
+                  y: LinearisationPolyCommitment<F, PC>| x + y,
+                &|x: LinearisationPolyCommitment<F, PC>,
+                  y: LinearisationPolyCommitment<F, PC>| {
+                    // TODO: do better order of ifs
+                    if !x.is_const() && !y.is_const() {
+                        panic!("Equation is not linearised correctly")
+                    }
+
+                    if x.is_const() {
+                        y * x.r0
+                    } else if y.is_const() {
+                        x * y.r0
+                    } else {
+                        LinearisationPolyCommitment::from_const(x.r0 * y.r0)
+                    }
+                },
+                &|x: LinearisationPolyCommitment<F, PC>, y: F| x * y,
+                &|query: &LinearisationOracleQuery| {
+                    let query_response: LinearisationQueryResponse<F, PC> =
+                        match query.oracle_type {
+                            OracleType::Witness => witness_oracles[query.index]
+                                .query_for_linearisation(
+                                    &query.rotation,
+                                    &query.ctx,
+                                    &info,
+                                ),
+                            OracleType::Instance => instance_oracles
+                                [query.index]
+                                .query_for_linearisation(
+                                    &query.rotation,
+                                    &query.ctx,
+                                    &info,
+                                ),
+                        };
+
+                    match query_response {
+                        LinearisationQueryResponse::Opening(x) => {
+                            LinearisationPolyCommitment::from_const(x)
+                        }
+                        LinearisationQueryResponse::Poly(_) => {
+                            panic!("Poly not possible from committed oracle")
+                        }
+                        LinearisationQueryResponse::Commitment(c) => {
+                            LinearisationPolyCommitment::from_commitment(c)
+                        }
+                    }
+                },
+            );
+
+            linearisation_poly = linearisation_poly + linearisation_i;
+        }
+        // END LINEARISATION POLY
+
+        // --------------------------------------------------------------------
+        // Third round
+
+        // Linearisation commitment and eval are being derived by verifier
+        //
+        fs_rng.absorb(&to_bytes![linearisation_poly.comm].unwrap());
+
+        // --------------------------------------------------------------------
+
+        fs_rng.absorb(&proof.evaluations);
 
         let opening_challenge: F = u128::rand(&mut fs_rng).into();
 

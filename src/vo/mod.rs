@@ -30,6 +30,6 @@ pub trait VirtualOracle<F: PrimeField> {
     fn get_expression(&self) -> &Expression<F>;
 }
 
-pub trait LinearisableVirtualOracle<F: PrimeField> : VirtualOracle<F> {
+pub trait LinearisableVirtualOracle<F: PrimeField>: VirtualOracle<F> {
     fn get_linearisation_expression(&self) -> &Expression<F>;
 }

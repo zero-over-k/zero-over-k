@@ -8,16 +8,20 @@ use ark_poly::{
 use ark_std::rand::Rng;
 
 use crate::{
+    commitment::HomomorphicCommitment,
     concrete_oracle::{
         OracleType, ProverConcreteOracle, Queriable, QueryContext, QueryPoint,
     },
     iop::error::Error,
     iop::{verifier::VerifierFirstMsg, IOPforPolyIdentity},
     vo::{
-        linearisation::{LinearisationOracleQuery, LinearisationQueryResponse, LinearisationQueriable, LinearisationInfo},
+        linearisation::{
+            LinearisationInfo, LinearisationOracleQuery,
+            LinearisationQueriable, LinearisationQueryResponse,
+        },
         query::{InstanceQuery, Query, Rotation, WitnessQuery},
-        VirtualOracle, LinearisableVirtualOracle,
-    }, commitment::HomomorphicCommitment,
+        LinearisableVirtualOracle, VirtualOracle,
+    },
 };
 
 use super::verifier::VerifierSecondMsg;
@@ -32,7 +36,7 @@ pub struct ProverState<'a, F: PrimeField> {
     pub(crate) vos: &'a Vec<Box<dyn LinearisableVirtualOracle<F>>>,
     pub(crate) domain: GeneralEvaluationDomain<F>,
     pub(crate) vanishing_polynomial: DensePolynomial<F>,
-    pub(crate) quotient_chunks: Option<Vec<ProverConcreteOracle<F>>>
+    pub(crate) quotient_chunks: Option<Vec<ProverConcreteOracle<F>>>,
 }
 
 impl<F: PrimeField> IOPforPolyIdentity<F> {
@@ -62,7 +66,7 @@ impl<F: PrimeField> IOPforPolyIdentity<F> {
             vos: vos,
             domain,
             vanishing_polynomial: vanishing_polynomial.clone(),
-            quotient_chunks: None
+            quotient_chunks: None,
         }
     }
     pub fn prover_first_round<'a, R: Rng>(
@@ -240,8 +244,7 @@ impl<F: PrimeField> IOPforPolyIdentity<F> {
         verifier_second_msg: &VerifierSecondMsg<F>,
         state: &mut ProverState<F>,
         srs_size: usize,
-    ) -> Result<Vec<ProverConcreteOracle<F>>, Error>{
-
+    ) -> Result<Vec<ProverConcreteOracle<F>>, Error> {
         let powers_of_alpha: Vec<F> = successors(Some(F::one()), |alpha_i| {
             Some(*alpha_i * verifier_first_msg.alpha)
         })
@@ -258,12 +261,8 @@ impl<F: PrimeField> IOPforPolyIdentity<F> {
         for (i, vo) in state.vos.iter().enumerate() {
             let linearisation_i = vo.get_linearisation_expression().evaluate(
                 &|x: F| DensePolynomial::from_coefficients_slice(&[x]),
-                &|_: &WitnessQuery| {
-                    panic!("Not allowed here")
-                },
-                &|_: &InstanceQuery| {
-                    panic!("Not allowed here")
-                },
+                &|_: &WitnessQuery| panic!("Not allowed here"),
+                &|_: &InstanceQuery| panic!("Not allowed here"),
                 &|x: DensePolynomial<F>| -x,
                 &|x: DensePolynomial<F>, y: DensePolynomial<F>| x + y,
                 &|x: DensePolynomial<F>, y: DensePolynomial<F>| &x * &y,
@@ -271,20 +270,22 @@ impl<F: PrimeField> IOPforPolyIdentity<F> {
                 &|query: &LinearisationOracleQuery| {
                     let query_response: LinearisationQueryResponse<F, PC> =
                         match query.oracle_type {
-                            OracleType::Witness => state.witness_oracles[query.index]
+                            OracleType::Witness => state.witness_oracles
+                                [query.index]
                                 .query_for_linearisation(
                                     &query.rotation,
                                     &query.ctx,
                                     &info,
                                 ),
-                            OracleType::Instance => state.instance_oracles[query.index]
+                            OracleType::Instance => state.instance_oracles
+                                [query.index]
                                 .query_for_linearisation(
                                     &query.rotation,
                                     &query.ctx,
                                     &info,
                                 ),
                         };
-    
+
                     match query_response {
                         LinearisationQueryResponse::Opening(x) => {
                             DensePolynomial::from_coefficients_slice(&[x])
@@ -297,17 +298,19 @@ impl<F: PrimeField> IOPforPolyIdentity<F> {
                 },
             );
 
-            linearisation_poly += &(&linearisation_i*powers_of_alpha[i])
+            linearisation_poly += &(&linearisation_i * powers_of_alpha[i])
         }
 
-        let quotient_chunks = state.quotient_chunks.as_ref().expect("Quotient chunks are not in the state");
+        let quotient_chunks = state
+            .quotient_chunks
+            .as_ref()
+            .expect("Quotient chunks are not in the state");
 
         let x_n = verifier_second_msg.xi.pow([srs_size as u64, 0, 0, 0]);
         let powers_of_x: Vec<F> =
             successors(Some(F::one()), |x_i| Some(*x_i * x_n))
                 .take(quotient_chunks.len())
                 .collect();
-
 
         let query_context = QueryContext::Opening(
             state.domain.size(),
@@ -318,13 +321,25 @@ impl<F: PrimeField> IOPforPolyIdentity<F> {
         for (&x_i, t_i) in powers_of_x.iter().zip(quotient_chunks.iter()) {
             t_part += x_i * t_i.query(&Rotation::curr(), &query_context);
         }
-        linearisation_poly[0] -= t_part * state.vanishing_polynomial.evaluate(&verifier_second_msg.xi);
+        linearisation_poly[0] -= t_part
+            * state.vanishing_polynomial.evaluate(&verifier_second_msg.xi);
 
         // sanity check
-        assert_eq!(linearisation_poly.evaluate(&verifier_second_msg.xi), F::zero());
+        assert_eq!(
+            linearisation_poly.evaluate(&verifier_second_msg.xi),
+            F::zero()
+        );
 
-        let linearisation_poly = ProverConcreteOracle { label: "linearisation_poly".into(), poly: linearisation_poly, evals_at_coset_of_extended_domain: None, oracle_type: OracleType::Witness, queried_rotations: BTreeSet::from([Rotation::curr()]), should_mask: false };
+        println!("r0 on prover side: {}", linearisation_poly[0]);
+
+        let linearisation_poly = ProverConcreteOracle {
+            label: "linearisation_poly".into(),
+            poly: linearisation_poly,
+            evals_at_coset_of_extended_domain: None,
+            oracle_type: OracleType::Witness,
+            queried_rotations: BTreeSet::from([Rotation::curr()]),
+            should_mask: false,
+        };
         Ok(vec![linearisation_poly])
-
     }
 }

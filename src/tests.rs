@@ -19,23 +19,22 @@ mod test {
     use crate::PIL;
     use blake2::Blake2s;
 
-    use crate::vo::{VirtualOracle, LinearisableVirtualOracle};
+    use crate::vo::{LinearisableVirtualOracle, VirtualOracle};
     use crate::{
+        commitment::KZG10,
         concrete_oracle::{OracleType, ProverConcreteOracle},
         vo::precompiled::mul::MulVO,
-        commitment::KZG10
     };
 
     type F = Fr;
     type FS = SimpleHashFiatShamirRng<Blake2s, ChaChaRng>;
-    // type PC = MarlinKZG10<Bls12_381, DensePolynomial<F>>;
     type PC = KZG10<Bls12_381>;
 
     type PilInstance = PIL<F, PC, FS>;
 
     #[test]
     fn test_simple_mul() {
-        let max_degree = 17;
+        let max_degree = 30;
         let mut rng = test_rng();
 
         let srs = PilInstance::universal_setup(max_degree, &mut rng).unwrap();
@@ -101,7 +100,8 @@ mod test {
 
         let concrete_oracles = [a, b, c.clone()];
 
-        let vos: Vec<Box<dyn LinearisableVirtualOracle<F>>> = vec![Box::new(mul_vo)];
+        let vos: Vec<Box<dyn LinearisableVirtualOracle<F>>> =
+            vec![Box::new(mul_vo)];
 
         let proof = PilInstance::prove(
             &pk,

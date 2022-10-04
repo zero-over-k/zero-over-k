@@ -166,19 +166,17 @@ impl<F: PrimeField> Expression<F> {
                 lhs.extend(rhs);
                 lhs
             }
-            Expression::Scaled(exp, _) => {
-                exp.compute_query_set(wtns_fn)
-            }
+            Expression::Scaled(exp, _) => exp.compute_query_set(wtns_fn),
             Expression::Linearisation(_) => panic!("Not allowed here"),
         }
     }
 
     pub fn compute_linearisation_query_set(
         &self,
-        oracle_fn: &impl Fn(&LinearisationOracleQuery) -> QuerySet<F>,
-    ) -> QuerySet<F> {
+        oracle_fn: &impl Fn(&LinearisationOracleQuery) -> Vec<(String, (String, F))>,
+    ) -> Vec<(String, (String, F))> {
         match self {
-            Expression::Constant(_) => QuerySet::new(),
+            Expression::Constant(_) => vec![],
             Expression::Witness(_) => panic!("Not allowed"),
             Expression::Instance(_) => panic!("Not allowed"),
             Expression::Negated(expression) => {

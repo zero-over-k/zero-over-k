@@ -27,6 +27,7 @@ pub trait QuerySetProvider<F: PrimeField> {
         domain_size: usize,
     ) -> QuerySet<F>;
 
+    // TODO: implement this function in Rotation
     fn get_point_info(
         &self,
         opening_challenge_label: &str,
@@ -34,9 +35,8 @@ pub trait QuerySetProvider<F: PrimeField> {
         omegas: &Vec<F>,
         rotation: Rotation,
     ) -> (String, F) {
-
         if rotation.degree == 0 {
-            return (opening_challenge_label.into(), opening_challenge)
+            return (opening_challenge_label.into(), opening_challenge);
         } else {
             let (omega, point_label) = match &rotation.sign {
                 Sign::Plus => {
@@ -48,8 +48,7 @@ pub trait QuerySetProvider<F: PrimeField> {
                     (omega, point_label)
                 }
                 Sign::Minus => {
-                    let omega =
-                        omegas[rotation.degree].inverse().unwrap();
+                    let omega = omegas[rotation.degree].inverse().unwrap();
                     let point_label = format!(
                         "omega_-{}_{}",
                         rotation.degree, opening_challenge_label
