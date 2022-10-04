@@ -26,6 +26,42 @@ pub trait QuerySetProvider<F: PrimeField> {
         opening_challenge: F,
         domain_size: usize,
     ) -> QuerySet<F>;
+
+    fn get_point_info(
+        &self,
+        opening_challenge_label: &str,
+        opening_challenge: F,
+        omegas: &Vec<F>,
+        rotation: Rotation,
+    ) -> (String, F) {
+
+        if rotation.degree == 0 {
+            return (opening_challenge_label.into(), opening_challenge)
+        } else {
+            let (omega, point_label) = match &rotation.sign {
+                Sign::Plus => {
+                    let omega = omegas[rotation.degree];
+                    let point_label = format!(
+                        "omega_{}_{}",
+                        rotation.degree, opening_challenge_label
+                    );
+                    (omega, point_label)
+                }
+                Sign::Minus => {
+                    let omega =
+                        omegas[rotation.degree].inverse().unwrap();
+                    let point_label = format!(
+                        "omega_-{}_{}",
+                        rotation.degree, opening_challenge_label
+                    );
+                    (omega, point_label)
+                }
+            };
+
+            let point = omega * opening_challenge;
+            (point_label, point)
+        }
+    }
 }
 #[derive(Debug)]
 pub enum QueryPoint<F: PrimeField> {

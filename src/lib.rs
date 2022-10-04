@@ -2,18 +2,19 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::iter::successors;
 use std::marker::PhantomData;
 
-use crate::concrete_oracle::{Queriable, QueryContext, QueryPoint};
+use crate::concrete_oracle::{Queriable, QueryContext, QueryPoint, QuerySetProvider};
 use crate::error::Error;
 use crate::vo::linearisation::LinearisationOracleQuery;
 use crate::vo::query::{Query, Rotation};
 use ark_ff::{to_bytes, PrimeField, UniformRand};
 use ark_poly::univariate::DensePolynomial;
-use ark_poly::Polynomial;
+use ark_poly::{Polynomial, GeneralEvaluationDomain, EvaluationDomain};
 use ark_poly_commit::LabeledCommitment;
 use ark_poly_commit::LabeledPolynomial;
 use ark_poly_commit::PCCommitterKey;
 use ark_poly_commit::PCUniversalParams;
 use ark_poly_commit::PolynomialCommitment;
+use ark_poly_commit::QuerySet;
 use ark_std::rand::Rng;
 use ark_std::rand::RngCore;
 use concrete_oracle::ProverConcreteOracle;
@@ -152,7 +153,7 @@ where
 
         fs_rng.absorb(&to_bytes![second_comms].unwrap());
 
-        let (_verifier_second_msg, verifier_state) =
+        let (verifier_second_msg, verifier_state) =
             IOPforPolyIdentity::verifier_second_round(
                 verifier_state,
                 &mut fs_rng,
@@ -174,13 +175,30 @@ where
             .chain(second_comm_rands)
             .collect();
 
-        // Compute the AHP verifier's query set.
-        let query_set = IOPforPolyIdentity::get_query_set(
-            &verifier_state,
-            prover_first_oracles
-                .iter()
-                .chain(prover_second_oracles.iter()),
-        );
+        // BEGIN QUERY SET
+        let domain = GeneralEvaluationDomain::<F>::new(domain_size).unwrap();
+        let omegas = domain.elements().collect();
+        let mut query_set = QuerySet::<F>::new();
+        for vo in vos {
+            let q_set_i = vo.get_expression().compute_query_set(
+                &|query: &WitnessQuery| {
+                    let oracle = &prover_state.witness_oracles[query.get_index()];
+                    let point_info = oracle.get_point_info(verifier_second_msg.label, verifier_second_msg.xi, &omegas, query.rotation);
+                    vec![(oracle.label.clone(), point_info)]
+                }
+            );
+
+            query_set.extend(q_set_i);
+        }
+
+        // assert_eq!(query_set_from_vos, query_set_from_expressions);
+
+        // Append quotient chunks queries to query_set
+        for chunk in &prover_second_oracles {
+            let point_info = chunk.get_point_info(verifier_second_msg.label, verifier_second_msg.xi, &omegas, Rotation::curr());
+            query_set.insert((chunk.label.clone(), point_info));
+        }
+        // END QUERY SET
 
         // println!("query set: {:?}", query_set);
         // println!("---------------------------");
@@ -376,10 +394,28 @@ where
             .map(|(c, label)| LabeledCommitment::new(label, c.clone(), None))
             .collect();
 
-        let query_set = IOPforPolyIdentity::get_query_set(
-            &verifier_state,
-            witness_oracles.iter().chain(quotient_chunks.iter()),
-        );
+        // BEGIN QUERY SET
+        let domain = GeneralEvaluationDomain::<F>::new(domain_size).unwrap();
+        let omegas = domain.elements().collect();
+        let mut query_set = QuerySet::<F>::new();
+        for vo in vos {
+            let q_set_i = vo.get_expression().compute_query_set(
+                &|query: &WitnessQuery| {
+                    let oracle = &witness_oracles[query.get_index()];
+                    let point_info = oracle.get_point_info(verifier_second_msg.label, verifier_second_msg.xi, &omegas, query.rotation);
+                    vec![(oracle.label.clone(), point_info)]
+                }
+            );
+
+            query_set.extend(q_set_i);
+        }
+
+        // Append quotient chunks queries to query_set
+        for chunk in &quotient_chunks {
+            let point_info = chunk.get_point_info(verifier_second_msg.label, verifier_second_msg.xi, &omegas, Rotation::curr());
+            query_set.insert((chunk.label.clone(), point_info));
+        }
+        // END QUERY SET
 
         // println!("query set: {:?}", query_set);
 

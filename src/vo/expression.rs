@@ -7,8 +7,8 @@ use super::{
     linearisation::LinearisationOracleQuery,
     query::{InstanceQuery, WitnessQuery},
 };
-use ark_ff::{PrimeField};
-
+use ark_ff::PrimeField;
+use ark_poly_commit::QuerySet;
 
 #[derive(Clone)]
 pub enum Expression<F> {
@@ -141,6 +141,67 @@ impl<F: PrimeField> Expression<F> {
             Expression::Linearisation(_) => panic!("skip degree for now"),
         }
     }
+
+    /// Compute which oracles should be queried at which rotations
+    pub fn compute_query_set(
+        &self,
+        wtns_fn: &impl Fn(&WitnessQuery) -> Vec<(String, (String, F))>,
+    ) -> Vec<(String, (String, F))> {
+        match self {
+            Expression::Constant(_) => vec![],
+            Expression::Witness(query) => wtns_fn(query),
+            Expression::Instance(query) => vec![], // we don't commit&open to instance polys
+            Expression::Negated(expression) => {
+                expression.compute_query_set(wtns_fn)
+            }
+            Expression::Sum(a, b) => {
+                let mut lhs = a.compute_query_set(wtns_fn);
+                let rhs = b.compute_query_set(wtns_fn);
+                lhs.extend(rhs);
+                lhs
+            }
+            Expression::Product(a, b) => {
+                let mut lhs = a.compute_query_set(wtns_fn);
+                let rhs = b.compute_query_set(wtns_fn);
+                lhs.extend(rhs);
+                lhs
+            }
+            Expression::Scaled(exp, _) => {
+                exp.compute_query_set(wtns_fn)
+            }
+            Expression::Linearisation(_) => panic!("Not allowed here"),
+        }
+    }
+
+    pub fn compute_linearisation_query_set(
+        &self,
+        oracle_fn: &impl Fn(&LinearisationOracleQuery) -> QuerySet<F>,
+    ) -> QuerySet<F> {
+        match self {
+            Expression::Constant(_) => QuerySet::new(),
+            Expression::Witness(_) => panic!("Not allowed"),
+            Expression::Instance(_) => panic!("Not allowed"),
+            Expression::Negated(expression) => {
+                expression.compute_linearisation_query_set(oracle_fn)
+            }
+            Expression::Sum(a, b) => {
+                let mut lhs = a.compute_linearisation_query_set(oracle_fn);
+                let rhs = b.compute_linearisation_query_set(oracle_fn);
+                lhs.extend(rhs);
+                lhs
+            }
+            Expression::Product(a, b) => {
+                let mut lhs = a.compute_linearisation_query_set(oracle_fn);
+                let rhs = b.compute_linearisation_query_set(oracle_fn);
+                lhs.extend(rhs);
+                lhs
+            }
+            Expression::Scaled(exp, _) => {
+                exp.compute_linearisation_query_set(oracle_fn)
+            }
+            Expression::Linearisation(query) => oracle_fn(query),
+        }
+    }
 }
 
 impl<F: PrimeField> Neg for Expression<F> {
@@ -227,7 +288,7 @@ mod test {
     use ark_bls12_381::{Bls12_381, Fr as F};
     use ark_ff::{UniformRand, Zero};
     use ark_poly::{univariate::DensePolynomial, Polynomial, UVPolynomial};
-    
+
     use ark_poly_commit::{
         LabeledCommitment, LabeledPolynomial, PolynomialCommitment,
     };
@@ -306,52 +367,50 @@ mod test {
 
         let expr_to_linearise = q1 * q2 - q3;
 
-        let linearisation_poly = expr_to_linearise
-            .evaluate(
-                &|x: F| DensePolynomial::from_coefficients_slice(&[x]),
-                &|_: &WitnessQuery| {
-                    // let oracle = &state.witness_oracles[query.get_index()];
-                    // oracle.query(&query.rotation, &query_context)
-                    panic!("Not allowed here")
-                },
-                &|_: &InstanceQuery| {
-                    // let oracle = &state.instance_oracles[query.get_index()];
-                    // oracle.query(&query.rotation, &query_context)
-                    panic!("Not allowed here")
-                },
-                &|x: DensePolynomial<F>| -x,
-                &|x: DensePolynomial<F>, y: DensePolynomial<F>| x + y,
-                &|x: DensePolynomial<F>, y: DensePolynomial<F>| &x * &y,
-                &|x: DensePolynomial<F>, y: F| &x * y,
-                &|query: &LinearisationOracleQuery| {
-                    let query_response: LinearisationQueryResponse<F, PC> =
-                        match query.oracle_type {
-                            OracleType::Witness => wtns_oracles[query.index]
-                                .query_for_linearisation(
-                                    &query.rotation,
-                                    &query.ctx,
-                                    &info,
-                                ),
-                            OracleType::Instance => instance_oracles
-                                [query.index]
-                                .query_for_linearisation(
-                                    &query.rotation,
-                                    &query.ctx,
-                                    &info,
-                                ),
-                        };
+        let linearisation_poly = expr_to_linearise.evaluate(
+            &|x: F| DensePolynomial::from_coefficients_slice(&[x]),
+            &|_: &WitnessQuery| {
+                // let oracle = &state.witness_oracles[query.get_index()];
+                // oracle.query(&query.rotation, &query_context)
+                panic!("Not allowed here")
+            },
+            &|_: &InstanceQuery| {
+                // let oracle = &state.instance_oracles[query.get_index()];
+                // oracle.query(&query.rotation, &query_context)
+                panic!("Not allowed here")
+            },
+            &|x: DensePolynomial<F>| -x,
+            &|x: DensePolynomial<F>, y: DensePolynomial<F>| x + y,
+            &|x: DensePolynomial<F>, y: DensePolynomial<F>| &x * &y,
+            &|x: DensePolynomial<F>, y: F| &x * y,
+            &|query: &LinearisationOracleQuery| {
+                let query_response: LinearisationQueryResponse<F, PC> =
+                    match query.oracle_type {
+                        OracleType::Witness => wtns_oracles[query.index]
+                            .query_for_linearisation(
+                                &query.rotation,
+                                &query.ctx,
+                                &info,
+                            ),
+                        OracleType::Instance => instance_oracles[query.index]
+                            .query_for_linearisation(
+                                &query.rotation,
+                                &query.ctx,
+                                &info,
+                            ),
+                    };
 
-                    match query_response {
-                        LinearisationQueryResponse::Opening(x) => {
-                            DensePolynomial::from_coefficients_slice(&[x])
-                        }
-                        LinearisationQueryResponse::Poly(poly) => poly,
-                        LinearisationQueryResponse::Commitment(_) => {
-                            panic!("commitment not allowed here")
-                        }
+                match query_response {
+                    LinearisationQueryResponse::Opening(x) => {
+                        DensePolynomial::from_coefficients_slice(&[x])
                     }
-                },
-            );
+                    LinearisationQueryResponse::Poly(poly) => poly,
+                    LinearisationQueryResponse::Commitment(_) => {
+                        panic!("commitment not allowed here")
+                    }
+                }
+            },
+        );
 
         let oracle_by_hand = &(&a.poly * &b.poly) - &c.poly;
 
@@ -422,70 +481,67 @@ mod test {
         // let verifier_expression = q1 * q2 - q3;
 
         // TEST THAT comms[5] which corresponds to linearisation - r0 is same as one from verifier linearisation
-        let linearisation_derived_from_trait =
-            expr_to_linearise.evaluate(
-                &|x: F| LinearisationPolyCommitment::from_const(x),
-                &|_: &WitnessQuery| {
-                    // let oracle = &state.witness_oracles[query.get_index()];
-                    // oracle.query(&query.rotation, &query_context)
-                    panic!("Not allowed here")
-                },
-                &|_: &InstanceQuery| {
-                    // let oracle = &state.instance_oracles[query.get_index()];
-                    // oracle.query(&query.rotation, &query_context)
-                    panic!("Not allowed here")
-                },
-                &|x: LinearisationPolyCommitment<F, PC>| -x,
-                &|x: LinearisationPolyCommitment<F, PC>,
-                  y: LinearisationPolyCommitment<F, PC>| x + y,
-                &|x: LinearisationPolyCommitment<F, PC>,
-                  y: LinearisationPolyCommitment<F, PC>| {
-                    // TODO: do better order of ifs
-                    if !x.is_const() && !y.is_const() {
-                        panic!("Equation is not linearised correctly")
-                    }
+        let linearisation_derived_from_trait = expr_to_linearise.evaluate(
+            &|x: F| LinearisationPolyCommitment::from_const(x),
+            &|_: &WitnessQuery| {
+                // let oracle = &state.witness_oracles[query.get_index()];
+                // oracle.query(&query.rotation, &query_context)
+                panic!("Not allowed here")
+            },
+            &|_: &InstanceQuery| {
+                // let oracle = &state.instance_oracles[query.get_index()];
+                // oracle.query(&query.rotation, &query_context)
+                panic!("Not allowed here")
+            },
+            &|x: LinearisationPolyCommitment<F, PC>| -x,
+            &|x: LinearisationPolyCommitment<F, PC>,
+              y: LinearisationPolyCommitment<F, PC>| x + y,
+            &|x: LinearisationPolyCommitment<F, PC>,
+              y: LinearisationPolyCommitment<F, PC>| {
+                // TODO: do better order of ifs
+                if !x.is_const() && !y.is_const() {
+                    panic!("Equation is not linearised correctly")
+                }
 
-                    if x.is_const() {
-                        y * x.r0
-                    } else if y.is_const() {
-                        x * y.r0
-                    } else {
-                        LinearisationPolyCommitment::from_const(x.r0 * y.r0)
-                    }
-                },
-                &|x: LinearisationPolyCommitment<F, PC>, y: F| x * y,
-                &|query: &LinearisationOracleQuery| {
-                    let query_response: LinearisationQueryResponse<F, PC> =
-                        match query.oracle_type {
-                            OracleType::Witness => verifier_oracles
-                                [query.index]
-                                .query_for_linearisation(
-                                    &query.rotation,
-                                    &query.ctx,
-                                    &info,
-                                ),
-                            OracleType::Instance => instance_oracles
-                                [query.index]
-                                .query_for_linearisation(
-                                    &query.rotation,
-                                    &query.ctx,
-                                    &info,
-                                ),
-                        };
+                if x.is_const() {
+                    y * x.r0
+                } else if y.is_const() {
+                    x * y.r0
+                } else {
+                    LinearisationPolyCommitment::from_const(x.r0 * y.r0)
+                }
+            },
+            &|x: LinearisationPolyCommitment<F, PC>, y: F| x * y,
+            &|query: &LinearisationOracleQuery| {
+                let query_response: LinearisationQueryResponse<F, PC> =
+                    match query.oracle_type {
+                        OracleType::Witness => verifier_oracles[query.index]
+                            .query_for_linearisation(
+                                &query.rotation,
+                                &query.ctx,
+                                &info,
+                            ),
+                        OracleType::Instance => instance_oracles[query.index]
+                            .query_for_linearisation(
+                                &query.rotation,
+                                &query.ctx,
+                                &info,
+                            ),
+                    };
 
-                    match query_response {
-                        LinearisationQueryResponse::Opening(x) => {
-                            LinearisationPolyCommitment::from_const(x)
-                        }
-                        LinearisationQueryResponse::Poly(_) => {
-                            panic!("Poly not possible from committed oracle")
-                        }
-                        LinearisationQueryResponse::Commitment(c) => {
-                            LinearisationPolyCommitment::from_commitment(c)
-                        }
+                match query_response {
+                    LinearisationQueryResponse::Opening(x) => {
+                        LinearisationPolyCommitment::from_const(x)
                     }
-                },
-            );
+                    LinearisationQueryResponse::Poly(_) => {
+                        panic!("Poly not possible from committed oracle")
+                    }
+                    LinearisationQueryResponse::Commitment(c) => {
+                        LinearisationPolyCommitment::from_commitment(c)
+                    }
+                }
+            },
+        );
 
         let separation_challenge = F::rand(&mut rng);
 
@@ -528,4 +584,5 @@ mod test {
 
         assert_eq!(res, true);
     }
+    // #[]
 }
