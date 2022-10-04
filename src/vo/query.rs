@@ -60,7 +60,8 @@ impl Rotation {
                 return Err(Error::PointLabelError(point_label.clone()));
             }
 
-            let degree = i32::from_str_radix(tokens[1], 10).map_err(Error::from_parse_int_error)?;
+            let degree = i32::from_str_radix(tokens[1], 10)
+                .map_err(Error::from_parse_int_error)?;
 
             let rotation = if degree > 0 {
                 Rotation {
@@ -91,7 +92,11 @@ pub struct VirtualQuery {
 }
 
 impl VirtualQuery {
-    pub fn new(index: usize, rotation: Rotation, oracle_type: OracleType) -> Self {
+    pub fn new(
+        index: usize,
+        rotation: Rotation,
+        oracle_type: OracleType,
+    ) -> Self {
         Self {
             index,
             rotation,
@@ -171,7 +176,9 @@ mod test {
         let opening_challenge_label = String::from("xi");
         let point_label = String::from("xi");
 
-        let rotation = Rotation::from_point_label(&point_label, &opening_challenge_label).unwrap();
+        let rotation =
+            Rotation::from_point_label(&point_label, &opening_challenge_label)
+                .unwrap();
         assert_eq!(rotation, Rotation::curr());
     }
 
@@ -180,7 +187,9 @@ mod test {
         let opening_challenge_label = String::from("xi");
         let point_label = String::from("omega_5_xi");
 
-        let rotation = Rotation::from_point_label(&point_label, &opening_challenge_label).unwrap();
+        let rotation =
+            Rotation::from_point_label(&point_label, &opening_challenge_label)
+                .unwrap();
         assert_eq!(
             rotation,
             Rotation {
@@ -195,7 +204,9 @@ mod test {
         let opening_challenge_label = String::from("xi");
         let point_label = String::from("omega_-5_xi");
 
-        let rotation = Rotation::from_point_label(&point_label, &opening_challenge_label).unwrap();
+        let rotation =
+            Rotation::from_point_label(&point_label, &opening_challenge_label)
+                .unwrap();
         assert_eq!(
             rotation,
             Rotation {

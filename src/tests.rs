@@ -6,7 +6,8 @@ mod test {
     use ark_ff::Zero;
     use ark_poly::Polynomial;
     use ark_poly::{
-        univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, UVPolynomial,
+        univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
+        UVPolynomial,
     };
     use ark_poly_commit::marlin_pc::MarlinKZG10;
     use ark_poly_commit::PCCommitterKey;
@@ -55,11 +56,13 @@ mod test {
             .map(|(&a, &b)| a * b)
             .collect::<Vec<_>>();
 
-        let c_poly = DensePolynomial::from_coefficients_slice(&domain.ifft(&c_evals));
+        let c_poly =
+            DensePolynomial::from_coefficients_slice(&domain.ifft(&c_evals));
 
         for elem in domain.elements() {
             assert_eq!(
-                a_poly.evaluate(&elem) * b_poly.evaluate(&elem) - c_poly.evaluate(&elem),
+                a_poly.evaluate(&elem) * b_poly.evaluate(&elem)
+                    - c_poly.evaluate(&elem),
                 F::zero()
             );
         }

@@ -30,7 +30,11 @@ impl<F: PrimeField> MulVO<F> {
     }
 
     // TODO: consider abstracting
-    pub fn configure(&mut self, witness_indices: Vec<usize>, instance_indices: Vec<usize>) {
+    pub fn configure(
+        &mut self,
+        witness_indices: Vec<usize>,
+        instance_indices: Vec<usize>,
+    ) {
         self.witness_indices = Some(vec![]);
         self.instance_indices = Some(vec![]);
         for vq in &self.virtual_queries {
@@ -39,10 +43,12 @@ impl<F: PrimeField> MulVO<F> {
                     index: witness_indices[vq.index],
                     rotation: vq.rotation.clone(),
                 }),
-                OracleType::Instance => self.instance_queries.push(InstanceQuery {
-                    index: instance_indices[vq.index],
-                    rotation: vq.rotation.clone(),
-                }),
+                OracleType::Instance => {
+                    self.instance_queries.push(InstanceQuery {
+                        index: instance_indices[vq.index],
+                        rotation: vq.rotation.clone(),
+                    })
+                }
             }
         }
 

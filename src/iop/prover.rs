@@ -2,17 +2,19 @@ use std::{cmp::max, collections::BTreeSet, iter::successors};
 
 use ark_ff::PrimeField;
 use ark_poly::{
-    univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, Polynomial,
-    UVPolynomial,
+    univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
+    Polynomial, UVPolynomial,
 };
 use ark_std::rand::Rng;
 
 use crate::{
-    concrete_oracle::{OracleType, ProverConcreteOracle, Queriable, QueryContext, QueryPoint},
+    concrete_oracle::{
+        OracleType, ProverConcreteOracle, Queriable, QueryContext, QueryPoint,
+    },
     iop::error::Error,
     iop::{verifier::VerifierFirstMsg, IOPforPolyIdentity},
     vo::{
-        linearisation::{LinearisationOracleQuery, LinearisationQueryContext},
+        linearisation::LinearisationOracleQuery,
         query::{InstanceQuery, Query, Rotation, WitnessQuery},
         VirtualOracle,
     },
@@ -70,8 +72,6 @@ impl<F: PrimeField> IOPforPolyIdentity<F> {
             .map(|vo| vo.get_wtns_queries())
             .flatten()
             .map(|query| query.clone())
-            .collect::<Vec<WitnessQuery>>()
-            .iter()
             .map(|wtns_query| wtns_query.clone())
             .collect();
 
@@ -81,8 +81,6 @@ impl<F: PrimeField> IOPforPolyIdentity<F> {
             .map(|vo| vo.get_instance_queries())
             .flatten()
             .map(|query| query.clone())
-            .collect::<Vec<InstanceQuery>>()
-            .iter()
             .map(|instance_query| instance_query.clone())
             .collect();
 
@@ -92,7 +90,8 @@ impl<F: PrimeField> IOPforPolyIdentity<F> {
                 return Err(Error::WtnsQueryIndexOutOfBounds(query.index));
             }
 
-            state.witness_oracles[query.index].register_rotation(query.rotation.clone());
+            state.witness_oracles[query.index]
+                .register_rotation(query.rotation.clone());
         }
 
         for query in &instance_queries {
@@ -100,7 +99,8 @@ impl<F: PrimeField> IOPforPolyIdentity<F> {
                 return Err(Error::InstanceQueryIndexOutOfBounds(query.index));
             }
 
-            state.instance_oracles[query.index].register_rotation(query.rotation.clone());
+            state.instance_oracles[query.index]
+                .register_rotation(query.rotation.clone());
         }
 
         // 3. Mask wtns oracles
@@ -139,7 +139,8 @@ impl<F: PrimeField> IOPforPolyIdentity<F> {
         // println!("quotient_degree {}", quotient_degree);
 
         // 2. Compute extended domain
-        let extended_domain = GeneralEvaluationDomain::new(quotient_degree).unwrap();
+        let extended_domain =
+            GeneralEvaluationDomain::new(quotient_degree).unwrap();
         let scaling_ratio = extended_domain.size() / state.domain.size();
 
         // println!("scaling ratio: {}", scaling_ratio);
@@ -185,14 +186,17 @@ impl<F: PrimeField> IOPforPolyIdentity<F> {
                     &|x: F, y: F| x + y,
                     &|x: F, y: F| x * y,
                     &|x: F, y: F| x * y,
-                    &|_: &LinearisationOracleQuery| panic!("Not allowed in this ctx"),
+                    &|_: &LinearisationOracleQuery| {
+                        panic!("Not allowed in this ctx")
+                    },
                 );
 
                 nominator_evals[i] += powers_of_alpha[vo_index] * vo_evaluation;
             }
         }
 
-        let mut zh_evals = extended_domain.coset_fft(&state.vanishing_polynomial);
+        let mut zh_evals =
+            extended_domain.coset_fft(&state.vanishing_polynomial);
         ark_ff::batch_inversion(&mut zh_evals);
 
         let quotient_evals: Vec<_> = nominator_evals
@@ -201,8 +205,9 @@ impl<F: PrimeField> IOPforPolyIdentity<F> {
             .map(|(&nom, &denom)| nom * denom)
             .collect();
 
-        let quotient =
-            DensePolynomial::from_coefficients_slice(&extended_domain.coset_ifft(&quotient_evals));
+        let quotient = DensePolynomial::from_coefficients_slice(
+            &extended_domain.coset_ifft(&quotient_evals),
+        );
 
         let quotient_chunks: Vec<ProverConcreteOracle<F>> = quotient
             .coeffs

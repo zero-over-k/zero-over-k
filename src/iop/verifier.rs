@@ -1,6 +1,8 @@
 use crate::concrete_oracle::QuerySetProvider;
 use ark_ff::PrimeField;
-use ark_poly::{univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain};
+use ark_poly::{
+    univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
+};
 use ark_poly_commit::QuerySet;
 use ark_std::rand::RngCore;
 
@@ -71,13 +73,17 @@ impl<F: PrimeField> IOPforPolyIdentity<F> {
         state: &VerifierState<'a, F>,
         queried_oracles: impl Iterator<Item = impl QuerySetProvider<F>>,
     ) -> QuerySet<F> {
-        let VerifierSecondMsg { xi, label } = state
-            .second_round_msg
-            .expect("State should include second round message when building query set");
+        let VerifierSecondMsg { xi, label } = state.second_round_msg.expect(
+            "State should include second round message when building query set",
+        );
         let mut query_set = QuerySet::new();
 
         for queried_oracle in queried_oracles {
-            query_set.extend(queried_oracle.get_query_set(label, xi, state.domain.size()));
+            query_set.extend(queried_oracle.get_query_set(
+                label,
+                xi,
+                state.domain.size(),
+            ));
         }
 
         query_set
