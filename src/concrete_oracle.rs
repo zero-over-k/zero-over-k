@@ -494,6 +494,7 @@ impl<'a, F: PrimeField, PC: PolynomialCommitment<F, DensePolynomial<F>>>
     ) -> QuerySet<F> {
         let mut query_set = QuerySet::new();
 
+        let domain = GeneralEvaluationDomain::<F>::new(domain_size).unwrap();
         for rotation in &self.queried_rotations {
             if rotation.degree == 0 {
                 query_set.insert((
@@ -501,8 +502,6 @@ impl<'a, F: PrimeField, PC: PolynomialCommitment<F, DensePolynomial<F>>>
                     (opening_challenge_label.into(), opening_challenge),
                 ));
             } else {
-                let domain =
-                    GeneralEvaluationDomain::<F>::new(domain_size).unwrap();
                 let (omega, point_label) = match &rotation.sign {
                     Sign::Plus => {
                         let omega = domain.element(rotation.degree);
