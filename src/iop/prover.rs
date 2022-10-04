@@ -14,7 +14,7 @@ use crate::{
     iop::error::Error,
     iop::{verifier::VerifierFirstMsg, IOPforPolyIdentity},
     vo::{
-        linearisation::{LinearisationOracleQuery},
+        linearisation::LinearisationOracleQuery,
         query::{InstanceQuery, Query, Rotation, WitnessQuery},
         VirtualOracle,
     },
@@ -72,8 +72,6 @@ impl<F: PrimeField> IOPforPolyIdentity<F> {
             .map(|vo| vo.get_wtns_queries())
             .flatten()
             .map(|query| query.clone())
-            .collect::<Vec<WitnessQuery>>()
-            .iter()
             .map(|wtns_query| wtns_query.clone())
             .collect();
 
@@ -83,8 +81,6 @@ impl<F: PrimeField> IOPforPolyIdentity<F> {
             .map(|vo| vo.get_instance_queries())
             .flatten()
             .map(|query| query.clone())
-            .collect::<Vec<InstanceQuery>>()
-            .iter()
             .map(|instance_query| instance_query.clone())
             .collect();
 
