@@ -17,6 +17,7 @@ use ark_poly_commit::PolynomialCommitment;
 use ark_poly_commit::QuerySet;
 use ark_std::rand::Rng;
 use ark_std::rand::RngCore;
+use commitment::HomomorphicCommitment;
 use concrete_oracle::ProverConcreteOracle;
 use concrete_oracle::VerifierConcreteOracle;
 use data_structures::Proof;
@@ -27,7 +28,7 @@ use iop::IOPforPolyIdentity;
 use rng::FiatShamirRng;
 use vo::query::InstanceQuery;
 use vo::query::WitnessQuery;
-use vo::VirtualOracle;
+use vo::{VirtualOracle, LinearisableVirtualOracle};
 
 pub mod commitment;
 pub mod concrete_oracle;
@@ -41,7 +42,7 @@ mod tests;
 
 pub struct PIL<
     F: PrimeField,
-    PC: PolynomialCommitment<F, DensePolynomial<F>>,
+    PC: HomomorphicCommitment<F>,
     FS: FiatShamirRng,
 > {
     _field: PhantomData<F>,
@@ -52,7 +53,7 @@ pub struct PIL<
 impl<F, PC, FS> PIL<F, PC, FS>
 where
     F: PrimeField,
-    PC: PolynomialCommitment<F, DensePolynomial<F>>,
+    PC: HomomorphicCommitment<F>,
     FS: FiatShamirRng,
 {
     pub const PROTOCOL_NAME: &'static [u8] = b"PIL-0.0.1";
@@ -86,7 +87,7 @@ where
     pub fn prove<R: Rng>(
         pk: &ProverKey<F, PC>,
         concrete_oracles: &[ProverConcreteOracle<F>],
-        vos: &Vec<Box<dyn VirtualOracle<F>>>,
+        vos: &Vec<Box<dyn LinearisableVirtualOracle<F>>>,
         domain_size: usize,
         vanishing_polynomial: &DensePolynomial<F>,
         zk_rng: &mut R,
@@ -158,6 +159,30 @@ where
                 verifier_state,
                 &mut fs_rng,
             );
+        // --------------------------------------------------------------------
+
+        // --------------------------------------------------------------------
+        // Third round
+
+        let prover_third_oracles =
+            IOPforPolyIdentity::prover_third_round::<PC>(
+                &verifier_first_msg,
+                &verifier_second_msg,
+                &mut prover_state,
+                pk.committer_key.max_degree(),
+            )?;
+        let third_oracles_labeled: Vec<
+            LabeledPolynomial<F, DensePolynomial<F>>,
+        > = prover_third_oracles
+            .iter()
+            .map(|oracle| oracle.to_labeled())
+            .collect();
+
+        // let (third_comms, third_comm_rands) =
+        //     PC::commit(&pk.committer_key, &third_oracles_labeled, None)
+        //         .map_err(Error::from_pc_err)?;
+
+        // fs_rng.absorb(&to_bytes![third_comms].unwrap());
         // --------------------------------------------------------------------
 
         // Gather prover polynomials in one vector.
@@ -258,7 +283,7 @@ where
         proof: Proof<F, PC>,
         witness_oracles: &mut [VerifierConcreteOracle<F, PC>],
         instance_oracles: &mut [ProverConcreteOracle<F>],
-        vos: &Vec<Box<dyn VirtualOracle<F>>>,
+        vos: &Vec<Box<dyn LinearisableVirtualOracle<F>>>,
         domain_size: usize,
         vanishing_polynomial: &DensePolynomial<F>,
         srs_size: usize,

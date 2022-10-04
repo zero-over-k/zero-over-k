@@ -1,6 +1,6 @@
 use std::ops::{Add, Mul, Neg, Sub};
 
-use ark_ff::PrimeField;
+use ark_ff::{PrimeField, Zero};
 use ark_poly::univariate::DensePolynomial;
 
 use crate::{commitment::HomomorphicCommitment, concrete_oracle::OracleType};
@@ -74,7 +74,20 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>>
     }
 
     pub fn is_const(&self) -> bool {
-        PC::is_zero(&self.comm)
+        PC::is_zero(&self.comm) && !self.r0.is_zero()
+    }
+}
+
+impl<F: PrimeField, PC: HomomorphicCommitment<F>> Zero for LinearisationPolyCommitment<F, PC> {
+    fn zero() -> Self {
+        Self {
+            comm: PC::zero_comm(), 
+            r0: F::zero()
+        }
+    }
+
+    fn is_zero(&self) -> bool {
+        PC::is_zero(&self.comm) && self.r0.is_zero()
     }
 }
 

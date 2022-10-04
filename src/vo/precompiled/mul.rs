@@ -5,7 +5,7 @@ use crate::{
     vo::{
         expression::Expression,
         query::{InstanceQuery, Rotation, VirtualQuery, WitnessQuery},
-        VirtualOracle,
+        VirtualOracle, LinearisableVirtualOracle, linearisation::{LinearisationOracleQuery, LinearisationQueryContext},
     },
 };
 
@@ -16,6 +16,7 @@ pub struct MulVO<F: PrimeField> {
     wtns_queries: Vec<WitnessQuery>,
     instance_queries: Vec<InstanceQuery>,
     expression: Option<Expression<F>>,
+    linearisation_expression: Option<Expression<F>>
 }
 
 impl<F: PrimeField> MulVO<F> {
@@ -46,6 +47,7 @@ impl<F: PrimeField> MulVO<F> {
             wtns_queries: vec![],
             instance_queries: vec![],
             expression: None,
+            linearisation_expression: None
         }
     }
 
@@ -80,7 +82,34 @@ impl<F: PrimeField> MulVO<F> {
             a * b - c
         };
 
+        // For now we keep linearisation same as without
+        let linearisation_expression = || {
+            let a: Expression<F> = LinearisationOracleQuery {
+                index: self.wtns_queries[0].index,
+                rotation: self.wtns_queries[0].rotation, 
+                oracle_type: OracleType::Witness, 
+                ctx: LinearisationQueryContext::AsEval
+            }.into();
+
+            let b: Expression<F> = LinearisationOracleQuery {
+                index: self.wtns_queries[1].index,
+                rotation: self.wtns_queries[1].rotation, 
+                oracle_type: OracleType::Witness, 
+                ctx: LinearisationQueryContext::AsEval
+            }.into();
+
+            let c: Expression<F> = LinearisationOracleQuery {
+                index: self.instance_queries[0].index,
+                rotation: self.instance_queries[0].rotation, 
+                oracle_type: OracleType::Instance, 
+                ctx: LinearisationQueryContext::AsEval
+            }.into();
+
+            a * b - c
+        };
+
         self.expression = Some(mul_expression());
+        self.linearisation_expression = Some(linearisation_expression());
     }
 }
 
@@ -96,6 +125,15 @@ impl<F: PrimeField> VirtualOracle<F> for MulVO<F> {
     // panics if expression is not defined before proving started
     fn get_expression(&self) -> &Expression<F> {
         match self.expression.as_ref() {
+            None => panic!("Expression is not defined"),
+            Some(expression) => return expression,
+        }
+    }
+}
+
+impl<F: PrimeField> LinearisableVirtualOracle<F> for MulVO<F> {
+    fn get_linearisation_expression(&self) -> &Expression<F> {
+        match self.linearisation_expression.as_ref() {
             None => panic!("Expression is not defined"),
             Some(expression) => return expression,
         }

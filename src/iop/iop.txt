@@ -19,9 +19,9 @@ d. commit to all witness oracles [W]
             
                     --------> send commitments to [W] <--------     
                                                                         
-                                                                    a. sample separation challenge
+                                                                    a. sample quotient challenge
                     
-                    --------> send separation challenge <--------
+                    --------> send quotient challenge <--------
 
 Round2: 
 
@@ -42,14 +42,29 @@ d. commit [Qi]
 
                         --------> send commitments to [Qi] <--------
                                                                                 a. sample evaluation challenge
+                        --------> send evaluation challenge <--------
+
+Round3: 
+
+a. compute linearisation polynomial from expressions
+
+b. sub quotient chunks from it 
+
+c. commit to linearisation (r)
+
+                        --------> send commitment to [r] <--------
+
+                                                                                c. sample opening challenge 
+                        --------> send opening challenge <--------
 
 
+Round 4:
 
-Round 3:
+a. Compute query set from expressions of vos 
 
-Compute batched openings at each w * evaluation_challenge
-For each concrete oracle we store queries made to it's possible to map 
-how to batch concrete oracles
+b. Append quotient chunks and linearisation to query set
+
+c. Evaluate query set
 
 
                         --------> send commitments to [Qi] <--------
