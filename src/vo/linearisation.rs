@@ -2,11 +2,11 @@ use std::ops::{Add, Mul, Neg, Sub};
 
 use ark_ff::PrimeField;
 use ark_poly::univariate::DensePolynomial;
-use ark_poly_commit::PolynomialCommitment;
+
 
 use crate::{
     commitment::HomomorphicCommitment,
-    concrete_oracle::{DomainSize, OracleType},
+    concrete_oracle::{OracleType},
 };
 
 use super::query::Rotation;

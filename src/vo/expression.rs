@@ -5,10 +5,10 @@ use std::{
 
 use super::{
     linearisation::LinearisationOracleQuery,
-    query::{self, InstanceQuery, WitnessQuery},
+    query::{InstanceQuery, WitnessQuery},
 };
-use ark_ff::{Field, PrimeField};
-use ark_poly::univariate::DensePolynomial;
+use ark_ff::{PrimeField};
+
 
 #[derive(Clone)]
 pub enum Expression<F> {
@@ -213,11 +213,11 @@ mod test {
         },
         vo::{
             linearisation::{
-                self, LinearisationInfo, LinearisationOracleQuery,
+                LinearisationInfo, LinearisationOracleQuery,
                 LinearisationPolyCommitment, LinearisationQueriable,
                 LinearisationQueryContext, LinearisationQueryResponse,
             },
-            query::{InstanceQuery, Query, Rotation, WitnessQuery},
+            query::{InstanceQuery, Rotation, WitnessQuery},
         },
     };
 
@@ -227,7 +227,7 @@ mod test {
     use ark_bls12_381::{Bls12_381, Fr as F};
     use ark_ff::{UniformRand, Zero};
     use ark_poly::{univariate::DensePolynomial, Polynomial, UVPolynomial};
-    use ark_poly_commit::marlin_pc::MarlinKZG10;
+    
     use ark_poly_commit::{
         LabeledCommitment, LabeledPolynomial, PolynomialCommitment,
     };
@@ -366,7 +366,7 @@ mod test {
         let (ck, vk) = PC::trim(&srs, max_degree, 0, None).unwrap();
 
         let mut linearisation_derived = linearisation_poly.clone();
-        let r0 = linearisation_derived[0];
+        let _r0 = linearisation_derived[0];
         linearisation_derived[0] = linearisation_derived[0]
             - linearisation_derived.evaluate(&F::zero());
 

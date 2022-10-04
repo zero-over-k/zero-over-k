@@ -14,7 +14,7 @@ use crate::{
     iop::error::Error,
     iop::{verifier::VerifierFirstMsg, IOPforPolyIdentity},
     vo::{
-        linearisation::{LinearisationOracleQuery, LinearisationQueryContext},
+        linearisation::{LinearisationOracleQuery},
         query::{InstanceQuery, Query, Rotation, WitnessQuery},
         VirtualOracle,
     },

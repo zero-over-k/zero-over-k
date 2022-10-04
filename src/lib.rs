@@ -152,7 +152,7 @@ where
 
         fs_rng.absorb(&to_bytes![second_comms].unwrap());
 
-        let (verifier_second_msg, verifier_state) =
+        let (_verifier_second_msg, verifier_state) =
             IOPforPolyIdentity::verifier_second_round(
                 verifier_state,
                 &mut fs_rng,
@@ -406,7 +406,7 @@ where
         let evaluations: BTreeMap<(String, F), F> = query_set
             .iter()
             .zip(proof.evaluations.iter())
-            .map(|((poly_label, (point_label, point)), &evaluation)| {
+            .map(|((poly_label, (_point_label, point)), &evaluation)| {
                 if quotient_chunk_regex.is_match(&poly_label) {
                     match quotient_chunks_label_index_mapping.get(poly_label) {
                         Some(index) => quotient_chunks[*index]
