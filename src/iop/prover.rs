@@ -13,7 +13,7 @@ use crate::{
     iop::{verifier::VerifierFirstMsg, IOPforPolyIdentity},
     vo::{
         query::{InstanceQuery, Query, Rotation, WitnessQuery},
-        VirtualOracle,
+        VirtualOracle, linearisation::{LinearisationQueryContext, LinearisationOracleQuery},
     },
 };
 
@@ -184,6 +184,8 @@ impl<F: PrimeField> IOPforPolyIdentity<F> {
                     &|x: F, y: F| x + y,
                     &|x: F, y: F| x * y,
                     &|x: F, y: F| x * y,
+
+                    &|_: &LinearisationOracleQuery| panic!("Not allowed in this ctx")
                 );
 
                 nominator_evals[i] += powers_of_alpha[vo_index] * vo_evaluation;

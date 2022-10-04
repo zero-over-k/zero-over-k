@@ -4,6 +4,7 @@ use std::marker::PhantomData;
 
 use crate::concrete_oracle::{QueryContext, QueryPoint, Queriable};
 use crate::error::Error;
+use crate::vo::linearisation::LinearisationOracleQuery;
 use crate::vo::query::{Rotation, Query};
 use ark_ff::{to_bytes, PrimeField, UniformRand};
 use ark_poly::Polynomial;
@@ -34,6 +35,7 @@ pub mod error;
 pub mod iop;
 pub mod rng;
 pub mod vo;
+pub mod commitment;
 
 mod tests;
 
@@ -412,6 +414,8 @@ where
                 &|x: F, y: F| x + y,
                 &|x: F, y: F| x * y,
                 &|x: F, y: F| x * y,
+
+                &|_: &LinearisationOracleQuery| panic!("Not allowed in this ctx")
             );
 
             quotient_eval += powers_of_alpha[vo_index] * vo_evaluation;

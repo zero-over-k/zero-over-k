@@ -111,6 +111,7 @@ mod test {
         let a_verifier = VerifierConcreteOracle::new("a".to_string(), true);
         let b_verifier = VerifierConcreteOracle::new("b".to_string(), true);
 
+
         let _ = PilInstance::verify(&vk, proof, &mut [a_verifier, b_verifier], &mut [c], &vos, domain_size, &domain.vanishing_polynomial().into(), pk.committer_key.max_degree(), &mut rng).unwrap();
     }
 }
