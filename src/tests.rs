@@ -3,7 +3,7 @@ mod test {
     use std::collections::BTreeSet;
 
     use ark_bls12_381::{Bls12_381, Fr};
-    use ark_ff::{Field, Zero};
+    use ark_ff::{Zero};
     use ark_poly::Polynomial;
     use ark_poly::{
         univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain, UVPolynomial,
@@ -14,7 +14,7 @@ mod test {
     use rand_chacha::ChaChaRng;
 
     use crate::concrete_oracle::VerifierConcreteOracle;
-    use crate::rng::{FiatShamirRng, SimpleHashFiatShamirRng};
+    use crate::rng::{SimpleHashFiatShamirRng};
     use crate::PIL;
     use blake2::Blake2s;
 

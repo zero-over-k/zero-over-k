@@ -4,10 +4,7 @@ use std::{
 };
 
 use ark_ff::{Field, PrimeField};
-
-use crate::concrete_oracle::{ProverConcreteOracle, QueryContext};
-
-use super::query::{InstanceQuery, Query, WitnessQuery};
+use super::query::{InstanceQuery, WitnessQuery};
 
 #[derive(Clone)]
 pub enum Expression<F> {

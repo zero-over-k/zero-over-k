@@ -1,6 +1,6 @@
 use ark_ff::PrimeField;
 use ark_poly::univariate::DensePolynomial;
-use ark_poly_commit::{sonic_pc::BatchProof, PolynomialCommitment};
+use ark_poly_commit::{PolynomialCommitment};
 
 pub type UniversalSRS<F, PC> = <PC as PolynomialCommitment<F, DensePolynomial<F>>>::UniversalParams;
 

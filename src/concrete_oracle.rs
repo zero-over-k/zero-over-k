@@ -1,7 +1,6 @@
-use std::{collections::{BTreeSet, BTreeMap}, marker::PhantomData};
+use std::{collections::{BTreeSet, BTreeMap}};
 
 use crate::{
-    error::Error,
     vo::query::{Rotation, Sign},
 };
 use ark_ff::PrimeField;

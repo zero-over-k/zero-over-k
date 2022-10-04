@@ -1,11 +1,10 @@
 use std::{cmp::max, collections::BTreeSet, iter::successors};
 
-use ark_ff::{PrimeField, Zero};
+use ark_ff::{PrimeField};
 use ark_poly::{
-    univariate::{DenseOrSparsePolynomial, DensePolynomial},
+    univariate::{DensePolynomial},
     EvaluationDomain, GeneralEvaluationDomain, Polynomial, UVPolynomial,
 };
-use ark_poly_commit::LabeledPolynomial;
 use ark_std::rand::Rng;
 
 use crate::{
