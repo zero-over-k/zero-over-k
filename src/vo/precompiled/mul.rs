@@ -97,7 +97,7 @@ impl<F: PrimeField> MulVO<F> {
                 index: self.wtns_queries[1].index,
                 rotation: self.wtns_queries[1].rotation,
                 oracle_type: OracleType::Witness,
-                ctx: LinearisationQueryContext::AsEval,
+                ctx: LinearisationQueryContext::AsPoly,
             }
             .into();
 

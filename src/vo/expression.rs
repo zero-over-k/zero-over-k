@@ -410,6 +410,8 @@ mod test {
             },
         );
 
+        println!("linearisation poly degree: {}", linearisation_poly.degree());
+
         let oracle_by_hand = &(&a.poly * &b.poly) - &c.poly;
 
         assert_eq!(
@@ -456,9 +458,9 @@ mod test {
         let mut c_verifier =
             VerifierConcreteOracle::<F, PC>::new("c".to_string(), false);
 
-        a_verifier.register_commitment(comms[0].commitment());
-        b_verifier.register_commitment(comms[1].commitment());
-        c_verifier.register_commitment(comms[2].commitment());
+        a_verifier.register_commitment(comms[0].commitment().clone());
+        b_verifier.register_commitment(comms[1].commitment().clone());
+        c_verifier.register_commitment(comms[2].commitment().clone());
 
         a_verifier.register_eval_at_challenge(
             opening_challenge,

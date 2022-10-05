@@ -36,3 +36,14 @@ pub struct Proof<F: PrimeField, PC: PolynomialCommitment<F, DensePolynomial<F>>>
     pub evaluations: Vec<F>,
     pub opening_proof: PC::BatchProof,
 }
+
+impl<F: PrimeField, PC: PolynomialCommitment<F, DensePolynomial<F>>>
+    Proof<F, PC>
+{
+    pub fn iter_witness_commitments(
+        &self,
+    ) -> impl Iterator<Item = PC::Commitment> {
+        let witness_commitments = self.commitments[0].clone();
+        witness_commitments.into_iter()
+    }
+}

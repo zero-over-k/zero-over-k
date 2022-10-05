@@ -3,7 +3,7 @@ mod test {
     use std::collections::BTreeSet;
 
     use ark_bls12_381::{Bls12_381, Fr};
-    use ark_ff::Zero;
+    use ark_ff::{One, Zero};
     use ark_poly::Polynomial;
     use ark_poly::{
         univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
@@ -34,7 +34,7 @@ mod test {
 
     #[test]
     fn test_simple_mul() {
-        let max_degree = 30;
+        let max_degree = 17;
         let mut rng = test_rng();
 
         let srs = PilInstance::universal_setup(max_degree, &mut rng).unwrap();

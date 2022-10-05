@@ -56,6 +56,17 @@ pub struct LinearisationPolyCommitment<
     pub r0: F,
 }
 
+impl<F: PrimeField, PC: HomomorphicCommitment<F>> Clone
+    for LinearisationPolyCommitment<F, PC>
+{
+    fn clone(&self) -> Self {
+        Self {
+            comm: self.comm.clone(),
+            r0: self.r0.clone(),
+        }
+    }
+}
+
 impl<F: PrimeField, PC: HomomorphicCommitment<F>>
     LinearisationPolyCommitment<F, PC>
 {

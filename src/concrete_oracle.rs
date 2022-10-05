@@ -361,7 +361,6 @@ impl<F: PrimeField> QuerySetProvider<F> for &ProverConcreteOracle<F> {
 }
 
 pub struct VerifierConcreteOracle<
-    'a,
     F: PrimeField,
     PC: PolynomialCommitment<F, DensePolynomial<F>>,
 > {
@@ -370,11 +369,11 @@ pub struct VerifierConcreteOracle<
     pub(crate) should_mask: bool,
     pub(crate) eval_at_rotation: BTreeMap<F, Rotation>,
     pub(crate) evals_at_challenges: BTreeMap<F, F>,
-    pub(crate) commitment: Option<&'a PC::Commitment>,
+    pub(crate) commitment: Option<PC::Commitment>,
 }
 
-impl<'a, F: PrimeField, PC: PolynomialCommitment<F, DensePolynomial<F>>> Clone
-    for VerifierConcreteOracle<'a, F, PC>
+impl<F: PrimeField, PC: PolynomialCommitment<F, DensePolynomial<F>>> Clone
+    for VerifierConcreteOracle<F, PC>
 {
     fn clone(&self) -> Self {
         Self {
@@ -388,8 +387,8 @@ impl<'a, F: PrimeField, PC: PolynomialCommitment<F, DensePolynomial<F>>> Clone
     }
 }
 
-impl<'a, F: PrimeField, PC: PolynomialCommitment<F, DensePolynomial<F>>>
-    VerifierConcreteOracle<'a, F, PC>
+impl<F: PrimeField, PC: PolynomialCommitment<F, DensePolynomial<F>>>
+    VerifierConcreteOracle<F, PC>
 {
     pub fn new(label: String, should_mask: bool) -> Self {
         Self {
@@ -402,7 +401,7 @@ impl<'a, F: PrimeField, PC: PolynomialCommitment<F, DensePolynomial<F>>>
         }
     }
 
-    pub fn register_commitment(&mut self, c: &'a PC::Commitment) {
+    pub fn register_commitment(&mut self, c: PC::Commitment) {
         self.commitment = Some(c)
     }
 
@@ -437,8 +436,8 @@ impl<'a, F: PrimeField, PC: PolynomialCommitment<F, DensePolynomial<F>>>
     }
 }
 
-impl<'a, F: PrimeField, PC: PolynomialCommitment<F, DensePolynomial<F>>>
-    Queriable<F> for VerifierConcreteOracle<'a, F, PC>
+impl<F: PrimeField, PC: PolynomialCommitment<F, DensePolynomial<F>>>
+    Queriable<F> for VerifierConcreteOracle<F, PC>
 {
     fn query(&self, rotation: &Rotation, context: &QueryContext<F>) -> F {
         match context {
@@ -476,8 +475,8 @@ impl<'a, F: PrimeField, PC: PolynomialCommitment<F, DensePolynomial<F>>>
     }
 }
 
-impl<'a, F: PrimeField, PC: HomomorphicCommitment<F>>
-    LinearisationQueriable<F, PC> for VerifierConcreteOracle<'a, F, PC>
+impl<F: PrimeField, PC: HomomorphicCommitment<F>> LinearisationQueriable<F, PC>
+    for VerifierConcreteOracle<F, PC>
 {
     fn query_for_linearisation(
         &self,
@@ -508,7 +507,7 @@ impl<'a, F: PrimeField, PC: HomomorphicCommitment<F>>
             }
             // TODO: Consider working with reference to commitment
             LinearisationQueryContext::AsPoly => {
-                let commitment = self.commitment.expect(&format!(
+                let commitment = self.commitment.as_ref().expect(&format!(
                     "Commitment missing for committed oracle {}",
                     self.label
                 ));
@@ -518,8 +517,8 @@ impl<'a, F: PrimeField, PC: HomomorphicCommitment<F>>
     }
 }
 
-impl<'a, F: PrimeField, PC: PolynomialCommitment<F, DensePolynomial<F>>>
-    QuerySetProvider<F> for &VerifierConcreteOracle<'a, F, PC>
+impl<F: PrimeField, PC: PolynomialCommitment<F, DensePolynomial<F>>>
+    QuerySetProvider<F> for &VerifierConcreteOracle<F, PC>
 {
     fn get_query_set(
         &self,

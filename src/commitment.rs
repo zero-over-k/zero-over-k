@@ -24,6 +24,8 @@ where
     fn zero_comm() -> Self::Commitment;
 
     fn is_zero(c: &Self::Commitment) -> bool;
+
+    fn eq_cm(c1: &Self::Commitment, c2: &Self::Commitment) -> bool;
 }
 
 /// The Default KZG-style commitment scheme
@@ -76,5 +78,9 @@ where
 
     fn is_zero(c: &Self::Commitment) -> bool {
         c.0.is_zero()
+    }
+
+    fn eq_cm(c1: &Self::Commitment, c2: &Self::Commitment) -> bool {
+        c1.0 == c2.0
     }
 }

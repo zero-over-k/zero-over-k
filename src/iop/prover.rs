@@ -312,25 +312,20 @@ impl<F: PrimeField> IOPforPolyIdentity<F> {
                 .take(quotient_chunks.len())
                 .collect();
 
-        let query_context = QueryContext::Opening(
-            state.domain.size(),
-            QueryPoint::Challenge(verifier_second_msg.xi),
-        );
-
-        let mut t_part = F::zero();
+        let mut t_part = DensePolynomial::<F>::zero();
         for (&x_i, t_i) in powers_of_x.iter().zip(quotient_chunks.iter()) {
-            t_part += x_i * t_i.query(&Rotation::curr(), &query_context);
+            t_part = t_part + &t_i.poly * x_i;
         }
-        linearisation_poly[0] -= t_part
+
+        t_part = &t_part
             * state.vanishing_polynomial.evaluate(&verifier_second_msg.xi);
+        linearisation_poly -= &t_part;
 
         // sanity check
         assert_eq!(
             linearisation_poly.evaluate(&verifier_second_msg.xi),
             F::zero()
         );
-
-        println!("r0 on prover side: {}", linearisation_poly[0]);
 
         let linearisation_poly = ProverConcreteOracle {
             label: "linearisation_poly".into(),
