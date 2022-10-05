@@ -137,7 +137,13 @@ impl<F: PrimeField> PIOPforPolyIdentity<F> {
             max_degree = max(max_degree, vo_degree);
         }
 
-        let quotient_degree = max_degree - state.vanishing_polynomial.degree();
+        let vanishing_degree = state.vanishing_polynomial.degree();
+        let quotient_degree = if max_degree > vanishing_degree {
+            max_degree - vanishing_degree
+        } else {
+            0usize
+        };
+        // println!("quotient_degree {}", quotient_degree);
 
         // 2. Compute extended domain
         let extended_domain =
