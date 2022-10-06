@@ -174,7 +174,7 @@ mod test {
             evals_at_coset_of_extended_domain: None,
             oracle_type: OracleType::Witness,
             queried_rotations: BTreeSet::new(),
-            should_mask: true,
+            should_mask: false,
         };
 
         let b = ProverConcreteOracle {
@@ -183,7 +183,7 @@ mod test {
             evals_at_coset_of_extended_domain: None,
             oracle_type: OracleType::Witness,
             queried_rotations: BTreeSet::new(),
-            should_mask: true,
+            should_mask: false,
         };
 
         let c = ProverConcreteOracle {
