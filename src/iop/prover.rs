@@ -144,16 +144,19 @@ impl<F: PrimeField> PIOPforPolyIdentity<F> {
         }
 
         let vanishing_degree = state.vanishing_polynomial.degree();
-        let quotient_degree = if max_degree > vanishing_degree {
+        let quotient_degree = if max_degree >= vanishing_degree {
             max_degree - vanishing_degree
         } else {
-            0usize
+            return Err(Error::ZeroQuotientPoly);
         };
         // println!("quotient_degree {}", quotient_degree);
 
         // 2. Compute extended domain
-        let extended_domain =
-            GeneralEvaluationDomain::new(quotient_degree).unwrap();
+        let extended_domain = GeneralEvaluationDomain::new(max(
+            quotient_degree,
+            vanishing_degree,
+        ))
+        .unwrap();
         let scaling_ratio = extended_domain.size() / state.domain.size();
 
         // 3. Compute extended evals of each oracle
