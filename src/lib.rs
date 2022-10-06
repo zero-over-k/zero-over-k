@@ -4,6 +4,7 @@ use std::marker::PhantomData;
 
 use crate::concrete_oracle::{OracleType, QuerySetProvider};
 use crate::error::Error;
+use crate::iop::error::Error::ZeroQuotientPoly;
 use crate::vo::query::{Query, Rotation};
 use ark_ff::{to_bytes, PrimeField, UniformRand, Zero};
 use ark_poly::univariate::DensePolynomial;
@@ -285,7 +286,12 @@ where
             max_degree = std::cmp::max(max_degree, vo_degree);
         }
 
-        let quotient_degree = max_degree - vanishing_polynomial.degree();
+        let vanishing_degree = vanishing_polynomial.degree();
+        let quotient_degree = if max_degree >= vanishing_degree {
+            max_degree - vanishing_degree
+        } else {
+            return Err(Error::IOPError(ZeroQuotientPoly));
+        };
 
         let num_of_quotient_chunks = quotient_degree / srs_size
             + if quotient_degree % srs_size != 0 {

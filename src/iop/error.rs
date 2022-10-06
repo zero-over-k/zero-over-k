@@ -4,4 +4,5 @@ pub enum Error {
     WtnsQueryIndexOutOfBounds(usize),
     InstanceQueryIndexOutOfBounds(usize),
     ExtendedEvalsMissing,
+    ZeroQuotientPoly,
 }
