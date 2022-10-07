@@ -339,7 +339,6 @@ where
                 label: format!("quotient_chunk_{}", i).to_string(),
                 queried_rotations: BTreeSet::from([Rotation::curr()]),
                 should_mask: false,
-                eval_at_rotation: BTreeMap::new(),
                 evals_at_challenges: BTreeMap::from([(
                     verifier_second_msg.xi,
                     proof.quotient_chunks_evaluations[i],

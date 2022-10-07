@@ -153,7 +153,6 @@ pub struct CommittedConcreteOracle<
     pub(crate) label: String,
     pub(crate) queried_rotations: BTreeSet<Rotation>,
     pub(crate) should_mask: bool,
-    pub(crate) eval_at_rotation: BTreeMap<F, Rotation>,
     pub(crate) evals_at_challenges: BTreeMap<F, F>,
     pub(crate) commitment: Option<PC::Commitment>,
 }
@@ -166,7 +165,6 @@ impl<F: PrimeField, PC: PolynomialCommitment<F, DensePolynomial<F>>> Clone
             label: self.label.clone(),
             queried_rotations: self.queried_rotations.clone(),
             should_mask: self.should_mask.clone(),
-            eval_at_rotation: self.eval_at_rotation.clone(),
             evals_at_challenges: self.evals_at_challenges.clone(),
             commitment: self.commitment.clone(),
         }
@@ -181,7 +179,6 @@ impl<F: PrimeField, PC: PolynomialCommitment<F, DensePolynomial<F>>>
             label,
             should_mask,
             queried_rotations: BTreeSet::new(),
-            eval_at_rotation: BTreeMap::new(),
             evals_at_challenges: BTreeMap::new(),
             commitment: None,
         }

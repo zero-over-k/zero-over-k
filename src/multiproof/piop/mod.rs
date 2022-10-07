@@ -404,7 +404,6 @@ mod test {
             label: "a".to_string(),
             queried_rotations: BTreeSet::from([Rotation::curr()]),
             should_mask: false,
-            eval_at_rotation: BTreeMap::new(),
             evals_at_challenges: BTreeMap::from([(xi, a_at_xi)]),
             commitment: Some(oracles_commitments[0].commitment().clone()),
         };
@@ -413,7 +412,6 @@ mod test {
             label: "b".to_string(),
             queried_rotations: BTreeSet::from([Rotation::curr()]),
             should_mask: false,
-            eval_at_rotation: BTreeMap::new(),
             evals_at_challenges: BTreeMap::from([(xi, b_at_xi)]),
             commitment: Some(oracles_commitments[1].commitment().clone()),
         };
@@ -425,7 +423,6 @@ mod test {
                 Rotation::next(),
             ]),
             should_mask: false,
-            eval_at_rotation: BTreeMap::new(),
             evals_at_challenges: BTreeMap::from([
                 (xi, c_at_xi),
                 (omega_xi, c_at_omega_xi),
@@ -440,7 +437,6 @@ mod test {
                 Rotation::next(),
             ]),
             should_mask: false,
-            eval_at_rotation: BTreeMap::new(),
             evals_at_challenges: BTreeMap::from([
                 (xi, d_at_xi),
                 (omega_xi, d_at_omega_xi),
