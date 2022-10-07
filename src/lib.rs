@@ -2,35 +2,35 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::iter::successors;
 use std::marker::PhantomData;
 
-use crate::concrete_oracle::{
-    OracleType, QuerySetProvider,
-};
+use crate::concrete_oracle::{OracleType, QuerySetProvider};
 use crate::error::Error;
 use crate::vo::query::{Query, Rotation};
 use ark_ff::{to_bytes, PrimeField, UniformRand, Zero};
 use ark_poly::univariate::DensePolynomial;
-use ark_poly::{EvaluationDomain, GeneralEvaluationDomain, Polynomial, evaluations};
-use ark_poly_commit::{LabeledCommitment, evaluate_query_set};
+use ark_poly::{
+    evaluations, EvaluationDomain, GeneralEvaluationDomain, Polynomial,
+};
 use ark_poly_commit::LabeledPolynomial;
 use ark_poly_commit::PCCommitterKey;
 use ark_poly_commit::PCUniversalParams;
 use ark_poly_commit::PolynomialCommitment;
 use ark_poly_commit::QuerySet;
+use ark_poly_commit::{evaluate_query_set, LabeledCommitment};
 use ark_std::rand::Rng;
 use ark_std::rand::RngCore;
 use commitment::HomomorphicCommitment;
-use concrete_oracle::ProverConcreteOracle;
-use concrete_oracle::VerifierConcreteOracle;
+use concrete_oracle::CommittedConcreteOracle;
+use concrete_oracle::InstantiableConcreteOracle;
 use data_structures::Proof;
 use data_structures::ProverKey;
 use data_structures::UniversalSRS;
 use data_structures::VerifierKey;
 use iop::PIOPforPolyIdentity;
-use multiproof::piop::{PIOP, Multiopen};
+use multiproof::piop::{Multiopen, PIOP};
 use rng::FiatShamirRng;
 use vo::query::InstanceQuery;
 use vo::query::WitnessQuery;
-use vo::{VirtualOracle};
+use vo::VirtualOracle;
 
 pub mod commitment;
 pub mod concrete_oracle;
@@ -86,7 +86,7 @@ where
 
     pub fn prove<R: Rng>(
         pk: &ProverKey<F, PC>,
-        concrete_oracles: &[ProverConcreteOracle<F>],
+        concrete_oracles: &[InstantiableConcreteOracle<F>],
         vos: &Vec<Box<dyn VirtualOracle<F>>>,
         domain_size: usize,
         vanishing_polynomial: &DensePolynomial<F>,
@@ -111,7 +111,7 @@ where
         // First round
 
         let witness_oracles =
-        PIOPforPolyIdentity::prover_first_round(&mut prover_state, zk_rng)?;
+            PIOPforPolyIdentity::prover_first_round(&mut prover_state, zk_rng)?;
         let witness_oracles_labeled: Vec<
             LabeledPolynomial<F, DensePolynomial<F>>,
         > = witness_oracles
@@ -126,7 +126,7 @@ where
         fs_rng.absorb(&to_bytes![witness_commitments].unwrap());
 
         let (verifier_first_msg, verifier_state) =
-        PIOPforPolyIdentity::verifier_first_round(
+            PIOPforPolyIdentity::verifier_first_round(
                 verifier_init_state,
                 &mut fs_rng,
             );
@@ -160,26 +160,54 @@ where
                 &mut fs_rng,
             );
 
-
         let domain = GeneralEvaluationDomain::new(domain_size).unwrap();
         let omegas: Vec<F> = domain.elements().collect();
-        let query_set = PIOPforPolyIdentity::get_query_set(witness_oracles.iter(), verifier_second_msg.label, verifier_second_msg.xi, &omegas);
+        let query_set = PIOPforPolyIdentity::get_query_set(
+            witness_oracles.iter(),
+            verifier_second_msg.label,
+            verifier_second_msg.xi,
+            &omegas,
+        );
 
-        let witness_evaluations: Vec<F> = evaluate_query_set(witness_oracles_labeled.iter(), &query_set).iter().map(|(_, eval)| *eval).collect();
-        let quotient_chunks_evaluations: Vec<F> = quotient_chunk_oracles.iter().map(|q_i| q_i.query_at_challenge(&verifier_second_msg.xi)).collect();
+        let witness_evaluations: Vec<F> =
+            evaluate_query_set(witness_oracles_labeled.iter(), &query_set)
+                .iter()
+                .map(|(_, eval)| *eval)
+                .collect();
+        let quotient_chunks_evaluations: Vec<F> = quotient_chunk_oracles
+            .iter()
+            .map(|q_i| q_i.query_at_challenge(&verifier_second_msg.xi))
+            .collect();
 
         let mut evaluations = vec![];
         evaluations.extend_from_slice(&witness_evaluations);
         evaluations.extend_from_slice(&quotient_chunks_evaluations);
 
         // Multiopen
-        let oracles: Vec<ProverConcreteOracle<F>> = witness_oracles.iter().chain(quotient_chunk_oracles.iter()).map(|oracle| oracle.clone()).collect();
-        let multiopen_proof = Multiopen::<F, PC, FS>::prove(&pk.committer_key, &oracles, &evaluations, verifier_second_msg.xi, domain_size).map_err(Error::from_multiproof_err)?;
+        let oracles: Vec<InstantiableConcreteOracle<F>> = witness_oracles
+            .iter()
+            .chain(quotient_chunk_oracles.iter())
+            .map(|oracle| oracle.clone())
+            .collect();
+        let multiopen_proof = Multiopen::<F, PC, FS>::prove(
+            &pk.committer_key,
+            &oracles,
+            &evaluations,
+            verifier_second_msg.xi,
+            domain_size,
+        )
+        .map_err(Error::from_multiproof_err)?;
 
         let proof = Proof {
-            witness_commitments: witness_commitments.iter().map(|c| c.commitment().clone()).collect(),
+            witness_commitments: witness_commitments
+                .iter()
+                .map(|c| c.commitment().clone())
+                .collect(),
             witness_evaluations,
-            quotient_chunk_commitments: quotient_chunk_commitments.iter().map(|c| c.commitment().clone()).collect(),
+            quotient_chunk_commitments: quotient_chunk_commitments
+                .iter()
+                .map(|c| c.commitment().clone())
+                .collect(),
             quotient_chunks_evaluations,
             multiopen_proof,
         };
@@ -190,8 +218,8 @@ where
     pub fn verify<R: Rng>(
         vk: &VerifierKey<F, PC>,
         proof: Proof<F, PC>,
-        witness_oracles: &mut [VerifierConcreteOracle<F, PC>],
-        instance_oracles: &mut [ProverConcreteOracle<F>],
+        witness_oracles: &mut [CommittedConcreteOracle<F, PC>],
+        instance_oracles: &mut [InstantiableConcreteOracle<F>],
         vos: &Vec<Box<dyn VirtualOracle<F>>>,
         domain_size: usize,
         vanishing_polynomial: &DensePolynomial<F>,
@@ -266,7 +294,9 @@ where
                 0
             };
 
-        if num_of_quotient_chunks != proof.quotient_chunk_commitments.len() || num_of_quotient_chunks != proof.quotient_chunks_evaluations.len() {
+        if num_of_quotient_chunks != proof.quotient_chunk_commitments.len()
+            || num_of_quotient_chunks != proof.quotient_chunks_evaluations.len()
+        {
             return Err(Error::WrongNumberOfChunks);
         }
 
@@ -275,9 +305,8 @@ where
 
         fs_rng.absorb(&to_bytes![&proof.witness_commitments].unwrap());
 
-
         let (verifier_first_msg, verifier_state) =
-        PIOPforPolyIdentity::verifier_first_round(
+            PIOPforPolyIdentity::verifier_first_round(
                 verifier_init_state,
                 &mut fs_rng,
             );
@@ -297,40 +326,48 @@ where
 
         // --------------------------------------------------------------------
 
-
-        for (witness_oracle, commitment) in
-        witness_oracles.iter_mut().zip(proof.witness_commitments.iter())
+        for (witness_oracle, commitment) in witness_oracles
+            .iter_mut()
+            .zip(proof.witness_commitments.iter())
         {
-        // TODO: we should consider doing this with storing ref to commitment but proof lifetime is causing some error
+            // TODO: we should consider doing this with storing ref to commitment but proof lifetime is causing some error
             witness_oracle.register_commitment(commitment.clone());
         }
 
-        let quotient_chunk_oracles = (0..num_of_quotient_chunks).map(|i| {
-            VerifierConcreteOracle {
-                label: format!("quotient_chunk_{}", i).to_string(), 
+        let quotient_chunk_oracles =
+            (0..num_of_quotient_chunks).map(|i| CommittedConcreteOracle {
+                label: format!("quotient_chunk_{}", i).to_string(),
                 queried_rotations: BTreeSet::from([Rotation::curr()]),
                 should_mask: false,
-                eval_at_rotation: BTreeMap::new(), 
-                evals_at_challenges: BTreeMap::from([(verifier_second_msg.xi, proof.quotient_chunks_evaluations[i])]),
-                commitment: Some(proof.quotient_chunk_commitments[i].clone())
-            }
-        });
+                eval_at_rotation: BTreeMap::new(),
+                evals_at_challenges: BTreeMap::from([(
+                    verifier_second_msg.xi,
+                    proof.quotient_chunks_evaluations[i],
+                )]),
+                commitment: Some(proof.quotient_chunk_commitments[i].clone()),
+            });
 
-
-        let domain = GeneralEvaluationDomain::new(domain_size).unwrap(); 
+        let domain = GeneralEvaluationDomain::new(domain_size).unwrap();
         let omegas: Vec<F> = domain.elements().collect();
-        let query_set = PIOPforPolyIdentity::get_query_set(witness_oracles.iter(), verifier_second_msg.label, verifier_second_msg.xi, &omegas);
+        let query_set = PIOPforPolyIdentity::get_query_set(
+            witness_oracles.iter(),
+            verifier_second_msg.label,
+            verifier_second_msg.xi,
+            &omegas,
+        );
 
         assert_eq!(query_set.len(), proof.witness_evaluations.len());
 
-        let witness_label_index_mapping = witness_oracles.iter()
+        let witness_label_index_mapping = witness_oracles
+            .iter()
             .enumerate()
             .map(|(i, oracle)| (oracle.label.clone(), i))
             .collect::<BTreeMap<String, usize>>();
 
-
         // map claimed evaluations with proper oracles
-        for ((poly_label, (_, point)), &evaluation) in query_set.iter().zip(proof.witness_evaluations.iter()) {
+        for ((poly_label, (_, point)), &evaluation) in
+            query_set.iter().zip(proof.witness_evaluations.iter())
+        {
             match witness_label_index_mapping.get(poly_label) {
                 Some(index) => witness_oracles[*index]
                     .register_eval_at_challenge(*point, evaluation),
@@ -350,12 +387,18 @@ where
                 &|x: F| x,
                 &|query: &WitnessQuery| {
                     let oracle = &witness_oracles[query.get_index()];
-                    let challenge = query.rotation.compute_evaluation_point(verifier_second_msg.xi, &omegas);
+                    let challenge = query.rotation.compute_evaluation_point(
+                        verifier_second_msg.xi,
+                        &omegas,
+                    );
                     oracle.query_at_challenge(&challenge)
                 },
                 &|query: &InstanceQuery| {
                     let oracle = &instance_oracles[query.get_index()];
-                    let challenge = query.rotation.compute_evaluation_point(verifier_second_msg.xi, &omegas);
+                    let challenge = query.rotation.compute_evaluation_point(
+                        verifier_second_msg.xi,
+                        &omegas,
+                    );
                     oracle.query_at_challenge(&challenge)
                 },
                 &|x: F| -x,
@@ -374,7 +417,9 @@ where
                 .collect();
 
         let mut t_part = F::zero();
-        for (&x_i, t_i) in powers_of_x.iter().zip(quotient_chunk_oracles.clone()) {
+        for (&x_i, t_i) in
+            powers_of_x.iter().zip(quotient_chunk_oracles.clone())
+        {
             t_part += x_i * t_i.query_at_challenge(&verifier_second_msg.xi);
         }
 
@@ -386,8 +431,24 @@ where
             return Err(Error::QuotientNotZero);
         }
 
-        let oracles: Vec<_> = witness_oracles.iter().map(|oracle| oracle.clone()).chain(quotient_chunk_oracles).collect();
-        let res = Multiopen::<F, PC, FS>::verify(&vk.verifier_key, proof.multiopen_proof, &oracles, &proof.witness_evaluations.into_iter().chain(proof.quotient_chunks_evaluations.into_iter()).collect::<Vec<F>>(), verifier_second_msg.xi, domain_size).map_err(Error::from_multiproof_err)?;
+        let oracles: Vec<_> = witness_oracles
+            .iter()
+            .map(|oracle| oracle.clone())
+            .chain(quotient_chunk_oracles)
+            .collect();
+        let res = Multiopen::<F, PC, FS>::verify(
+            &vk.verifier_key,
+            proof.multiopen_proof,
+            &oracles,
+            &proof
+                .witness_evaluations
+                .into_iter()
+                .chain(proof.quotient_chunks_evaluations.into_iter())
+                .collect::<Vec<F>>(),
+            verifier_second_msg.xi,
+            domain_size,
+        )
+        .map_err(Error::from_multiproof_err)?;
         Ok(res)
     }
 }

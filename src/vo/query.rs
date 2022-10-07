@@ -59,8 +59,7 @@ impl Rotation {
         evaluation_point * omega
     }
 
-    pub fn get_point_info<F: Field>
-    (
+    pub fn get_point_info<F: Field>(
         &self,
         opening_challenge_label: &str,
         opening_challenge: F,

@@ -69,15 +69,19 @@ impl<F: PrimeField> PIOPforPolyIdentity<F> {
     }
 
     pub fn get_query_set(
-        oracles: impl Iterator <Item = impl QuerySetProvider<F>>,
+        oracles: impl Iterator<Item = impl QuerySetProvider<F>>,
         evaluation_challenge_label: &str,
-        evaluation_challenge: F, 
-        omegas: &Vec<F>
+        evaluation_challenge: F,
+        omegas: &Vec<F>,
     ) -> QuerySet<F> {
-        let mut query_set = QuerySet::new(); 
+        let mut query_set = QuerySet::new();
 
         for oracle in oracles {
-            query_set.extend(oracle.get_query_set(evaluation_challenge_label, evaluation_challenge, omegas));
+            query_set.extend(oracle.get_query_set(
+                evaluation_challenge_label,
+                evaluation_challenge,
+                omegas,
+            ));
         }
 
         query_set

@@ -7,16 +7,16 @@ use ark_poly::{EvaluationDomain, GeneralEvaluationDomain, Polynomial};
 use ark_poly_commit::LabeledPolynomial;
 
 use crate::multiproof::poly::construct_vanishing;
-use crate::{concrete_oracle::ProverConcreteOracle, vo::query::Rotation};
+use crate::{concrete_oracle::InstantiableConcreteOracle, vo::query::Rotation};
 
 use super::{PIOPError, PIOP};
 // use super::super::error::Error;
 use super::verifier::{VerifierFirstMsg, VerifierSecondMsg};
 
 pub struct ProverState<'a, F: PrimeField> {
-    oracles: &'a [ProverConcreteOracle<F>],
+    oracles: &'a [InstantiableConcreteOracle<F>],
     opening_sets:
-        BTreeMap<BTreeSet<Rotation>, Vec<&'a ProverConcreteOracle<F>>>,
+        BTreeMap<BTreeSet<Rotation>, Vec<&'a InstantiableConcreteOracle<F>>>,
     domain: GeneralEvaluationDomain<F>,
     q_polys: Option<Vec<LabeledPolynomial<F, DensePolynomial<F>>>>,
     f_polys: Option<Vec<LabeledPolynomial<F, DensePolynomial<F>>>>,
@@ -25,12 +25,12 @@ pub struct ProverState<'a, F: PrimeField> {
 impl<F: PrimeField> PIOP<F> {
     // NOTE: Oracles are already masked
     pub fn init_prover<'a>(
-        oracles: &'a [ProverConcreteOracle<F>],
+        oracles: &'a [InstantiableConcreteOracle<F>],
         domain_size: usize,
     ) -> Result<ProverState<'a, F>, PIOPError> {
         let mut opening_sets = BTreeMap::<
             BTreeSet<Rotation>,
-            Vec<&'a ProverConcreteOracle<F>>,
+            Vec<&'a InstantiableConcreteOracle<F>>,
         >::new();
 
         for oracle in oracles.iter() {

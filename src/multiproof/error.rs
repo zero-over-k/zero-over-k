@@ -9,7 +9,7 @@ pub enum Error<E> {
     PIOPError(PIOPError),
 
     /// Pairing was evaluated as false
-    OpeningCheckFailed
+    OpeningCheckFailed,
 }
 
 impl<E> Error<E> {

@@ -5,9 +5,7 @@ use std::{
     ops::{Add, Mul, Neg, Sub},
 };
 
-use super::{
-    query::{InstanceQuery, WitnessQuery},
-};
+use super::query::{InstanceQuery, WitnessQuery};
 use ark_ff::PrimeField;
 
 #[derive(Clone)]

@@ -14,15 +14,15 @@ mod test {
     use ark_std::test_rng;
     use rand_chacha::ChaChaRng;
 
-    use crate::concrete_oracle::VerifierConcreteOracle;
+    use crate::concrete_oracle::CommittedConcreteOracle;
     use crate::rng::SimpleHashFiatShamirRng;
     use crate::PIL;
     use blake2::Blake2s;
 
-    use crate::vo::{VirtualOracle};
+    use crate::vo::VirtualOracle;
     use crate::{
         commitment::KZG10,
-        concrete_oracle::{OracleType, ProverConcreteOracle},
+        concrete_oracle::{InstantiableConcreteOracle, OracleType},
         vo::precompiled::mul::MulVO,
     };
 
@@ -68,7 +68,7 @@ mod test {
             );
         }
 
-        let a = ProverConcreteOracle {
+        let a = InstantiableConcreteOracle {
             label: "a".to_string(),
             poly: a_poly,
             evals_at_coset_of_extended_domain: None,
@@ -77,7 +77,7 @@ mod test {
             should_mask: true,
         };
 
-        let b = ProverConcreteOracle {
+        let b = InstantiableConcreteOracle {
             label: "b".to_string(),
             poly: b_poly,
             evals_at_coset_of_extended_domain: None,
@@ -86,7 +86,7 @@ mod test {
             should_mask: true,
         };
 
-        let c = ProverConcreteOracle {
+        let c = InstantiableConcreteOracle {
             label: "c".to_string(),
             poly: c_poly,
             evals_at_coset_of_extended_domain: None,
@@ -100,8 +100,7 @@ mod test {
 
         let concrete_oracles = [a, b, c.clone()];
 
-        let vos: Vec<Box<dyn VirtualOracle<F>>> =
-            vec![Box::new(mul_vo)];
+        let vos: Vec<Box<dyn VirtualOracle<F>>> = vec![Box::new(mul_vo)];
 
         let proof = PilInstance::prove(
             &pk,
@@ -113,8 +112,8 @@ mod test {
         )
         .unwrap();
 
-        let a_verifier = VerifierConcreteOracle::new("a".to_string(), true);
-        let b_verifier = VerifierConcreteOracle::new("b".to_string(), true);
+        let a_verifier = CommittedConcreteOracle::new("a".to_string(), true);
+        let b_verifier = CommittedConcreteOracle::new("b".to_string(), true);
 
         let res = PilInstance::verify(
             &vk,
@@ -130,6 +129,5 @@ mod test {
         .unwrap();
 
         assert_eq!(res, ());
-
     }
 }

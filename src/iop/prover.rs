@@ -9,9 +9,7 @@ use ark_std::rand::Rng;
 
 use crate::{
     commitment::HomomorphicCommitment,
-    concrete_oracle::{
-        OracleType, ProverConcreteOracle
-    },
+    concrete_oracle::{InstantiableConcreteOracle, OracleType},
     iop::error::Error,
     iop::{verifier::VerifierFirstMsg, PIOPforPolyIdentity},
     vo::{
@@ -27,18 +25,18 @@ use super::verifier::VerifierSecondMsg;
 
 /// State of the prover
 pub struct ProverState<'a, F: PrimeField> {
-    pub(crate) witness_oracles: Vec<ProverConcreteOracle<F>>,
-    pub(crate) instance_oracles: Vec<ProverConcreteOracle<F>>,
+    pub(crate) witness_oracles: Vec<InstantiableConcreteOracle<F>>,
+    pub(crate) instance_oracles: Vec<InstantiableConcreteOracle<F>>,
     pub(crate) vos: &'a Vec<Box<dyn VirtualOracle<F>>>,
     pub(crate) domain: GeneralEvaluationDomain<F>,
     pub(crate) vanishing_polynomial: DensePolynomial<F>,
-    pub(crate) quotient_chunks: Option<Vec<ProverConcreteOracle<F>>>,
+    pub(crate) quotient_chunks: Option<Vec<InstantiableConcreteOracle<F>>>,
 }
 
 impl<F: PrimeField> PIOPforPolyIdentity<F> {
     // NOTE: consider having indexed concrete oracles by initializing evals_at_coset_of_extended_domain (ex. selector polynomials)
     pub fn init_prover<'a>(
-        concrete_oracles: &[ProverConcreteOracle<F>],
+        concrete_oracles: &[InstantiableConcreteOracle<F>],
         vos: &'a Vec<Box<dyn VirtualOracle<F>>>,
         domain_size: usize,
         vanishing_polynomial: &DensePolynomial<F>,
@@ -68,7 +66,7 @@ impl<F: PrimeField> PIOPforPolyIdentity<F> {
     pub fn prover_first_round<'a, R: Rng>(
         state: &'a mut ProverState<F>,
         rng: &mut R,
-    ) -> Result<Vec<ProverConcreteOracle<F>>, Error> {
+    ) -> Result<Vec<InstantiableConcreteOracle<F>>, Error> {
         // 1. Get all different witness queries
         let wtns_queries: BTreeSet<WitnessQuery> = state
             .vos
@@ -119,7 +117,7 @@ impl<F: PrimeField> PIOPforPolyIdentity<F> {
         verifier_msg: &VerifierFirstMsg<F>,
         state: &mut ProverState<F>,
         srs_size: usize,
-    ) -> Result<Vec<ProverConcreteOracle<F>>, Error> {
+    ) -> Result<Vec<InstantiableConcreteOracle<F>>, Error> {
         let wnts_get_degree_fn = |query: &WitnessQuery| {
             let oracle = &state.witness_oracles[query.get_index()];
             oracle.get_degree()
@@ -169,11 +167,19 @@ impl<F: PrimeField> PIOPforPolyIdentity<F> {
                     &|x: F| x,
                     &|query: &WitnessQuery| {
                         let oracle = &state.witness_oracles[query.get_index()];
-                        oracle.query_at_rotated_root_of_extended_domain(state.domain.size(), query.rotation, i)
+                        oracle.query_at_rotated_root_of_extended_domain(
+                            state.domain.size(),
+                            query.rotation,
+                            i,
+                        )
                     },
                     &|query: &InstanceQuery| {
                         let oracle = &state.instance_oracles[query.get_index()];
-                        oracle.query_at_rotated_root_of_extended_domain(state.domain.size(), query.rotation, i)
+                        oracle.query_at_rotated_root_of_extended_domain(
+                            state.domain.size(),
+                            query.rotation,
+                            i,
+                        )
                     },
                     &|x: F| -x,
                     &|x: F, y: F| x + y,
@@ -199,13 +205,13 @@ impl<F: PrimeField> PIOPforPolyIdentity<F> {
             &extended_domain.coset_ifft(&quotient_evals),
         );
 
-        let quotient_chunks: Vec<ProverConcreteOracle<F>> = quotient
+        let quotient_chunks: Vec<InstantiableConcreteOracle<F>> = quotient
             .coeffs
             .chunks(srs_size)
             .enumerate()
             .map(|(i, chunk)| {
                 let poly = DensePolynomial::from_coefficients_slice(chunk);
-                ProverConcreteOracle {
+                InstantiableConcreteOracle {
                     label: format!("quotient_chunk_{}", i).to_string(),
                     poly,
                     evals_at_coset_of_extended_domain: None,

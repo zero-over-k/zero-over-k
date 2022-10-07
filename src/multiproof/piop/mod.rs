@@ -9,12 +9,14 @@ use ark_poly::{
     univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
     Polynomial,
 };
-use ark_poly_commit::{LabeledCommitment, LabeledPolynomial, evaluate_query_set};
+use ark_poly_commit::{
+    evaluate_query_set, LabeledCommitment, LabeledPolynomial,
+};
 use ark_std::rand::RngCore;
 
 use crate::{
     commitment::HomomorphicCommitment,
-    concrete_oracle::{ProverConcreteOracle, VerifierConcreteOracle},
+    concrete_oracle::{CommittedConcreteOracle, InstantiableConcreteOracle},
     rng::FiatShamirRng,
     vo::query::Rotation,
 };
@@ -53,7 +55,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng>
 
     pub fn prove<'a>(
         ck: &PC::CommitterKey,
-        oracles: &[ProverConcreteOracle<F>],
+        oracles: &[InstantiableConcreteOracle<F>],
         evals: &Vec<F>,
         evaluation_challenge: F,
         domain_size: usize,
@@ -124,7 +126,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng>
     pub fn verify(
         vk: &PC::VerifierKey,
         proof: Proof<F, PC>,
-        oracles: &[VerifierConcreteOracle<F, PC>], // At this moment challenge -> eval mapping should already be filled
+        oracles: &[CommittedConcreteOracle<F, PC>], // At this moment challenge -> eval mapping should already be filled
         evals: &Vec<F>,
         evaluation_challenge: F,
         domain_size: usize,
@@ -133,10 +135,8 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng>
 
         let domain = GeneralEvaluationDomain::new(domain_size).unwrap();
 
-        let mut fs_rng = FS::initialize(
-            &to_bytes![&Self::PROTOCOL_NAME, evals]
-                .unwrap(),
-        ); // TODO: add &pk.vk, &commitments and evaluation_challenge
+        let mut fs_rng =
+            FS::initialize(&to_bytes![&Self::PROTOCOL_NAME, evals].unwrap()); // TODO: add &pk.vk, &commitments and evaluation_challenge
 
         let (verifier_state, verifier_first_msg) =
             PIOP::verifier_first_round(verifier_state, &mut fs_rng);
@@ -146,10 +146,9 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng>
         let (_, verifier_second_msg) =
             PIOP::verifier_second_round(verifier_state, &mut fs_rng);
 
-
         let mut opening_sets = BTreeMap::<
             BTreeSet<Rotation>,
-            Vec<&VerifierConcreteOracle<F, PC>>,
+            Vec<&CommittedConcreteOracle<F, PC>>,
         >::new();
 
         for oracle in oracles.iter() {
@@ -196,7 +195,8 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng>
             (q_i, q_i_evals_set)
         });
 
-        let f_evals: Vec<F> = qs.clone()
+        let f_evals: Vec<F> = qs
+            .clone()
             .zip(proof.q_evals.iter())
             .map(|((_, q_eval_set), &q_eval)| {
                 let evaluation_domain: Vec<F> =
@@ -226,7 +226,9 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng>
 
         let mut final_poly_commitment = PC::zero_comm();
         let mut final_poly_eval = F::zero();
-        for (i, (f_commit, &f_eval)) in proof.f_poly_commits.iter().zip(f_evals.iter()).enumerate() {
+        for (i, (f_commit, &f_eval)) in
+            proof.f_poly_commits.iter().zip(f_evals.iter()).enumerate()
+        {
             final_poly_commitment = PC::add(
                 &final_poly_commitment,
                 &PC::scale_com(f_commit, x2_powers[i]),
@@ -242,15 +244,33 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng>
             .take(proof.q_evals.len())
             .collect();
 
-        for (i, ((q_commitment, _), &q_eval)) in qs.zip(proof.q_evals.iter()).enumerate() {
-            final_poly_commitment = PC::add(&final_poly_commitment, &PC::scale_com(&q_commitment, x4_powers[i]));
+        for (i, ((q_commitment, _), &q_eval)) in
+            qs.zip(proof.q_evals.iter()).enumerate()
+        {
+            final_poly_commitment = PC::add(
+                &final_poly_commitment,
+                &PC::scale_com(&q_commitment, x4_powers[i]),
+            );
             final_poly_eval += x4_powers[i] * q_eval;
         }
 
-        let final_poly_commitment = LabeledCommitment::new("final_poly".to_string(), final_poly_commitment, None);
+        let final_poly_commitment = LabeledCommitment::new(
+            "final_poly".to_string(),
+            final_poly_commitment,
+            None,
+        );
 
-        let res = PC::check(vk, &[final_poly_commitment], &verifier_second_msg.x3, [final_poly_eval], &proof.opening_proof, F::one(), None).map_err(Error::from_pc_err)?;
-        
+        let res = PC::check(
+            vk,
+            &[final_poly_commitment],
+            &verifier_second_msg.x3,
+            [final_poly_eval],
+            &proof.opening_proof,
+            F::one(),
+            None,
+        )
+        .map_err(Error::from_pc_err)?;
+
         if !res {
             return Err(Error::OpeningCheckFailed);
         }
@@ -259,16 +279,27 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng>
     }
 }
 
-
 #[cfg(test)]
 mod test {
-    use std::collections::{BTreeSet, BTreeMap};
+    use std::collections::{BTreeMap, BTreeSet};
 
-    use ark_poly::{univariate::DensePolynomial, UVPolynomial, GeneralEvaluationDomain, EvaluationDomain, Polynomial};
-    use ark_poly_commit::{PolynomialCommitment, PCUniversalParams, LabeledPolynomial};
-    use ark_std::test_rng;
+    use crate::{
+        commitment::KZG10,
+        concrete_oracle::{
+            CommittedConcreteOracle, InstantiableConcreteOracle, OracleType,
+        },
+        rng::SimpleHashFiatShamirRng,
+        vo::query::Rotation,
+    };
     use ark_bls12_381::{Bls12_381, Fr as F};
-    use crate::{commitment::{KZG10}, concrete_oracle::{ProverConcreteOracle, OracleType, VerifierConcreteOracle}, vo::query::Rotation, rng::SimpleHashFiatShamirRng};
+    use ark_poly::{
+        univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
+        Polynomial, UVPolynomial,
+    };
+    use ark_poly_commit::{
+        LabeledPolynomial, PCUniversalParams, PolynomialCommitment,
+    };
+    use ark_std::test_rng;
     use blake2::Blake2s;
     use rand_chacha::ChaChaRng;
 
@@ -283,16 +314,14 @@ mod test {
         let max_degree = 30;
         let mut rng = test_rng();
 
-
-        let domain_size = 16; 
-        let domain = GeneralEvaluationDomain::<F>::new(domain_size).unwrap(); 
-        let poly_degree = domain_size - 1; 
+        let domain_size = 16;
+        let domain = GeneralEvaluationDomain::<F>::new(domain_size).unwrap();
+        let poly_degree = domain_size - 1;
 
         let srs = PC::setup(max_degree, None, &mut rng).unwrap();
-        
+
         let (committer_key, verifier_key) =
-        PC::trim(&srs, srs.max_degree(), 0, None)
-            .unwrap();
+            PC::trim(&srs, srs.max_degree(), 0, None).unwrap();
 
         let a_poly = DensePolynomial::<F>::rand(poly_degree, &mut rng);
         let b_poly = DensePolynomial::<F>::rand(poly_degree, &mut rng);
@@ -300,7 +329,7 @@ mod test {
         let c_poly = DensePolynomial::<F>::rand(poly_degree, &mut rng);
         let d_poly = DensePolynomial::<F>::rand(poly_degree, &mut rng);
 
-        let a = ProverConcreteOracle {
+        let a = InstantiableConcreteOracle {
             label: "a".to_string(),
             poly: a_poly.clone(),
             evals_at_coset_of_extended_domain: None,
@@ -309,7 +338,7 @@ mod test {
             should_mask: false,
         };
 
-        let b = ProverConcreteOracle {
+        let b = InstantiableConcreteOracle {
             label: "b".to_string(),
             poly: b_poly.clone(),
             evals_at_coset_of_extended_domain: None,
@@ -318,30 +347,36 @@ mod test {
             should_mask: false,
         };
 
-        let c = ProverConcreteOracle {
+        let c = InstantiableConcreteOracle {
             label: "c".to_string(),
             poly: c_poly.clone(),
             evals_at_coset_of_extended_domain: None,
             oracle_type: OracleType::Witness,
-            queried_rotations: BTreeSet::from([Rotation::curr(), Rotation::next()]),
+            queried_rotations: BTreeSet::from([
+                Rotation::curr(),
+                Rotation::next(),
+            ]),
             should_mask: false,
         };
 
-        let d = ProverConcreteOracle {
+        let d = InstantiableConcreteOracle {
             label: "d".to_string(),
             poly: d_poly.clone(),
             evals_at_coset_of_extended_domain: None,
             oracle_type: OracleType::Witness,
-            queried_rotations: BTreeSet::from([Rotation::curr(), Rotation::next()]),
+            queried_rotations: BTreeSet::from([
+                Rotation::curr(),
+                Rotation::next(),
+            ]),
             should_mask: false,
         };
 
         let oracles = [a, b, c, d];
 
-        let labeled_oracles: Vec<LabeledPolynomial<F, DensePolynomial<F>>> = oracles.iter().map(|oracle| oracle.to_labeled()).collect();
+        let labeled_oracles: Vec<LabeledPolynomial<F, DensePolynomial<F>>> =
+            oracles.iter().map(|oracle| oracle.to_labeled()).collect();
         let (oracles_commitments, _) =
             PC::commit(&committer_key, &labeled_oracles, None).unwrap();
-
 
         let xi = F::from(13131u64);
         let omega = domain.element(1);
@@ -355,9 +390,17 @@ mod test {
         let c_at_omega_xi = c_poly.evaluate(&omega_xi);
         let d_at_omega_xi = d_poly.evaluate(&omega_xi);
 
-        let evals = vec![a_at_xi, b_at_xi, c_at_xi, d_at_xi, c_at_omega_xi, c_at_omega_xi, d_at_omega_xi];
-        
-        let a_ver = VerifierConcreteOracle {
+        let evals = vec![
+            a_at_xi,
+            b_at_xi,
+            c_at_xi,
+            d_at_xi,
+            c_at_omega_xi,
+            c_at_omega_xi,
+            d_at_omega_xi,
+        ];
+
+        let a_ver = CommittedConcreteOracle {
             label: "a".to_string(),
             queried_rotations: BTreeSet::from([Rotation::curr()]),
             should_mask: false,
@@ -366,7 +409,7 @@ mod test {
             commitment: Some(oracles_commitments[0].commitment().clone()),
         };
 
-        let b_ver = VerifierConcreteOracle {
+        let b_ver = CommittedConcreteOracle {
             label: "b".to_string(),
             queried_rotations: BTreeSet::from([Rotation::curr()]),
             should_mask: false,
@@ -375,31 +418,55 @@ mod test {
             commitment: Some(oracles_commitments[1].commitment().clone()),
         };
 
-        let c_ver = VerifierConcreteOracle {
+        let c_ver = CommittedConcreteOracle {
             label: "c".to_string(),
-            queried_rotations: BTreeSet::from([Rotation::curr(), Rotation::next()]),
+            queried_rotations: BTreeSet::from([
+                Rotation::curr(),
+                Rotation::next(),
+            ]),
             should_mask: false,
             eval_at_rotation: BTreeMap::new(),
-            evals_at_challenges: BTreeMap::from([(xi, c_at_xi), (omega_xi, c_at_omega_xi)]),
+            evals_at_challenges: BTreeMap::from([
+                (xi, c_at_xi),
+                (omega_xi, c_at_omega_xi),
+            ]),
             commitment: Some(oracles_commitments[2].commitment().clone()),
         };
 
-        let d_ver = VerifierConcreteOracle {
+        let d_ver = CommittedConcreteOracle {
             label: "d".to_string(),
-            queried_rotations: BTreeSet::from([Rotation::curr(), Rotation::next()]),
+            queried_rotations: BTreeSet::from([
+                Rotation::curr(),
+                Rotation::next(),
+            ]),
             should_mask: false,
             eval_at_rotation: BTreeMap::new(),
-            evals_at_challenges: BTreeMap::from([(xi, d_at_xi), (omega_xi, d_at_omega_xi)]),
+            evals_at_challenges: BTreeMap::from([
+                (xi, d_at_xi),
+                (omega_xi, d_at_omega_xi),
+            ]),
             commitment: Some(oracles_commitments[3].commitment().clone()),
         };
 
         let ver_oracles = [a_ver, b_ver, c_ver, d_ver];
 
-
-        let proof = MultiopenInst::prove(&committer_key, &oracles, &evals, xi, domain_size).unwrap();
-        let res = MultiopenInst::verify(&verifier_key, proof, &ver_oracles, &evals, xi, domain_size);
+        let proof = MultiopenInst::prove(
+            &committer_key,
+            &oracles,
+            &evals,
+            xi,
+            domain_size,
+        )
+        .unwrap();
+        let res = MultiopenInst::verify(
+            &verifier_key,
+            proof,
+            &ver_oracles,
+            &evals,
+            xi,
+            domain_size,
+        );
 
         assert_eq!(res.is_ok(), true);
-
     }
 }
