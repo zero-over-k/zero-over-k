@@ -24,7 +24,6 @@ pub struct ArithVO<F: PrimeField> {
     wtns_queries: Vec<WitnessQuery>,
     instance_queries: Vec<InstanceQuery>,
     expression: Option<Expression<F>>,
-    linearisation_expression: Option<Expression<F>>,
 }
 
 impl<F: PrimeField> ArithVO<F> {
@@ -91,7 +90,6 @@ impl<F: PrimeField> ArithVO<F> {
             wtns_queries: vec![],
             instance_queries: vec![],
             expression: None,
-            linearisation_expression: None,
         }
     }
 
