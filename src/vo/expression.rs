@@ -1,14 +1,14 @@
+// All credits to Halo2 devs for inspiration!
+
 use std::{
     cmp::max,
     ops::{Add, Mul, Neg, Sub},
 };
 
 use super::{
-    linearisation::LinearisationOracleQuery,
     query::{InstanceQuery, WitnessQuery},
 };
 use ark_ff::PrimeField;
-use ark_poly_commit::QuerySet;
 
 #[derive(Clone)]
 pub enum Expression<F> {
@@ -19,8 +19,6 @@ pub enum Expression<F> {
     Sum(Box<Expression<F>>, Box<Expression<F>>),
     Product(Box<Expression<F>>, Box<Expression<F>>),
     Scaled(Box<Expression<F>>, F),
-
-    Linearisation(LinearisationOracleQuery),
 }
 
 impl<F: PrimeField> Expression<F> {
@@ -37,8 +35,6 @@ impl<F: PrimeField> Expression<F> {
         sum_fn: &impl Fn(T, T) -> T,
         product_fn: &impl Fn(T, T) -> T,
         scaled_fn: &impl Fn(T, F) -> T,
-
-        linearisation_fn: &impl Fn(&LinearisationOracleQuery) -> T,
     ) -> T {
         match self {
             Expression::Constant(scalar) => constant_fn(*scalar),
@@ -53,7 +49,6 @@ impl<F: PrimeField> Expression<F> {
                     sum_fn,
                     product_fn,
                     scaled_fn,
-                    linearisation_fn,
                 );
                 negated_fn(a)
             }
@@ -66,7 +61,6 @@ impl<F: PrimeField> Expression<F> {
                     sum_fn,
                     product_fn,
                     scaled_fn,
-                    linearisation_fn,
                 );
                 let b = b.evaluate(
                     constant_fn,
@@ -76,7 +70,6 @@ impl<F: PrimeField> Expression<F> {
                     sum_fn,
                     product_fn,
                     scaled_fn,
-                    linearisation_fn,
                 );
                 sum_fn(a, b)
             }
@@ -89,7 +82,6 @@ impl<F: PrimeField> Expression<F> {
                     sum_fn,
                     product_fn,
                     scaled_fn,
-                    linearisation_fn,
                 );
                 let b = b.evaluate(
                     constant_fn,
@@ -99,7 +91,6 @@ impl<F: PrimeField> Expression<F> {
                     sum_fn,
                     product_fn,
                     scaled_fn,
-                    linearisation_fn,
                 );
                 product_fn(a, b)
             }
@@ -112,11 +103,9 @@ impl<F: PrimeField> Expression<F> {
                     sum_fn,
                     product_fn,
                     scaled_fn,
-                    linearisation_fn,
                 );
                 scaled_fn(a, *f)
             }
-            Expression::Linearisation(query) => linearisation_fn(query),
         }
     }
     /// Compute the degree of this polynomial
@@ -138,66 +127,6 @@ impl<F: PrimeField> Expression<F> {
                 a.degree(wtns_fn, instance_fn) + b.degree(wtns_fn, instance_fn)
             }
             Expression::Scaled(poly, _) => poly.degree(wtns_fn, instance_fn),
-            Expression::Linearisation(_) => panic!("skip degree for now"),
-        }
-    }
-
-    /// Compute which oracles should be queried at which rotations
-    pub fn compute_query_set(
-        &self,
-        wtns_fn: &impl Fn(&WitnessQuery) -> Vec<(String, (String, F))>,
-    ) -> Vec<(String, (String, F))> {
-        match self {
-            Expression::Constant(_) => vec![],
-            Expression::Witness(query) => wtns_fn(query),
-            Expression::Instance(query) => vec![], // we don't commit&open to instance polys
-            Expression::Negated(expression) => {
-                expression.compute_query_set(wtns_fn)
-            }
-            Expression::Sum(a, b) => {
-                let mut lhs = a.compute_query_set(wtns_fn);
-                let rhs = b.compute_query_set(wtns_fn);
-                lhs.extend(rhs);
-                lhs
-            }
-            Expression::Product(a, b) => {
-                let mut lhs = a.compute_query_set(wtns_fn);
-                let rhs = b.compute_query_set(wtns_fn);
-                lhs.extend(rhs);
-                lhs
-            }
-            Expression::Scaled(exp, _) => exp.compute_query_set(wtns_fn),
-            Expression::Linearisation(_) => panic!("Not allowed here"),
-        }
-    }
-
-    pub fn compute_linearisation_query_set(
-        &self,
-        oracle_fn: &impl Fn(&LinearisationOracleQuery) -> Vec<(String, (String, F))>,
-    ) -> Vec<(String, (String, F))> {
-        match self {
-            Expression::Constant(_) => vec![],
-            Expression::Witness(_) => panic!("Not allowed"),
-            Expression::Instance(_) => panic!("Not allowed"),
-            Expression::Negated(expression) => {
-                expression.compute_linearisation_query_set(oracle_fn)
-            }
-            Expression::Sum(a, b) => {
-                let mut lhs = a.compute_linearisation_query_set(oracle_fn);
-                let rhs = b.compute_linearisation_query_set(oracle_fn);
-                lhs.extend(rhs);
-                lhs
-            }
-            Expression::Product(a, b) => {
-                let mut lhs = a.compute_linearisation_query_set(oracle_fn);
-                let rhs = b.compute_linearisation_query_set(oracle_fn);
-                lhs.extend(rhs);
-                lhs
-            }
-            Expression::Scaled(exp, _) => {
-                exp.compute_linearisation_query_set(oracle_fn)
-            }
-            Expression::Linearisation(query) => oracle_fn(query),
         }
     }
 }
@@ -246,11 +175,5 @@ impl<F: PrimeField> From<WitnessQuery> for Expression<F> {
 impl<F: PrimeField> From<InstanceQuery> for Expression<F> {
     fn from(query: InstanceQuery) -> Self {
         Self::Instance(query)
-    }
-}
-
-impl<F: PrimeField> From<LinearisationOracleQuery> for Expression<F> {
-    fn from(query: LinearisationOracleQuery) -> Self {
-        Self::Linearisation(query)
     }
 }

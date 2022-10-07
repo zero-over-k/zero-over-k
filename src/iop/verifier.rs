@@ -68,28 +68,7 @@ impl<F: PrimeField> PIOPforPolyIdentity<F> {
         (msg, state)
     }
 
-    /// Gets query set for batch poly commit
-    pub fn get_query_set<'a>(
-        state: &VerifierState<'a, F>,
-        queried_oracles: impl Iterator<Item = impl QuerySetProvider<F>>,
-    ) -> QuerySet<F> {
-        let VerifierSecondMsg { xi, label } = state.second_round_msg.expect(
-            "State should include second round message when building query set",
-        );
-        let mut query_set = QuerySet::new();
-
-        for queried_oracle in queried_oracles {
-            query_set.extend(queried_oracle.get_query_set(
-                label,
-                xi,
-                state.domain.size(),
-            ));
-        }
-
-        query_set
-    }
-
-    pub fn compute_query_set(
+    pub fn get_query_set(
         oracles: impl Iterator <Item = impl QuerySetProvider<F>>,
         evaluation_challenge_label: &str,
         evaluation_challenge: F, 
@@ -98,7 +77,7 @@ impl<F: PrimeField> PIOPforPolyIdentity<F> {
         let mut query_set = QuerySet::new(); 
 
         for oracle in oracles {
-            query_set.extend(oracle.get_query_set_new(evaluation_challenge_label, evaluation_challenge, omegas));
+            query_set.extend(oracle.get_query_set(evaluation_challenge_label, evaluation_challenge, omegas));
         }
 
         query_set

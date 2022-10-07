@@ -5,7 +5,6 @@ use query::{InstanceQuery, WitnessQuery};
 use self::expression::Expression;
 pub mod error;
 pub mod expression;
-pub mod linearisation;
 pub mod precompiled;
 pub mod precompiled_vos;
 pub mod query;
@@ -28,8 +27,4 @@ pub trait VirtualOracle<F: PrimeField> {
 
     /// Returns expression that combines concrete oracles
     fn get_expression(&self) -> &Expression<F>;
-}
-
-pub trait LinearisableVirtualOracle<F: PrimeField>: VirtualOracle<F> {
-    fn get_linearisation_expression(&self) -> &Expression<F>;
 }

@@ -19,7 +19,7 @@ mod test {
     use crate::PIL;
     use blake2::Blake2s;
 
-    use crate::vo::{LinearisableVirtualOracle, VirtualOracle};
+    use crate::vo::{VirtualOracle};
     use crate::{
         commitment::KZG10,
         concrete_oracle::{OracleType, ProverConcreteOracle},
@@ -100,7 +100,7 @@ mod test {
 
         let concrete_oracles = [a, b, c.clone()];
 
-        let vos: Vec<Box<dyn LinearisableVirtualOracle<F>>> =
+        let vos: Vec<Box<dyn VirtualOracle<F>>> =
             vec![Box::new(mul_vo)];
 
         let proof = PilInstance::prove(

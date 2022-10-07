@@ -1,10 +1,5 @@
 use ark_ff::PrimeField;
-use ark_poly_commit::QuerySet;
 use ark_std::rand::RngCore;
-
-use crate::{
-    commitment::HomomorphicCommitment, concrete_oracle::{VerifierConcreteOracle, QuerySetProvider},
-};
 
 use super::PIOP;
 
@@ -60,20 +55,5 @@ impl<F: PrimeField> PIOP<F> {
 
         state.second_msg = Some(msg);
         (state, msg)
-    }
-
-    pub fn get_query_set(
-        oracles: &[impl QuerySetProvider<F>],
-        evaluation_challenge_label: &str,
-        evaluation_challenge: F, 
-        omegas: &Vec<F>
-    ) -> QuerySet<F> {
-        let mut query_set = QuerySet::new(); 
-
-        for oracle in oracles.iter() {
-            query_set.extend(oracle.get_query_set_new(evaluation_challenge_label, evaluation_challenge, omegas));
-        }
-
-        query_set
     }
 }

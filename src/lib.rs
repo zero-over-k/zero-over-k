@@ -3,13 +3,9 @@ use std::iter::successors;
 use std::marker::PhantomData;
 
 use crate::concrete_oracle::{
-    OracleType, Queriable, QueryContext, QueryPoint, QuerySetProvider,
+    OracleType, QuerySetProvider,
 };
 use crate::error::Error;
-use crate::vo::linearisation::{
-    LinearisationInfo, LinearisationOracleQuery, LinearisationPolyCommitment,
-    LinearisationQueriable, LinearisationQueryResponse,
-};
 use crate::vo::query::{Query, Rotation};
 use ark_ff::{to_bytes, PrimeField, UniformRand, Zero};
 use ark_poly::univariate::DensePolynomial;
@@ -34,7 +30,7 @@ use multiproof::piop::{PIOP, Multiopen};
 use rng::FiatShamirRng;
 use vo::query::InstanceQuery;
 use vo::query::WitnessQuery;
-use vo::{LinearisableVirtualOracle, VirtualOracle};
+use vo::{VirtualOracle};
 
 pub mod commitment;
 pub mod concrete_oracle;
@@ -91,7 +87,7 @@ where
     pub fn prove<R: Rng>(
         pk: &ProverKey<F, PC>,
         concrete_oracles: &[ProverConcreteOracle<F>],
-        vos: &Vec<Box<dyn LinearisableVirtualOracle<F>>>,
+        vos: &Vec<Box<dyn VirtualOracle<F>>>,
         domain_size: usize,
         vanishing_polynomial: &DensePolynomial<F>,
         zk_rng: &mut R,
@@ -167,7 +163,7 @@ where
 
         let domain = GeneralEvaluationDomain::new(domain_size).unwrap();
         let omegas: Vec<F> = domain.elements().collect();
-        let query_set = PIOPforPolyIdentity::compute_query_set(witness_oracles.iter(), verifier_second_msg.label, verifier_second_msg.xi, &omegas);
+        let query_set = PIOPforPolyIdentity::get_query_set(witness_oracles.iter(), verifier_second_msg.label, verifier_second_msg.xi, &omegas);
 
         let witness_evaluations: Vec<F> = evaluate_query_set(witness_oracles_labeled.iter(), &query_set).iter().map(|(_, eval)| *eval).collect();
         let quotient_chunks_evaluations: Vec<F> = quotient_chunk_oracles.iter().map(|q_i| q_i.query_at_challenge(&verifier_second_msg.xi)).collect();
@@ -196,7 +192,7 @@ where
         proof: Proof<F, PC>,
         witness_oracles: &mut [VerifierConcreteOracle<F, PC>],
         instance_oracles: &mut [ProverConcreteOracle<F>],
-        vos: &Vec<Box<dyn LinearisableVirtualOracle<F>>>,
+        vos: &Vec<Box<dyn VirtualOracle<F>>>,
         domain_size: usize,
         vanishing_polynomial: &DensePolynomial<F>,
         srs_size: usize,
@@ -323,7 +319,7 @@ where
 
         let domain = GeneralEvaluationDomain::new(domain_size).unwrap(); 
         let omegas: Vec<F> = domain.elements().collect();
-        let query_set = PIOPforPolyIdentity::compute_query_set(witness_oracles.iter(), verifier_second_msg.label, verifier_second_msg.xi, &omegas);
+        let query_set = PIOPforPolyIdentity::get_query_set(witness_oracles.iter(), verifier_second_msg.label, verifier_second_msg.xi, &omegas);
 
         assert_eq!(query_set.len(), proof.witness_evaluations.len());
 
@@ -366,9 +362,6 @@ where
                 &|x: F, y: F| x + y,
                 &|x: F, y: F| x * y,
                 &|x: F, y: F| x * y,
-                &|_: &LinearisationOracleQuery| {
-                    panic!("Not allowed in this ctx")
-                },
             );
 
             quotient_eval += powers_of_alpha[vo_index] * vo_evaluation;
