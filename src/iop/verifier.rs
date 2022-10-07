@@ -6,7 +6,7 @@ use ark_poly::{
 use ark_poly_commit::QuerySet;
 use ark_std::rand::RngCore;
 
-use super::IOPforPolyIdentity;
+use super::PIOPforPolyIdentity;
 
 /// State of the verifier
 pub struct VerifierState<'a, F: PrimeField> {
@@ -30,7 +30,7 @@ pub struct VerifierSecondMsg<F: PrimeField> {
     pub(crate) label: &'static str,
 }
 
-impl<F: PrimeField> IOPforPolyIdentity<F> {
+impl<F: PrimeField> PIOPforPolyIdentity<F> {
     pub fn init_verifier(
         domain_size: usize,
         vanishing_polynomial: &DensePolynomial<F>,
@@ -84,6 +84,21 @@ impl<F: PrimeField> IOPforPolyIdentity<F> {
                 xi,
                 state.domain.size(),
             ));
+        }
+
+        query_set
+    }
+
+    pub fn compute_query_set(
+        oracles: impl Iterator <Item = impl QuerySetProvider<F>>,
+        evaluation_challenge_label: &str,
+        evaluation_challenge: F, 
+        omegas: &Vec<F>
+    ) -> QuerySet<F> {
+        let mut query_set = QuerySet::new(); 
+
+        for oracle in oracles {
+            query_set.extend(oracle.get_query_set_new(evaluation_challenge_label, evaluation_challenge, omegas));
         }
 
         query_set

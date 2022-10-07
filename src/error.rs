@@ -1,5 +1,5 @@
 use crate::iop::error::Error as IOPError;
-
+use crate::multiproof::error::Error as MultiproofError;
 /// A `enum` specifying the possible failure modes of the `SNARK`.
 #[derive(Debug)]
 pub enum Error<E> {
@@ -9,10 +9,12 @@ pub enum Error<E> {
     IOPError(IOPError),
     /// There was an error in the underlying polynomial commitment.
     PolynomialCommitmentError(E),
-    /// Prover sent commitments to more chunks of quotient than needed
-    TooManyChunks,
+    /// Prover sent commitments to more or less chunks of quotient than needed
+    WrongNumberOfChunks,
     /// Non zero over K indentity does not hold
     QuotientNotZero,
+
+    MultiproofError(MultiproofError<E>)
 }
 
 impl<E> From<IOPError> for Error<E> {
@@ -26,5 +28,9 @@ impl<E> Error<E> {
     /// to a `Error`.
     pub fn from_pc_err(err: E) -> Self {
         Error::PolynomialCommitmentError(err)
+    }
+
+    pub fn from_multiproof_err(err: MultiproofError<E>) -> Self {
+        Error::MultiproofError(err)
     }
 }

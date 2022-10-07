@@ -13,7 +13,7 @@ use crate::{
         OracleType, ProverConcreteOracle, Queriable, QueryContext, QueryPoint,
     },
     iop::error::Error,
-    iop::{verifier::VerifierFirstMsg, IOPforPolyIdentity},
+    iop::{verifier::VerifierFirstMsg, PIOPforPolyIdentity},
     vo::{
         linearisation::{
             LinearisationInfo, LinearisationOracleQuery,
@@ -39,7 +39,7 @@ pub struct ProverState<'a, F: PrimeField> {
     pub(crate) quotient_chunks: Option<Vec<ProverConcreteOracle<F>>>,
 }
 
-impl<F: PrimeField> IOPforPolyIdentity<F> {
+impl<F: PrimeField> PIOPforPolyIdentity<F> {
     // NOTE: consider having indexed concrete oracles by initializing evals_at_coset_of_extended_domain (ex. selector polynomials)
     pub fn init_prover<'a>(
         concrete_oracles: &[ProverConcreteOracle<F>],
@@ -144,15 +144,11 @@ impl<F: PrimeField> IOPforPolyIdentity<F> {
         }
 
         let quotient_degree = max_degree - state.vanishing_polynomial.degree();
-        // println!("quotient_degree {}", quotient_degree);
 
         // 2. Compute extended domain
         let extended_domain =
             GeneralEvaluationDomain::new(quotient_degree).unwrap();
         let scaling_ratio = extended_domain.size() / state.domain.size();
-
-        // println!("scaling ratio: {}", scaling_ratio);
-        // println!("ext domain: {}", extended_domain.size());
 
         // 3. Compute extended evals of each oracle
         for oracle in &mut state.witness_oracles {
@@ -169,7 +165,7 @@ impl<F: PrimeField> IOPforPolyIdentity<F> {
         .take(state.vos.len())
         .collect();
 
-        let mut nominator_evals = vec![F::zero(); extended_domain.size()];
+        let mut numerator_evals = vec![F::zero(); extended_domain.size()];
 
         let mut query_context = QueryContext::Instantiation(
             scaling_ratio,
@@ -199,7 +195,7 @@ impl<F: PrimeField> IOPforPolyIdentity<F> {
                     },
                 );
 
-                nominator_evals[i] += powers_of_alpha[vo_index] * vo_evaluation;
+                numerator_evals[i] += powers_of_alpha[vo_index] * vo_evaluation;
             }
         }
 
@@ -207,7 +203,7 @@ impl<F: PrimeField> IOPforPolyIdentity<F> {
             extended_domain.coset_fft(&state.vanishing_polynomial);
         ark_ff::batch_inversion(&mut zh_evals);
 
-        let quotient_evals: Vec<_> = nominator_evals
+        let quotient_evals: Vec<_> = numerator_evals
             .iter()
             .zip(zh_evals.iter())
             .map(|(&nom, &denom)| nom * denom)

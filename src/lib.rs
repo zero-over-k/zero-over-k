@@ -13,8 +13,8 @@ use crate::vo::linearisation::{
 use crate::vo::query::{Query, Rotation};
 use ark_ff::{to_bytes, PrimeField, UniformRand, Zero};
 use ark_poly::univariate::DensePolynomial;
-use ark_poly::{EvaluationDomain, GeneralEvaluationDomain, Polynomial};
-use ark_poly_commit::LabeledCommitment;
+use ark_poly::{EvaluationDomain, GeneralEvaluationDomain, Polynomial, evaluations};
+use ark_poly_commit::{LabeledCommitment, evaluate_query_set};
 use ark_poly_commit::LabeledPolynomial;
 use ark_poly_commit::PCCommitterKey;
 use ark_poly_commit::PCUniversalParams;
@@ -29,7 +29,8 @@ use data_structures::Proof;
 use data_structures::ProverKey;
 use data_structures::UniversalSRS;
 use data_structures::VerifierKey;
-use iop::IOPforPolyIdentity;
+use iop::PIOPforPolyIdentity;
+use multiproof::piop::{PIOP, Multiopen};
 use rng::FiatShamirRng;
 use vo::query::InstanceQuery;
 use vo::query::WitnessQuery;
@@ -42,6 +43,8 @@ pub mod error;
 pub mod iop;
 pub mod rng;
 pub mod vo;
+
+pub mod multiproof;
 
 mod tests;
 
@@ -93,14 +96,14 @@ where
         vanishing_polynomial: &DensePolynomial<F>,
         zk_rng: &mut R,
     ) -> Result<Proof<F, PC>, Error<PC::Error>> {
-        let mut prover_state = IOPforPolyIdentity::init_prover(
+        let mut prover_state = PIOPforPolyIdentity::init_prover(
             concrete_oracles,
             vos,
             domain_size,
             vanishing_polynomial,
         );
 
-        let verifier_init_state = IOPforPolyIdentity::init_verifier(
+        let verifier_init_state = PIOPforPolyIdentity::init_verifier(
             domain_size,
             vanishing_polynomial,
         );
@@ -111,23 +114,23 @@ where
         // --------------------------------------------------------------------
         // First round
 
-        let prover_first_oracles =
-            IOPforPolyIdentity::prover_first_round(&mut prover_state, zk_rng)?;
-        let first_oracles_labeled: Vec<
+        let witness_oracles =
+        PIOPforPolyIdentity::prover_first_round(&mut prover_state, zk_rng)?;
+        let witness_oracles_labeled: Vec<
             LabeledPolynomial<F, DensePolynomial<F>>,
-        > = prover_first_oracles
+        > = witness_oracles
             .iter()
             .map(|oracle| oracle.to_labeled())
             .collect();
 
-        let (first_comms, first_comm_rands) =
-            PC::commit(&pk.committer_key, &first_oracles_labeled, None)
+        let (witness_commitments, _) =
+            PC::commit(&pk.committer_key, &witness_oracles_labeled, None)
                 .map_err(Error::from_pc_err)?;
 
-        fs_rng.absorb(&to_bytes![first_comms].unwrap());
+        fs_rng.absorb(&to_bytes![witness_commitments].unwrap());
 
         let (verifier_first_msg, verifier_state) =
-            IOPforPolyIdentity::verifier_first_round(
+        PIOPforPolyIdentity::verifier_first_round(
                 verifier_init_state,
                 &mut fs_rng,
             );
@@ -136,189 +139,53 @@ where
         // --------------------------------------------------------------------
         // Second round
 
-        let prover_second_oracles = IOPforPolyIdentity::prover_second_round(
+        let quotient_chunk_oracles = PIOPforPolyIdentity::prover_second_round(
             &verifier_first_msg,
             &mut prover_state,
             pk.committer_key.max_degree(),
         )?;
 
-        let second_oracles_labeled: Vec<
+        let quotient_chunks_labeled: Vec<
             LabeledPolynomial<F, DensePolynomial<F>>,
-        > = prover_second_oracles
+        > = quotient_chunk_oracles
             .iter()
             .map(|oracle| oracle.to_labeled())
             .collect();
 
-        let (second_comms, second_comm_rands) =
-            PC::commit(&pk.committer_key, &second_oracles_labeled, None)
+        let (quotient_chunk_commitments, _) =
+            PC::commit(&pk.committer_key, &quotient_chunks_labeled, None)
                 .map_err(Error::from_pc_err)?;
 
-        fs_rng.absorb(&to_bytes![second_comms].unwrap());
+        fs_rng.absorb(&to_bytes![quotient_chunk_commitments].unwrap());
 
         let (verifier_second_msg, verifier_state) =
-            IOPforPolyIdentity::verifier_second_round(
+            PIOPforPolyIdentity::verifier_second_round(
                 verifier_state,
                 &mut fs_rng,
             );
-        // --------------------------------------------------------------------
 
-        // --------------------------------------------------------------------
-        // Third round
 
-        let prover_third_oracles = IOPforPolyIdentity::prover_third_round::<PC>(
-            &verifier_first_msg,
-            &verifier_second_msg,
-            &mut prover_state,
-            pk.committer_key.max_degree(),
-        )?;
-        let third_oracles_labeled: Vec<
-            LabeledPolynomial<F, DensePolynomial<F>>,
-        > = prover_third_oracles
-            .iter()
-            .map(|oracle| oracle.to_labeled())
-            .collect();
+        let domain = GeneralEvaluationDomain::new(domain_size).unwrap();
+        let omegas: Vec<F> = domain.elements().collect();
+        let query_set = PIOPforPolyIdentity::compute_query_set(witness_oracles.iter(), verifier_second_msg.label, verifier_second_msg.xi, &omegas);
 
-        let (third_comms, third_comm_rands) =
-            PC::commit(&pk.committer_key, &third_oracles_labeled, None)
-                .map_err(Error::from_pc_err)?;
+        let witness_evaluations: Vec<F> = evaluate_query_set(witness_oracles_labeled.iter(), &query_set).iter().map(|(_, eval)| *eval).collect();
+        let quotient_chunks_evaluations: Vec<F> = quotient_chunk_oracles.iter().map(|q_i| q_i.query_at_challenge(&verifier_second_msg.xi)).collect();
 
-        // fs_rng.absorb(&to_bytes![third_comms[0]].unwrap()); //
-        // ------ Do not put linearisation poly in transcript since verifier derives r(x) - r0---------
-        // --------------------------------------------------------------------
+        let mut evaluations = vec![];
+        evaluations.extend_from_slice(&witness_evaluations);
+        evaluations.extend_from_slice(&quotient_chunks_evaluations);
 
-        // Gather prover polynomials in one vector.
-        let polynomials: Vec<_> = first_oracles_labeled
-            .iter()
-            .chain(second_oracles_labeled.iter())
-            .chain(third_oracles_labeled.iter())
-            .collect();
-
-        let commitments: Vec<_> = first_comms
-            .iter()
-            .chain(second_comms.iter())
-            .chain(third_comms.iter())
-            .collect();
-
-        // Gather commitment randomness together.
-        let rands: Vec<PC::Randomness> = first_comm_rands
-            .into_iter()
-            .chain(second_comm_rands)
-            .chain(third_comm_rands)
-            .collect();
-
-        // BEGIN QUERY SET
-        let domain = GeneralEvaluationDomain::<F>::new(domain_size).unwrap();
-        let omegas = domain.elements().collect();
-        let mut query_set = QuerySet::<F>::new();
-        for vo in vos {
-            let q_set_i = vo
-                .get_linearisation_expression()
-                .compute_linearisation_query_set(
-                    &|query: &LinearisationOracleQuery| {
-                        match query.oracle_type {
-                            concrete_oracle::OracleType::Witness => {
-                                match query.ctx {
-                                    vo::linearisation::LinearisationQueryContext::AsEval => {
-                                        let oracle = &prover_state.witness_oracles[query.index];
-                                        let point_info = oracle.get_point_info(
-                                            verifier_second_msg.label,
-                                            verifier_second_msg.xi,
-                                            &omegas,
-                                            query.rotation,
-                                        );
-                                        return vec![(oracle.label.clone(), point_info)]
-                                    },
-                                    vo::linearisation::LinearisationQueryContext::AsPoly => return vec![], // if queried oracle is poly we don't open it directly
-                                }
-                            }
-                            concrete_oracle::OracleType::Instance => {
-                                // Do not commit&open to instance
-                                return vec![];
-                            }
-                        };
-                    },
-                );
-
-            query_set.extend(q_set_i);
-        }
-
-        // Chunks are handled through linearisation poly
-        // Append quotient chunks queries to query_set
-        // for chunk in &prover_second_oracles {
-        //     let point_info = chunk.get_point_info(
-        //         verifier_second_msg.label,
-        //         verifier_second_msg.xi,
-        //         &omegas,
-        //         Rotation::curr(),
-        //     );
-        //     query_set.insert((chunk.label.clone(), point_info));
-        // }
-
-        // Append linearisation poly
-        let point_info = (&prover_third_oracles[0]).get_point_info(
-            verifier_second_msg.label,
-            verifier_second_msg.xi,
-            &omegas,
-            Rotation::curr(),
-        );
-        query_set
-            .insert((third_oracles_labeled[0].label().clone(), point_info));
-        // END QUERY SET
-
-        println!("query set: {:?}", query_set);
-        println!("---------------------------");
-
-        let evals = ark_poly_commit::evaluate_query_set(
-            polynomials.clone(),
-            &query_set,
-        );
-        println!("evaluations: {:?}", evals);
-        println!("---------------------------");
-
-        // Make sure that BTreeMap is sorted by poly_label, point_value so that verifier can deterministically reconstruct evals from commitments and query set
-        // BEGIN SANITY CHECK
-        // let mut evals_vec: Vec<(String, F, F)> = evals.iter().map(|((poly_label, point), &evaluation)| (poly_label.clone(), point.clone(), evaluation)).collect();
-        // let mut evals_vec_copy: Vec<(String, F, F)> = evals.iter().map(|((poly_label, point), &evaluation)| (poly_label.clone(), point.clone(), evaluation)).collect();
-        // evals_vec.sort_unstable_by_key(|item| (item.0.clone(), item.1));
-        // assert_eq!(evals_vec, evals_vec_copy);
-        // END SANITY CHECK
-
-        let evals = evals
-            .into_iter()
-            .filter(|((poly_label, _), _)| {
-                *poly_label != "linearisation_poly".to_string()
-            })
-            .map(|item| item.1)
-            .collect::<Vec<F>>();
-        // let evals = evals.into_iter().map(|item| item.1).collect::<Vec<F>>();
-        fs_rng.absorb(&evals);
-
-        // TODO: add evaluations in transcript
-        let opening_challenge: F = u128::rand(&mut fs_rng).into();
-
-        let opening_proof = PC::batch_open(
-            &pk.committer_key,
-            polynomials,
-            commitments.clone(),
-            &query_set,
-            opening_challenge,
-            &rands,
-            Some(zk_rng),
-        )
-        .map_err(Error::from_pc_err)?;
-
-        let commitments = vec![
-            first_comms.iter().map(|c| c.commitment().clone()).collect(),
-            second_comms
-                .iter()
-                .map(|c| c.commitment().clone())
-                .collect(),
-        ];
+        // Multiopen
+        let oracles: Vec<ProverConcreteOracle<F>> = witness_oracles.iter().chain(quotient_chunk_oracles.iter()).map(|oracle| oracle.clone()).collect();
+        let multiopen_proof = Multiopen::<F, PC, FS>::prove(&pk.committer_key, &oracles, &evaluations, verifier_second_msg.xi, domain_size).map_err(Error::from_multiproof_err)?;
 
         let proof = Proof {
-            commitments,
-            evaluations: evals,
-            opening_proof,
+            witness_commitments: witness_commitments.iter().map(|c| c.commitment().clone()).collect(),
+            witness_evaluations,
+            quotient_chunk_commitments: quotient_chunk_commitments.iter().map(|c| c.commitment().clone()).collect(),
+            quotient_chunks_evaluations,
+            multiopen_proof,
         };
 
         Ok(proof)
@@ -335,7 +202,7 @@ where
         srs_size: usize,
         zk_rng: &mut R,
     ) -> Result<(), Error<PC::Error>> {
-        let verifier_init_state = IOPforPolyIdentity::init_verifier(
+        let verifier_init_state = PIOPforPolyIdentity::init_verifier(
             domain_size,
             vanishing_polynomial,
         );
@@ -403,25 +270,18 @@ where
                 0
             };
 
-        if num_of_quotient_chunks != proof.commitments[1].len() {
-            return Err(Error::TooManyChunks);
+        if num_of_quotient_chunks != proof.quotient_chunk_commitments.len() || num_of_quotient_chunks != proof.quotient_chunks_evaluations.len() {
+            return Err(Error::WrongNumberOfChunks);
         }
 
         // --------------------------------------------------------------------
         // First round
 
-        let first_comms = &proof.commitments[0];
-        fs_rng.absorb(&to_bytes![first_comms].unwrap());
+        fs_rng.absorb(&to_bytes![&proof.witness_commitments].unwrap());
 
-        for (witness_oracle, commitment) in
-            witness_oracles.iter_mut().zip(first_comms.iter())
-        {
-            // TODO: we should consider doing this with storing ref to commitment but proof lifetime is causing some error
-            witness_oracle.register_commitment(commitment.clone());
-        }
 
         let (verifier_first_msg, verifier_state) =
-            IOPforPolyIdentity::verifier_first_round(
+        PIOPforPolyIdentity::verifier_first_round(
                 verifier_init_state,
                 &mut fs_rng,
             );
@@ -431,111 +291,56 @@ where
         // --------------------------------------------------------------------
         // Second round
 
-        let second_comms = &proof.commitments[1];
-        fs_rng.absorb(&to_bytes![second_comms].unwrap());
+        fs_rng.absorb(&to_bytes![&proof.quotient_chunk_commitments].unwrap());
 
         let (verifier_second_msg, verifier_state) =
-            IOPforPolyIdentity::verifier_second_round(
+            PIOPforPolyIdentity::verifier_second_round(
                 verifier_state,
                 &mut fs_rng,
             );
 
         // --------------------------------------------------------------------
 
-        let quotient_chunk_labels = (0..num_of_quotient_chunks)
-            .map(|i| format!("quotient_chunk_{}", i).to_string());
-        let commitment_labels = witness_oracles
-            .iter()
-            .map(|oracle| oracle.label.clone())
-            .chain(quotient_chunk_labels);
 
-        let mut commitments: Vec<_> = first_comms
-            .iter()
-            .chain(second_comms.iter())
-            .zip(commitment_labels)
-            .map(|(c, label)| LabeledCommitment::new(label, c.clone(), None))
-            .collect();
-
-        // BEGIN QUERY SET
-        let domain = GeneralEvaluationDomain::<F>::new(domain_size).unwrap();
-        let omegas = domain.elements().collect();
-        let mut query_set = QuerySet::<F>::new();
-        for vo in vos {
-            let q_set_i = vo
-                .get_linearisation_expression()
-                .compute_linearisation_query_set(
-                    &|query: &LinearisationOracleQuery| {
-                        match query.oracle_type {
-                            concrete_oracle::OracleType::Witness => {
-                                match query.ctx {
-                                    vo::linearisation::LinearisationQueryContext::AsEval => {
-                                        let oracle = &witness_oracles[query.index];
-                                        let point_info = oracle.get_point_info(
-                                            verifier_second_msg.label,
-                                            verifier_second_msg.xi,
-                                            &omegas,
-                                            query.rotation,
-                                        );
-                                        return vec![(oracle.label.clone(), point_info)]
-                                    },
-                                    vo::linearisation::LinearisationQueryContext::AsPoly => return vec![], // if queried oracle is poly we don't open it directly
-                                }
-                            }
-                            concrete_oracle::OracleType::Instance => {
-                                // Do not commit&open to instance
-                                return vec![];
-                            }
-                        };
-                    },
-                );
-
-            query_set.extend(q_set_i);
+        for (witness_oracle, commitment) in
+        witness_oracles.iter_mut().zip(proof.witness_commitments.iter())
+        {
+        // TODO: we should consider doing this with storing ref to commitment but proof lifetime is causing some error
+            witness_oracle.register_commitment(commitment.clone());
         }
 
-        // Quotient chunks are handled through linearisation poly
-        // Append quotient chunks queries to query_set
-        // for chunk in &quotient_chunks {
-        //     let point_info = chunk.get_point_info(
-        //         verifier_second_msg.label,
-        //         verifier_second_msg.xi,
-        //         &omegas,
-        //         Rotation::curr(),
-        //     );
-        //     query_set.insert((chunk.label.clone(), point_info));
-        // }
-        // END QUERY SET
+        let quotient_chunk_oracles = (0..num_of_quotient_chunks).map(|i| {
+            VerifierConcreteOracle {
+                label: format!("quotient_chunk_{}", i).to_string(), 
+                queried_rotations: BTreeSet::from([Rotation::curr()]),
+                should_mask: false,
+                eval_at_rotation: BTreeMap::new(), 
+                evals_at_challenges: BTreeMap::from([(verifier_second_msg.xi, proof.quotient_chunks_evaluations[i])]),
+                commitment: Some(proof.quotient_chunk_commitments[i].clone())
+            }
+        });
 
-        assert_eq!(query_set.len(), proof.evaluations.len());
 
-        let wtns_oracle_label_index_mapping = witness_oracles
-            .iter()
+        let domain = GeneralEvaluationDomain::new(domain_size).unwrap(); 
+        let omegas: Vec<F> = domain.elements().collect();
+        let query_set = PIOPforPolyIdentity::compute_query_set(witness_oracles.iter(), verifier_second_msg.label, verifier_second_msg.xi, &omegas);
+
+        assert_eq!(query_set.len(), proof.witness_evaluations.len());
+
+        let witness_label_index_mapping = witness_oracles.iter()
             .enumerate()
             .map(|(i, oracle)| (oracle.label.clone(), i))
             .collect::<BTreeMap<String, usize>>();
 
-        // ((poly_label, point), &evaluation)
-        let mut evaluations: BTreeMap<(String, F), F> = query_set
-            .iter()
-            .zip(proof.evaluations.iter())
-            .map(|((poly_label, (_point_label, point)), &evaluation)| {
-                match wtns_oracle_label_index_mapping.get(poly_label) {
-                    Some(index) => witness_oracles[*index]
-                        .register_eval_at_challenge(*point, evaluation),
-                    None => panic!("Missing poly: {}", poly_label),
-                };
 
-                ((poly_label.clone(), point.clone()), evaluation)
-            })
-            .collect();
-
-        // BEGIN LINEARISATION POLY
-        let info = LinearisationInfo {
-            domain_size,
-            opening_challenge: verifier_second_msg.xi,
-        };
-
-        let mut linearisation_commitment =
-            LinearisationPolyCommitment::<F, PC>::zero();
+        // map claimed evaluations with proper oracles
+        for ((poly_label, (_, point)), &evaluation) in query_set.iter().zip(proof.witness_evaluations.iter()) {
+            match witness_label_index_mapping.get(poly_label) {
+                Some(index) => witness_oracles[*index]
+                    .register_eval_at_challenge(*point, evaluation),
+                None => panic!("Missing poly: {}", poly_label),
+            };
+        }
 
         let powers_of_alpha: Vec<F> = successors(Some(F::one()), |alpha_i| {
             Some(*alpha_i * verifier_first_msg.alpha)
@@ -543,64 +348,30 @@ where
         .take(vos.len())
         .collect();
 
-        for (i, vo) in vos.iter().enumerate() {
-            let linearisation_i = vo.get_linearisation_expression().evaluate(
-                &|x: F| LinearisationPolyCommitment::from_const(x),
-                &|_: &WitnessQuery| panic!("Not allowed here"),
-                &|_: &InstanceQuery| panic!("Not allowed here"),
-                &|x: LinearisationPolyCommitment<F, PC>| -x,
-                &|x: LinearisationPolyCommitment<F, PC>,
-                  y: LinearisationPolyCommitment<F, PC>| x + y,
-                &|x: LinearisationPolyCommitment<F, PC>,
-                  y: LinearisationPolyCommitment<F, PC>| {
-                    // TODO: do better order of ifs
-                    if !x.is_const() && !y.is_const() {
-                        panic!("Equation is not linearised correctly")
-                    }
-
-                    if x.is_const() {
-                        y * x.r0
-                    } else if y.is_const() {
-                        x * y.r0
-                    } else {
-                        LinearisationPolyCommitment::from_const(x.r0 * y.r0)
-                    }
+        let mut quotient_eval = F::zero();
+        for (vo_index, vo) in vos.iter().enumerate() {
+            let vo_evaluation = vo.get_expression().evaluate(
+                &|x: F| x,
+                &|query: &WitnessQuery| {
+                    let oracle = &witness_oracles[query.get_index()];
+                    let challenge = query.rotation.compute_evaluation_point(verifier_second_msg.xi, &omegas);
+                    oracle.query_at_challenge(&challenge)
                 },
-                &|x: LinearisationPolyCommitment<F, PC>, y: F| x * y,
-                &|query: &LinearisationOracleQuery| {
-                    let query_response: LinearisationQueryResponse<F, PC> =
-                        match query.oracle_type {
-                            OracleType::Witness => witness_oracles[query.index]
-                                .query_for_linearisation(
-                                    &query.rotation,
-                                    &query.ctx,
-                                    &info,
-                                ),
-                            OracleType::Instance => instance_oracles
-                                [query.index]
-                                .query_for_linearisation(
-                                    &query.rotation,
-                                    &query.ctx,
-                                    &info,
-                                ),
-                        };
-
-                    match query_response {
-                        LinearisationQueryResponse::Opening(x) => {
-                            LinearisationPolyCommitment::from_const(x)
-                        }
-                        LinearisationQueryResponse::Poly(_) => {
-                            panic!("Poly not possible from committed oracle")
-                        }
-                        LinearisationQueryResponse::Commitment(c) => {
-                            LinearisationPolyCommitment::from_commitment(c)
-                        }
-                    }
+                &|query: &InstanceQuery| {
+                    let oracle = &instance_oracles[query.get_index()];
+                    let challenge = query.rotation.compute_evaluation_point(verifier_second_msg.xi, &omegas);
+                    oracle.query_at_challenge(&challenge)
+                },
+                &|x: F| -x,
+                &|x: F, y: F| x + y,
+                &|x: F, y: F| x * y,
+                &|x: F, y: F| x * y,
+                &|_: &LinearisationOracleQuery| {
+                    panic!("Not allowed in this ctx")
                 },
             );
 
-            linearisation_commitment =
-            linearisation_commitment + linearisation_i * powers_of_alpha[i];
+            quotient_eval += powers_of_alpha[vo_index] * vo_evaluation;
         }
 
         let x_n = verifier_second_msg.xi.pow([srs_size as u64, 0, 0, 0]);
@@ -609,68 +380,21 @@ where
                 .take(num_of_quotient_chunks)
                 .collect();
 
-        // calculate x^n * chunk
-        let t_part = PC::msm(&proof.commitments[1], &powers_of_x);
-        // calculate -zh(xi) * t_part
-        let t_part = PC::scale_com(
-            &t_part,
-            -vanishing_polynomial.evaluate(&verifier_second_msg.xi),
-        );
+        let mut t_part = F::zero();
+        for (&x_i, t_i) in powers_of_x.iter().zip(quotient_chunk_oracles.clone()) {
+            t_part += x_i * t_i.query_at_challenge(&verifier_second_msg.xi);
+        }
 
-        let linearisation_commitment_minus_const_part =
-            PC::add(&linearisation_commitment.comm, &t_part);
-        let linearisation_commitment_minus_const_part = LabeledCommitment::new(
-            "linearisation_poly".to_string(),
-            linearisation_commitment_minus_const_part,
-            None,
-        );
+        t_part *= vanishing_polynomial.evaluate(&verifier_second_msg.xi);
 
-        // END LINEARISATION POLY
+        quotient_eval -= t_part;
 
-        // Append linearisation poly to query set
-        query_set.insert((
-            "linearisation_poly".to_string(),
-            (verifier_second_msg.label.into(), verifier_second_msg.xi),
-        ));
+        if quotient_eval != F::zero() {
+            return Err(Error::QuotientNotZero);
+        }
 
-        // Append r'(x) and -r0 to evaluations
-        evaluations.insert(
-            ("linearisation_poly".to_string(), verifier_second_msg.xi),
-            -linearisation_commitment.r0,
-        );
-
-        // Append r'(x) to commitments
-        commitments.push(linearisation_commitment_minus_const_part);
-
-        // println!("query set verifier: {:?}", query_set);
-        // println!("evaluations: {:?}", evaluations);
-
-        // --------------------------------------------------------------------
-        // Third round
-
-        // Linearisation commitment and eval are being derived by verifier
-        //
-        // fs_rng.absorb(&to_bytes![linearisation_poly.comm].unwrap());
-        // ------ Verifier derives r(x) - r0 and so we don't put it into transcipt
-
-        // --------------------------------------------------------------------
-
-        fs_rng.absorb(&proof.evaluations);
-
-        let opening_challenge: F = u128::rand(&mut fs_rng).into();
-
-        let res = PC::batch_check(
-            &vk.verifier_key,
-            &commitments,
-            &query_set,
-            &evaluations,
-            &proof.opening_proof,
-            opening_challenge,
-            zk_rng,
-        )
-        .map_err(Error::from_pc_err)?;
-        assert_eq!(res, true);
-
-        Ok(())
+        let oracles: Vec<_> = witness_oracles.iter().map(|oracle| oracle.clone()).chain(quotient_chunk_oracles).collect();
+        let res = Multiopen::<F, PC, FS>::verify(&vk.verifier_key, proof.multiopen_proof, &oracles, &proof.witness_evaluations.into_iter().chain(proof.quotient_chunks_evaluations.into_iter()).collect::<Vec<F>>(), verifier_second_msg.xi, domain_size).map_err(Error::from_multiproof_err)?;
+        Ok(res)
     }
 }

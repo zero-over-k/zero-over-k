@@ -20,12 +20,15 @@ use ark_poly_commit::{LabeledPolynomial, PolynomialCommitment, QuerySet};
 use ark_std::rand::Rng;
 
 pub trait QuerySetProvider<F: PrimeField> {
+    //TODO: remove this is deprecated
     fn get_query_set(
         &self,
         opening_challenge_label: &str,
         opening_challenge: F,
         domain_size: usize,
     ) -> QuerySet<F>;
+
+    fn get_query_set_new(&self, opening_challenge_label: &str, opening_challenge: F, omegas: &Vec<F>) -> QuerySet<F>;
 
     // TODO: implement this function in Rotation
     fn get_point_info(
@@ -175,6 +178,25 @@ impl<F: PrimeField> ProverConcreteOracle<F> {
 
     pub fn get_degree(&self) -> usize {
         self.poly.degree()
+    }
+
+    pub fn eval_at_all_rotations(
+        &self,
+        evaluation_point: F,
+        omegas: &Vec<F>,
+    ) -> Vec<F> {
+        self.queried_rotations
+            .iter()
+            .map(|rotation| {
+                let evaluation_challenge =
+                    rotation.compute_evaluation_point(evaluation_point, omegas);
+                self.poly.evaluate(&evaluation_challenge)
+            })
+            .collect()
+    }
+
+    pub fn query_at_challenge(&self, challenge: &F) -> F {
+        self.poly.evaluate(challenge)
     }
 
     pub fn to_labeled(&self) -> LabeledPolynomial<F, DensePolynomial<F>> {
@@ -358,6 +380,16 @@ impl<F: PrimeField> QuerySetProvider<F> for &ProverConcreteOracle<F> {
         }
         query_set
     }
+
+    fn get_query_set_new(&self, opening_challenge_label: &str, opening_challenge: F, omegas: &Vec<F>) -> QuerySet<F> {
+        let mut query_set = QuerySet::new();
+        for rotation in &self.queried_rotations {
+            let point_info = rotation.get_point_info(opening_challenge_label, opening_challenge, omegas);
+            query_set.insert((self.label.clone(), point_info));
+        }
+
+        query_set
+    }
 }
 
 pub struct VerifierConcreteOracle<
@@ -409,17 +441,6 @@ impl<F: PrimeField, PC: PolynomialCommitment<F, DensePolynomial<F>>>
         self.queried_rotations.insert(rotation);
     }
 
-    // TODO: probably remove
-    pub fn register_eval_at_rotation(&mut self, eval: F, rotation: Rotation) {
-        let prev_rotation = self.eval_at_rotation.insert(eval, rotation);
-        if !prev_rotation.is_none() {
-            panic!(
-                "Same eval already registered for rotation {:?}",
-                prev_rotation
-            );
-        }
-    }
-
     pub fn register_eval_at_challenge(&mut self, challenge: F, eval: F) {
         let prev_eval = self.evals_at_challenges.insert(challenge, eval);
         if !prev_eval.is_none() {
@@ -434,6 +455,28 @@ impl<F: PrimeField, PC: PolynomialCommitment<F, DensePolynomial<F>>>
             domain_size - 1
         }
     }
+
+    pub fn get_commitment(&self) -> &PC::Commitment {
+        match &self.commitment {
+            Some(c) => &c,
+            None => panic!("Commitment not assigned for {} oracle", self.label),
+        }
+    }
+
+    pub fn query_at_challenge(&self, challenge: &F) -> F {
+        match self.evals_at_challenges.get(&challenge) {
+            Some(eval) => *eval,
+            None => panic!(
+                "No eval at challenge: {} of oracle {}",
+                challenge, self.label
+            ),
+        }
+    }
+
+    pub fn get_queried_rotations(&self) -> &BTreeSet<Rotation> {
+        &self.queried_rotations
+    }
+
 }
 
 impl<F: PrimeField, PC: PolynomialCommitment<F, DensePolynomial<F>>>
@@ -559,6 +602,16 @@ impl<F: PrimeField, PC: PolynomialCommitment<F, DensePolynomial<F>>>
                 let point = omega * opening_challenge;
                 query_set.insert((self.label.clone(), (point_label, point)));
             }
+        }
+
+        query_set
+    }
+
+    fn get_query_set_new(&self, opening_challenge_label: &str, opening_challenge: F, omegas: &Vec<F>) -> QuerySet<F> {
+        let mut query_set = QuerySet::new();
+        for rotation in &self.queried_rotations {
+            let point_info = rotation.get_point_info(opening_challenge_label, opening_challenge, omegas);
+            query_set.insert((self.label.clone(), point_info));
         }
 
         query_set

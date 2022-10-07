@@ -40,34 +40,15 @@ e. split quotient on chunks of srs_size, [Qi]
 
 d. commit [Qi]
 
-                        --------> send commitments to [Qi] <--------
+                        --------> send commitments to [Qi]  -------->
                                                                                 a. sample evaluation challenge
-                        --------> send evaluation challenge <--------
+                        <-------- send evaluation challenge <--------
 
 Round3: 
 
-a. compute linearisation polynomial from expressions
-
-b. sub quotient chunks from it 
-
-c. commit to linearisation (r)
-
-                        --------> send commitment to [r] <--------
-
-                                                                                c. sample opening challenge 
-                        --------> send opening challenge <--------
+a. evaluate each witness oracle at all rotations 
 
 
-Round 4:
-
-a. Compute query set from expressions of vos 
-
-b. Append quotient chunks and linearisation to query set
-
-c. Evaluate query set
-
-
-                        --------> send commitments to [Qi] <--------
-*/
+b. do multiopen proof 
 
 

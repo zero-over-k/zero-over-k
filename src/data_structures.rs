@@ -2,6 +2,8 @@ use ark_ff::PrimeField;
 use ark_poly::univariate::DensePolynomial;
 use ark_poly_commit::PolynomialCommitment;
 
+use crate::{multiproof::Proof as MultiOpenProof, commitment::HomomorphicCommitment};
+
 pub type UniversalSRS<F, PC> =
     <PC as PolynomialCommitment<F, DensePolynomial<F>>>::UniversalParams;
 
@@ -30,20 +32,11 @@ impl<F: PrimeField, PC: PolynomialCommitment<F, DensePolynomial<F>>> Clone
     }
 }
 
-pub struct Proof<F: PrimeField, PC: PolynomialCommitment<F, DensePolynomial<F>>>
+pub struct Proof<F: PrimeField, PC: HomomorphicCommitment<F>>
 {
-    pub commitments: Vec<Vec<PC::Commitment>>,
-    pub evaluations: Vec<F>,
-    pub opening_proof: PC::BatchProof,
-}
-
-impl<F: PrimeField, PC: PolynomialCommitment<F, DensePolynomial<F>>>
-    Proof<F, PC>
-{
-    pub fn iter_witness_commitments(
-        &self,
-    ) -> impl Iterator<Item = PC::Commitment> {
-        let witness_commitments = self.commitments[0].clone();
-        witness_commitments.into_iter()
-    }
+    pub witness_commitments: Vec<PC::Commitment>,
+    pub witness_evaluations: Vec<F>,
+    pub quotient_chunk_commitments: Vec<PC::Commitment>,
+    pub quotient_chunks_evaluations: Vec<F>,
+    pub multiopen_proof: MultiOpenProof<F, PC>,
 }
