@@ -274,7 +274,7 @@ where
         };
 
         let instance_degree_fn =
-            |query: &InstanceQuery| instance_oracles[query.index].get_degree();
+            |query: &InstanceQuery| instance_oracles[query.index].get_degree(domain_size);
 
         let mut max_degree = 0;
         for vo in vos {

@@ -3,7 +3,7 @@ use std::{cmp::max, collections::BTreeSet, iter::successors};
 use ark_ff::{PrimeField, Zero};
 use ark_poly::{
     univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
-    Polynomial, UVPolynomial,
+    Polynomial, UVPolynomial, domain,
 };
 use ark_std::rand::Rng;
 
@@ -120,12 +120,12 @@ impl<F: PrimeField> PIOPforPolyIdentity<F> {
     ) -> Result<Vec<InstantiableConcreteOracle<F>>, Error> {
         let wnts_get_degree_fn = |query: &WitnessQuery| {
             let oracle = &state.witness_oracles[query.get_index()];
-            oracle.get_degree()
+            oracle.get_degree(state.domain.size())
         };
 
         let instance_get_degree_fn = |query: &InstanceQuery| {
             let oracle = &state.instance_oracles[query.get_index()];
-            oracle.get_degree()
+            oracle.get_degree(state.domain.size())
         };
 
         // 1. compute quotient degree
