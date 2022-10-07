@@ -4,9 +4,8 @@ use crate::{
     concrete_oracle::OracleType,
     vo::{
         expression::Expression,
-        linearisation::{LinearisationOracleQuery, LinearisationQueryContext},
         query::{InstanceQuery, Rotation, VirtualQuery, WitnessQuery},
-        LinearisableVirtualOracle, VirtualOracle,
+        VirtualOracle,
     },
 };
 
@@ -83,37 +82,7 @@ impl<F: PrimeField> AddVO<F> {
             a + b - c
         };
 
-        // For now we keep linearisation same as without
-        let linearisation_expression = || {
-            let a: Expression<F> = LinearisationOracleQuery {
-                index: self.wtns_queries[0].index,
-                rotation: self.wtns_queries[0].rotation,
-                oracle_type: OracleType::Witness,
-                ctx: LinearisationQueryContext::AsPoly,
-            }
-            .into();
-
-            let b: Expression<F> = LinearisationOracleQuery {
-                index: self.wtns_queries[1].index,
-                rotation: self.wtns_queries[1].rotation,
-                oracle_type: OracleType::Witness,
-                ctx: LinearisationQueryContext::AsPoly,
-            }
-            .into();
-
-            let c: Expression<F> = LinearisationOracleQuery {
-                index: self.instance_queries[0].index,
-                rotation: self.instance_queries[0].rotation,
-                oracle_type: OracleType::Instance,
-                ctx: LinearisationQueryContext::AsEval,
-            }
-            .into();
-
-            a + b - c
-        };
-
         self.expression = Some(add_expression());
-        self.linearisation_expression = Some(linearisation_expression());
     }
 }
 
@@ -129,15 +98,6 @@ impl<F: PrimeField> VirtualOracle<F> for AddVO<F> {
     // panics if expression is not defined before proving started
     fn get_expression(&self) -> &Expression<F> {
         match self.expression.as_ref() {
-            None => panic!("Expression is not defined"),
-            Some(expression) => return expression,
-        }
-    }
-}
-
-impl<F: PrimeField> LinearisableVirtualOracle<F> for AddVO<F> {
-    fn get_linearisation_expression(&self) -> &Expression<F> {
-        match self.linearisation_expression.as_ref() {
             None => panic!("Expression is not defined"),
             Some(expression) => return expression,
         }

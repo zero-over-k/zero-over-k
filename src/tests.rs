@@ -168,7 +168,7 @@ mod test {
             );
         }
 
-        let a = ProverConcreteOracle {
+        let a = InstantiableConcreteOracle {
             label: "a".to_string(),
             poly: a_poly,
             evals_at_coset_of_extended_domain: None,
@@ -177,7 +177,7 @@ mod test {
             should_mask: true,
         };
 
-        let b = ProverConcreteOracle {
+        let b = InstantiableConcreteOracle {
             label: "b".to_string(),
             poly: b_poly,
             evals_at_coset_of_extended_domain: None,
@@ -186,7 +186,7 @@ mod test {
             should_mask: true,
         };
 
-        let c = ProverConcreteOracle {
+        let c = InstantiableConcreteOracle {
             label: "c".to_string(),
             poly: c_poly,
             evals_at_coset_of_extended_domain: None,
@@ -200,8 +200,7 @@ mod test {
 
         let concrete_oracles = [a, b, c.clone()];
 
-        let vos: Vec<Box<dyn LinearisableVirtualOracle<F>>> =
-            vec![Box::new(add_vo)];
+        let vos: Vec<Box<dyn VirtualOracle<F>>> = vec![Box::new(add_vo)];
 
         let proof = PilInstance::prove(
             &pk,
@@ -213,8 +212,8 @@ mod test {
         )
         .unwrap();
 
-        let a_verifier = VerifierConcreteOracle::new("a".to_string(), true);
-        let b_verifier = VerifierConcreteOracle::new("b".to_string(), true);
+        let a_verifier = CommittedConcreteOracle::new("a".to_string(), true);
+        let b_verifier = CommittedConcreteOracle::new("b".to_string(), true);
 
         let _ = PilInstance::verify(
             &vk,
