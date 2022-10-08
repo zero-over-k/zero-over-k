@@ -2,8 +2,8 @@ use std::{cmp::max, collections::BTreeSet, iter::successors};
 
 use ark_ff::{PrimeField, Zero};
 use ark_poly::{
-    univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
-    Polynomial, UVPolynomial, domain,
+    domain, univariate::DensePolynomial, EvaluationDomain,
+    GeneralEvaluationDomain, Polynomial, UVPolynomial,
 };
 use ark_std::rand::Rng;
 

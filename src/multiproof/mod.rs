@@ -12,7 +12,7 @@ pub mod error;
 pub struct Proof<F: PrimeField, PC: HomomorphicCommitment<F>> {
     // pub oracle_evaluations: Vec<F>,
     pub q_evals: Vec<F>,
-    pub f_poly_commits: Vec<PC::Commitment>,
+    pub f_commit: PC::Commitment,
     pub opening_proof: PC::Proof,
 }
 

@@ -192,9 +192,9 @@ where
         let multiopen_proof = Multiopen::<F, PC, FS>::prove(
             &pk.committer_key,
             &oracles,
-            &evaluations,
             verifier_second_msg.xi,
             domain_size,
+            &mut fs_rng,
         )
         .map_err(Error::from_multiproof_err)?;
 
@@ -273,8 +273,9 @@ where
             witness_oracles[query.index].get_degree(domain_size)
         };
 
-        let instance_degree_fn =
-            |query: &InstanceQuery| instance_oracles[query.index].get_degree(domain_size);
+        let instance_degree_fn = |query: &InstanceQuery| {
+            instance_oracles[query.index].get_degree(domain_size)
+        };
 
         let mut max_degree = 0;
         for vo in vos {
@@ -439,15 +440,12 @@ where
             &vk.verifier_key,
             proof.multiopen_proof,
             &oracles,
-            &proof
-                .witness_evaluations
-                .into_iter()
-                .chain(proof.quotient_chunks_evaluations.into_iter())
-                .collect::<Vec<F>>(),
             verifier_second_msg.xi,
             domain_size,
+            &mut fs_rng,
         )
         .map_err(Error::from_multiproof_err)?;
+        
         Ok(res)
     }
 }

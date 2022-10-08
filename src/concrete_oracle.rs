@@ -68,7 +68,7 @@ impl<F: PrimeField> InstantiableConcreteOracle<F> {
             Some(extended_domain.coset_fft(&self.poly));
     }
 
-    // NOTE: We always want degree to be calculated same for all types of oracles 
+    // NOTE: We always want degree to be calculated same for all types of oracles
     // consider example when some witness poly is just 0, P side will derive different quotient degree then V
     pub fn get_degree(&self, domain_size: usize) -> usize {
         if self.should_mask {

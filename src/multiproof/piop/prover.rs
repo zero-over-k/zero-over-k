@@ -10,8 +10,7 @@ use crate::multiproof::poly::construct_vanishing;
 use crate::{concrete_oracle::InstantiableConcreteOracle, vo::query::Rotation};
 
 use super::{PIOPError, PIOP};
-// use super::super::error::Error;
-use super::verifier::{VerifierFirstMsg, VerifierSecondMsg};
+use super::verifier::{VerifierFirstMsg, VerifierSecondMsg, VerifierThirdMsg};
 
 pub struct ProverState<'a, F: PrimeField> {
     oracles: &'a [InstantiableConcreteOracle<F>],
@@ -19,7 +18,7 @@ pub struct ProverState<'a, F: PrimeField> {
         BTreeMap<BTreeSet<Rotation>, Vec<&'a InstantiableConcreteOracle<F>>>,
     domain: GeneralEvaluationDomain<F>,
     q_polys: Option<Vec<LabeledPolynomial<F, DensePolynomial<F>>>>,
-    f_polys: Option<Vec<LabeledPolynomial<F, DensePolynomial<F>>>>,
+    f_poly: Option<LabeledPolynomial<F, DensePolynomial<F>>>
 }
 
 impl<F: PrimeField> PIOP<F> {
@@ -47,7 +46,7 @@ impl<F: PrimeField> PIOP<F> {
             opening_sets,
             domain,
             q_polys: None,
-            f_polys: None,
+            f_poly: None,
         };
 
         Ok(state)
@@ -59,7 +58,7 @@ impl<F: PrimeField> PIOP<F> {
         verifier_first_msg: &VerifierFirstMsg<F>,
     ) -> Result<
         (
-            Vec<LabeledPolynomial<F, DensePolynomial<F>>>,
+            LabeledPolynomial<F, DensePolynomial<F>>,
             ProverState<'a, F>,
         ),
         PIOPError,
@@ -86,7 +85,7 @@ impl<F: PrimeField> PIOP<F> {
                 let mut evaluation = F::zero();
                 for (i, &oracle) in oracles.iter().enumerate() {
                     evaluation += x1_powers[i]
-                        * oracle.query_at_challenge(&evaluation_point); //TODO: consider using query trait here
+                        * oracle.query_at_challenge(&evaluation_point);
                 }
 
                 let prev = q_i_evals_set.insert(evaluation_point, evaluation);
@@ -128,14 +127,6 @@ impl<F: PrimeField> PIOP<F> {
 
                 */
 
-                // let lagrange_bases = construct_lagrange_basis(&evaluation_domain);
-                // let r_evals: Vec<F> = q_eval_set.values().cloned().collect();
-
-                // let mut r_poly = DensePolynomial::zero();
-                // for (l_i, &r_i) in lagrange_bases.iter().zip(r_evals.iter()) {
-                //     r_poly += &(l_i * r_i)
-                // }
-
                 LabeledPolynomial::new(
                     "f_i".to_string(),
                     &q_poly / &z_h,
@@ -145,54 +136,64 @@ impl<F: PrimeField> PIOP<F> {
             })
             .collect();
 
-        state.f_polys = Some(f_polys.clone());
-        Ok((f_polys, state))
+        let x2_powers: Vec<F> = successors(Some(F::one()), |x2_i| {
+            Some(*x2_i * verifier_first_msg.x2)
+        })
+        .take(f_polys.len())
+        .collect();
+
+        let mut f_agg_poly = DensePolynomial::zero();
+        for (i, f_i) in f_polys.iter().enumerate() {
+            f_agg_poly += &(f_i.polynomial() * x2_powers[i])
+        }
+
+        // f is blinded with degree 1
+        let f_agg_poly = LabeledPolynomial::new(
+            "f_aggregated".to_string(),
+            f_agg_poly,
+            None,
+            None, // don't forget to blind
+        );
+
+        state.f_poly = Some(f_agg_poly.clone());
+        Ok((f_agg_poly, state))
     }
 
     pub fn prover_second_round<'a>(
         state: &'a ProverState<'a, F>,
         verifier_second_msg: &VerifierSecondMsg<F>,
-    ) -> Result<(Vec<F>, LabeledPolynomial<F, DensePolynomial<F>>, F), PIOPError>
-    {
-        let f_polys =
-            state.f_polys.as_ref().expect("F polys should be in state");
+    ) -> Result<Vec<F>, PIOPError> {
+        let q_polys =
+            state.q_polys.as_ref().expect("Q polys should be in state");
+        let q_evals = q_polys
+            .iter()
+            .map(|q_i| q_i.polynomial().evaluate(&verifier_second_msg.x3))
+            .collect();
+        Ok(q_evals)
+    }
 
+    pub fn prover_third_round<'a>(
+        state: &'a ProverState<'a, F>,
+        verifier_third_msg: &VerifierThirdMsg<F>,
+    ) -> Result<LabeledPolynomial<F, DensePolynomial<F>>, PIOPError> {
         let q_polys =
             state.q_polys.as_ref().expect("Q polys should be in state");
 
-        let x2_powers: Vec<F> = successors(Some(F::one()), |x2_i| {
-            Some(*x2_i * verifier_second_msg.x2)
-        })
-        .take(f_polys.len())
-        .collect();
-
-        let mut final_poly = DensePolynomial::zero();
-        for (i, f_poly) in f_polys.iter().enumerate() {
-            final_poly += &(f_poly.polynomial() * x2_powers[i])
-        }
+        let f_poly = state.f_poly.as_ref().expect("F poly is not in the state");
 
         let x4_powers: Vec<F> =
-            successors(Some(verifier_second_msg.x4), |x4_i| {
-                Some(*x4_i * verifier_second_msg.x4)
+            successors(Some(verifier_third_msg.x4), |x4_i| {
+                Some(*x4_i * verifier_third_msg.x4)
             })
             .take(q_polys.len())
             .collect();
 
-        let mut q_evals = Vec::with_capacity(q_polys.len());
-
+        let mut final_poly = f_poly.polynomial().clone();
         for (i, q_poly) in q_polys.iter().enumerate() {
             final_poly += &(q_poly.polynomial() * x4_powers[i]);
-            q_evals.push(q_poly.evaluate(&verifier_second_msg.x3));
         }
 
-        let eval = final_poly.evaluate(&verifier_second_msg.x3);
-        let final_poly = LabeledPolynomial::new(
-            "final_poly".to_string(),
-            final_poly,
-            None,
-            None,
-        );
-
-        Ok((q_evals, final_poly, eval))
+        let final_poly = LabeledPolynomial::new("final_poly".to_string(), final_poly, None, None);
+        Ok(final_poly)
     }
 }
