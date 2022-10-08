@@ -67,15 +67,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng>
         domain_size: usize,
         fs_rng: &mut FS,
     ) -> Result<Proof<F, PC>, Error<PC::Error>> {
-        // let labeled_oracles: Vec<LabeledPolynomial<F, DensePolynomial<F>>> = oracles.iter().map(|oracle| oracle.to_labeled()).collect();
-
-        // let (oracles_commitments, _) =
-        //     PC::commit(ck, &labeled_oracles, None).map_err(Error::from_pc_err)?;
-
         let verifier_state = PIOP::init_verifier(evaluation_challenge);
-
-        // let mut fs_rng =
-        //     FS::initialize(&to_bytes![&Self::PROTOCOL_NAME, evals].unwrap()); // TODO: add &pk.vk, &commitments and evaluation_challenge?
 
         let (verifier_state, verifier_first_msg) =
             PIOP::verifier_first_round(verifier_state, fs_rng);
@@ -143,9 +135,6 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng>
     ) -> Result<(), Error<PC::Error>> {
         let domain = GeneralEvaluationDomain::new(domain_size).unwrap();
         let verifier_state = PIOP::init_verifier(evaluation_challenge);
-
-        // let mut fs_rng =
-        //     FS::initialize(&to_bytes![&Self::PROTOCOL_NAME, evals].unwrap()); // TODO: add &pk.vk, &commitments and evaluation_challenge
 
         let (verifier_state, verifier_first_msg) =
             PIOP::verifier_first_round(verifier_state, fs_rng);
