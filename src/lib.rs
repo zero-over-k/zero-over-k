@@ -289,16 +289,17 @@ where
 
         let quotient_degree = max_degree - vanishing_polynomial.degree();
 
-        let num_of_quotient_chunks = quotient_degree / srs_size
-            + if quotient_degree % srs_size != 0 {
-                1
-            } else {
-                0
-            };
+        let num_of_quotient_chunks =
+            quotient_degree.next_power_of_two() / domain_size;
 
         if num_of_quotient_chunks != proof.quotient_chunk_commitments.len()
             || num_of_quotient_chunks != proof.quotient_chunks_evaluations.len()
         {
+            dbg!(
+                num_of_quotient_chunks,
+                proof.quotient_chunk_commitments.len(),
+                proof.quotient_chunks_evaluations.len(),
+            );
             return Err(Error::WrongNumberOfChunks);
         }
 
@@ -411,7 +412,7 @@ where
             quotient_eval += powers_of_alpha[vo_index] * vo_evaluation;
         }
 
-        let x_n = verifier_second_msg.xi.pow([srs_size as u64, 0, 0, 0]);
+        let x_n = verifier_second_msg.xi.pow([domain_size as u64, 0, 0, 0]);
         let powers_of_x: Vec<F> =
             successors(Some(F::one()), |x_i| Some(*x_i * x_n))
                 .take(num_of_quotient_chunks)

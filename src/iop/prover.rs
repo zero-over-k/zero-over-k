@@ -201,22 +201,28 @@ impl<F: PrimeField> PIOPforPolyIdentity<F> {
             &extended_domain.coset_ifft(&quotient_evals),
         );
 
-        let quotient_chunks: Vec<InstantiableConcreteOracle<F>> = quotient
-            .coeffs
-            .chunks(srs_size)
-            .enumerate()
-            .map(|(i, chunk)| {
-                let poly = DensePolynomial::from_coefficients_slice(chunk);
-                InstantiableConcreteOracle {
-                    label: format!("quotient_chunk_{}", i).to_string(),
-                    poly,
-                    evals_at_coset_of_extended_domain: None,
-                    oracle_type: OracleType::Witness,
-                    queried_rotations: BTreeSet::from([Rotation::curr()]),
-                    should_mask: false,
-                }
-            })
-            .collect();
+        let mut quotient_coeffs = Vec::from(quotient.coeffs());
+        let padding_size = extended_domain.size() - quotient_coeffs.len();
+        if padding_size > 0 {
+            quotient_coeffs.extend(vec![F::zero(); padding_size]);
+        }
+
+        let quotient_chunks: Vec<InstantiableConcreteOracle<F>> =
+            quotient_coeffs
+                .chunks(state.domain.size())
+                .enumerate()
+                .map(|(i, chunk)| {
+                    let poly = DensePolynomial::from_coefficients_slice(chunk);
+                    InstantiableConcreteOracle {
+                        label: format!("quotient_chunk_{}", i).to_string(),
+                        poly,
+                        evals_at_coset_of_extended_domain: None,
+                        oracle_type: OracleType::Witness,
+                        queried_rotations: BTreeSet::from([Rotation::curr()]),
+                        should_mask: false,
+                    }
+                })
+                .collect();
 
         state.quotient_chunks = Some(quotient_chunks.clone());
         Ok(quotient_chunks)

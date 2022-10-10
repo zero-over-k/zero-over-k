@@ -233,9 +233,11 @@ mod test {
         let mut arith_vo = ArithVO::<F>::new();
         arith_vo.configure(&[0, 1, 2, 3, 4, 5, 6, 7], &[0]);
 
-        wires.append(&mut fixed);
-        wires.push(pi.clone());
-        let concrete_oracles = wires.as_slice();
+        let mut columns = Vec::with_capacity(9);
+        columns.append(&mut fixed);
+        columns.append(&mut wires);
+        columns.push(pi.clone());
+        let concrete_oracles = columns.as_slice();
 
         let vos: Vec<Box<dyn VirtualOracle<F>>> = vec![Box::new(arith_vo)];
 
