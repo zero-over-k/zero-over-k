@@ -60,20 +60,23 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng>
 {
     pub const PROTOCOL_NAME: &'static [u8] = b"GEOMETRY-MULTIOPEN";
 
-    pub fn prove<'a>(
+    pub fn prove<R: Rng>(
         ck: &PC::CommitterKey,
         oracles: &[InstantiableConcreteOracle<F>],
+        oracle_rands: &[PC::Randomness],
         evaluation_challenge: F,
         domain_size: usize,
         fs_rng: &mut FS,
+        zk_rng: &mut R,
     ) -> Result<Proof<F, PC>, Error<PC::Error>> {
         let verifier_state = PIOP::init_verifier(evaluation_challenge);
 
         let (verifier_state, verifier_first_msg) =
             PIOP::verifier_first_round(verifier_state, fs_rng);
 
-        let prover_state = PIOP::init_prover(oracles, domain_size)
-            .map_err(Error::from_piop_err)?;
+        let prover_state =
+            PIOP::init_prover::<PC>(oracles, oracle_rands, domain_size)
+                .map_err(Error::from_piop_err)?;
 
         let (f_agg_poly, prover_state) = PIOP::prover_first_round(
             prover_state,
@@ -82,8 +85,9 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng>
         )
         .map_err(Error::from_piop_err)?;
 
-        let (f_agg_poly_commitment, _) =
-            PC::commit(ck, iter::once(&f_agg_poly), None).map_err(Error::from_pc_err)?;
+        let (f_agg_poly_commitment, f_agg_rand) =
+            PC::commit(ck, iter::once(&f_agg_poly), Some(zk_rng))
+                .map_err(Error::from_pc_err)?;
 
         fs_rng.absorb(&to_bytes![&f_agg_poly_commitment].unwrap());
 
@@ -99,9 +103,14 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng>
         let (_, verifier_third_msg) =
             PIOP::verifier_third_round(verifier_state, fs_rng);
 
-        let final_poly = PIOP::prover_third_round(&prover_state, &verifier_third_msg).map_err(Error::from_piop_err)?;
+        let (final_poly, final_poly_rand) = PIOP::prover_third_round(
+            &prover_state,
+            &verifier_third_msg,
+            &f_agg_rand[0],
+        )
+        .map_err(Error::from_piop_err)?;
 
-        let (final_poly_commitment, rands) =
+        let (final_poly_commitment, _) =
             PC::commit(ck, iter::once(&final_poly), None)
                 .map_err(Error::from_pc_err)?;
 
@@ -111,7 +120,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng>
             final_poly_commitment.clone().iter(),
             &verifier_second_msg.x3,
             F::one(), // Opening challenge is not needed since only one polynomial is being committed
-            rands.iter(),
+            &[final_poly_rand],
             None, // Randomness is not needed since only one polynomial is committed
         )
         .map_err(Error::from_pc_err)?;
@@ -229,9 +238,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng>
 
         let mut final_poly_commitment = proof.f_commit.clone();
         let mut final_poly_eval = F::zero();
-        for (i, &f_eval) in
-            f_evals.iter().enumerate()
-        {
+        for (i, &f_eval) in f_evals.iter().enumerate() {
             final_poly_eval += x2_powers[i] * f_eval;
         }
 
@@ -286,7 +293,7 @@ mod test {
         concrete_oracle::{
             CommittedConcreteOracle, InstantiableConcreteOracle, OracleType,
         },
-        rng::{SimpleHashFiatShamirRng, FiatShamirRng},
+        rng::{FiatShamirRng, SimpleHashFiatShamirRng},
         vo::query::Rotation,
     };
     use ark_bls12_381::{Bls12_381, Fr as F};
@@ -320,7 +327,7 @@ mod test {
         let srs = PC::setup(max_degree, None, &mut rng).unwrap();
 
         let (committer_key, verifier_key) =
-            PC::trim(&srs, srs.max_degree(), 0, None).unwrap();
+            PC::trim(&srs, srs.max_degree(), 1, None).unwrap();
 
         let a_poly = DensePolynomial::<F>::rand(poly_degree, &mut rng);
         let b_poly = DensePolynomial::<F>::rand(poly_degree, &mut rng);
@@ -374,8 +381,9 @@ mod test {
 
         let labeled_oracles: Vec<LabeledPolynomial<F, DensePolynomial<F>>> =
             oracles.iter().map(|oracle| oracle.to_labeled()).collect();
-        let (oracles_commitments, _) =
-            PC::commit(&committer_key, &labeled_oracles, None).unwrap();
+        let (oracles_commitments, rands) =
+            PC::commit(&committer_key, &labeled_oracles, Some(&mut rng))
+                .unwrap();
 
         let xi = F::from(13131u64);
         let omega = domain.element(1);
@@ -445,20 +453,24 @@ mod test {
 
         let ver_oracles = [a_ver, b_ver, c_ver, d_ver];
 
-        let mut fs_rng =
-            FS::initialize(&to_bytes![&oracles_commitments, &evals, &xi].unwrap());
+        let mut fs_rng = FS::initialize(
+            &to_bytes![&oracles_commitments, &evals, &xi].unwrap(),
+        );
 
         let proof = MultiopenInst::prove(
             &committer_key,
             &oracles,
+            &rands,
             xi,
             domain_size,
-            &mut fs_rng
+            &mut fs_rng,
+            &mut rng,
         )
         .unwrap();
 
-        let mut fs_rng =
-        FS::initialize(&to_bytes![&oracles_commitments, &evals, &xi].unwrap());
+        let mut fs_rng = FS::initialize(
+            &to_bytes![&oracles_commitments, &evals, &xi].unwrap(),
+        );
 
         let res = MultiopenInst::verify(
             &verifier_key,
@@ -466,7 +478,7 @@ mod test {
             &ver_oracles,
             xi,
             domain_size,
-            &mut fs_rng
+            &mut fs_rng,
         );
 
         assert_eq!(res.is_ok(), true);

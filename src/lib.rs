@@ -69,9 +69,9 @@ where
     pub fn prepare_keys(
         srs: &UniversalSRS<F, PC>,
     ) -> Result<(ProverKey<F, PC>, VerifierKey<F, PC>), Error<PC::Error>> {
-        // keep all params simple for now
+        let supported_hiding_bound = 1; // we need to blind oracles for multiproof and opening in x3
         let (committer_key, verifier_key) =
-            PC::trim(&srs, srs.max_degree(), 0, None)
+            PC::trim(&srs, srs.max_degree(), supported_hiding_bound, None)
                 .map_err(Error::from_pc_err)?;
 
         let vk = VerifierKey { verifier_key };
@@ -119,9 +119,12 @@ where
             .map(|oracle| oracle.to_labeled())
             .collect();
 
-        let (witness_commitments, _) =
-            PC::commit(&pk.committer_key, &witness_oracles_labeled, None)
-                .map_err(Error::from_pc_err)?;
+        let (witness_commitments, wtns_rands) = PC::commit(
+            &pk.committer_key,
+            &witness_oracles_labeled,
+            Some(zk_rng),
+        )
+        .map_err(Error::from_pc_err)?;
 
         fs_rng.absorb(&to_bytes![witness_commitments].unwrap());
 
@@ -148,9 +151,12 @@ where
             .map(|oracle| oracle.to_labeled())
             .collect();
 
-        let (quotient_chunk_commitments, _) =
-            PC::commit(&pk.committer_key, &quotient_chunks_labeled, None)
-                .map_err(Error::from_pc_err)?;
+        let (quotient_chunk_commitments, quotient_rands) = PC::commit(
+            &pk.committer_key,
+            &quotient_chunks_labeled,
+            Some(zk_rng),
+        )
+        .map_err(Error::from_pc_err)?;
 
         fs_rng.absorb(&to_bytes![quotient_chunk_commitments].unwrap());
 
@@ -189,12 +195,20 @@ where
             .chain(quotient_chunk_oracles.iter())
             .map(|oracle| oracle.clone())
             .collect();
+
+        let oracle_rands: Vec<PC::Randomness> = wtns_rands
+            .iter()
+            .chain(quotient_rands.iter())
+            .map(|rand| rand.clone())
+            .collect();
         let multiopen_proof = Multiopen::<F, PC, FS>::prove(
             &pk.committer_key,
             &oracles,
+            &oracle_rands,
             verifier_second_msg.xi,
             domain_size,
             &mut fs_rng,
+            zk_rng,
         )
         .map_err(Error::from_multiproof_err)?;
 
@@ -445,7 +459,7 @@ where
             &mut fs_rng,
         )
         .map_err(Error::from_multiproof_err)?;
-        
+
         Ok(res)
     }
 }

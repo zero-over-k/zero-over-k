@@ -1,15 +1,18 @@
 //! Useful commitment stuff
+use std::ops::Add;
+
 use ark_ec::{msm::VariableBaseMSM, AffineCurve, PairingEngine};
 use ark_ff::{One, PrimeField, Zero};
 use ark_poly::univariate::DensePolynomial;
-use ark_poly_commit::{sonic_pc::SonicKZG10, PolynomialCommitment};
+use ark_poly_commit::{
+    sonic_pc::SonicKZG10, PCRandomness, PolynomialCommitment,
+};
 
 /// A homomorphic polynomial commitment
 pub trait HomomorphicCommitment<F>:
     PolynomialCommitment<F, DensePolynomial<F>>
 where
     F: PrimeField,
-    Self::VerifierKey: core::fmt::Debug,
 {
     /// Combine a linear combination of homomorphic commitments
     fn msm(commitments: &[Self::Commitment], scalars: &[F])
@@ -26,6 +29,16 @@ where
     fn is_zero(c: &Self::Commitment) -> bool;
 
     fn eq_cm(c1: &Self::Commitment, c2: &Self::Commitment) -> bool;
+
+    fn scale_rand(randomness: &Self::Randomness, scalar: F)
+        -> Self::Randomness;
+
+    fn add_rands(
+        a: &Self::Randomness,
+        b: &Self::Randomness,
+    ) -> Self::Randomness;
+
+    fn add_assign_rand(a: &mut Self::Randomness, b: &Self::Randomness);
 }
 
 /// The Default KZG-style commitment scheme
@@ -36,7 +49,7 @@ pub type KZG10Commitment<E> = <KZG10<E> as PolynomialCommitment<
     DensePolynomial<<E as PairingEngine>::Fr>,
 >>::Commitment;
 
-impl<E> HomomorphicCommitment<E::Fr> for KZG10<E>
+impl<'a, E> HomomorphicCommitment<E::Fr> for KZG10<E>
 where
     E: PairingEngine,
 {
@@ -82,5 +95,25 @@ where
 
     fn eq_cm(c1: &Self::Commitment, c2: &Self::Commitment) -> bool {
         c1.0 == c2.0
+    }
+
+    fn scale_rand(
+        randomness: &Self::Randomness,
+        scalar: E::Fr,
+    ) -> Self::Randomness {
+        let mut rand = Self::Randomness::empty();
+        rand.blinding_polynomial = &randomness.blinding_polynomial * scalar;
+        rand
+    }
+
+    fn add_rands(
+        a: &Self::Randomness,
+        b: &Self::Randomness,
+    ) -> Self::Randomness {
+        a.clone() + b
+    }
+
+    fn add_assign_rand(a: &mut Self::Randomness, b: &Self::Randomness) {
+        a.blinding_polynomial += &b.blinding_polynomial
     }
 }

@@ -121,12 +121,11 @@ impl<F: PrimeField> InstantiableConcreteOracle<F> {
     }
 
     pub fn to_labeled(&self) -> LabeledPolynomial<F, DensePolynomial<F>> {
-        // for now keep degree bound and hiding bound to None
         LabeledPolynomial::new(
             self.label.clone(),
             self.poly.clone(),
             None,
-            None,
+            Some(1), // blind for opening in x3 in multiproof
         )
     }
 }

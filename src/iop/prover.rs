@@ -44,7 +44,6 @@ impl<F: PrimeField> PIOPforPolyIdentity<F> {
         let mut witness_oracles = vec![];
         let mut instance_oracles = vec![];
 
-        // TODO: consider keeping pointers to oracle in state
         for oracle in concrete_oracles {
             match oracle.oracle_type {
                 OracleType::Witness => witness_oracles.push(oracle.clone()),
@@ -224,5 +223,109 @@ impl<F: PrimeField> PIOPforPolyIdentity<F> {
 
         state.quotient_chunks = Some(quotient_chunks.clone());
         Ok(quotient_chunks)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::{
+        commitment::{HomomorphicCommitment, KZG10},
+        multiproof::poly,
+    };
+    use ark_bls12_381::{Bls12_381, Fr as F};
+    use ark_ff::{One, UniformRand};
+    use ark_poly::{univariate::DensePolynomial, Polynomial, UVPolynomial};
+    use ark_poly_commit::{
+        LabeledCommitment, LabeledPolynomial, PCUniversalParams,
+        PolynomialCommitment,
+    };
+    use ark_std::test_rng;
+
+    type PC = KZG10<Bls12_381>;
+
+    #[test]
+    fn test_rands_homomorphism() {
+        let max_degree = 17;
+        let mut rng = test_rng();
+
+        let poly_degree = 10;
+        let srs = PC::setup(max_degree, None, &mut rng).unwrap();
+
+        let (committer_key, verifier_key) =
+            PC::trim(&srs, srs.max_degree(), 1, None).unwrap();
+
+        let p = DensePolynomial::<F>::rand(poly_degree, &mut rng);
+        let p =
+            LabeledPolynomial::new("p".to_string(), p.clone(), None, Some(1));
+        let q = DensePolynomial::<F>::rand(poly_degree, &mut rng);
+        let q =
+            LabeledPolynomial::new("q".to_string(), q.clone(), None, Some(1));
+
+        let polys = [p.clone(), q.clone()];
+
+        let (comms, rands) =
+            PC::commit(&committer_key, polys.iter(), Some(&mut rng)).unwrap();
+
+        let challenge = F::rand(&mut rng);
+        let x1 = F::rand(&mut rng);
+
+        let r = p.polynomial().clone() + q.polynomial() * x1;
+        let value = r.evaluate(&challenge);
+
+        let r =
+            LabeledPolynomial::new("r".to_string(), r.clone(), None, Some(1));
+
+        let r_comm = PC::add(
+            comms[0].commitment(),
+            &PC::scale_com(comms[1].commitment(), x1),
+        );
+        let r_comm =
+            LabeledCommitment::new("r_comm".to_string(), r_comm.clone(), None);
+        let r_rand = PC::add_rands(&rands[0], &PC::scale_rand(&rands[1], x1));
+
+        // let r_rand = rands[0] + rands[1];
+
+        // let (r_comm, r_rands) = PC::commit(&committer_key, &[r.clone()], Some(&mut rng)).unwrap();
+        // println!("r_rand {:?}", r_rands[0]);
+
+        let proof = PC::open(
+            &committer_key,
+            &[r.clone()],
+            &[r_comm],
+            &challenge,
+            F::one(),
+            &[r_rand],
+            Some(&mut rng),
+        )
+        .unwrap();
+
+        // let proof = PC::open(
+        //     &committer_key,
+        //     polys.iter(),
+        //     comms.iter(),
+        //     &challenge,
+        //     x1,
+        //     rands.iter(),
+        //     Some(&mut rng)
+        // ).unwrap();
+
+        let r_comm = PC::add(
+            comms[0].commitment(),
+            &PC::scale_com(comms[1].commitment(), x1),
+        );
+        let r_comm =
+            LabeledCommitment::new("r_comm".to_string(), r_comm.clone(), None);
+
+        let res = PC::check(
+            &verifier_key,
+            &[r_comm.clone()],
+            &challenge,
+            vec![value],
+            &proof,
+            F::one(),
+            Some(&mut rng),
+        )
+        .unwrap();
+        assert_eq!(res, true);
     }
 }
