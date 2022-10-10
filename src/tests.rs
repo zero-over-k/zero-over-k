@@ -3,13 +3,13 @@ mod test {
     use std::collections::BTreeSet;
 
     use ark_bls12_381::{Bls12_381, Fr};
-    use ark_ff::{One, Zero};
+    use ark_ff::{Zero};
     use ark_poly::Polynomial;
     use ark_poly::{
         univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
         UVPolynomial,
     };
-    use ark_poly_commit::marlin_pc::MarlinKZG10;
+    
     use ark_poly_commit::PCCommitterKey;
     use ark_std::test_rng;
     use rand_chacha::ChaChaRng;

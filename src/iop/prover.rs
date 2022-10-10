@@ -1,14 +1,13 @@
 use std::{cmp::max, collections::BTreeSet, iter::successors};
 
-use ark_ff::{PrimeField, Zero};
+use ark_ff::PrimeField;
 use ark_poly::{
-    domain, univariate::DensePolynomial, EvaluationDomain,
-    GeneralEvaluationDomain, Polynomial, UVPolynomial,
+    univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
+    Polynomial, UVPolynomial,
 };
 use ark_std::rand::Rng;
 
 use crate::{
-    commitment::HomomorphicCommitment,
     concrete_oracle::{InstantiableConcreteOracle, OracleType},
     iop::error::Error,
     iop::{verifier::VerifierFirstMsg, PIOPforPolyIdentity},
@@ -17,8 +16,6 @@ use crate::{
         VirtualOracle,
     },
 };
-
-use super::verifier::VerifierSecondMsg;
 
 // Note: To keep flexible vanishing polynomial should not be strictly domain.vanishing_polynomial
 // For example consider https://hackmd.io/1DaroFVfQwySwZPHMoMdBg?view where we remove some roots from Zh
@@ -141,7 +138,7 @@ impl<F: PrimeField> PIOPforPolyIdentity<F> {
         // 2. Compute extended domain
         let extended_domain =
             GeneralEvaluationDomain::new(quotient_degree).unwrap();
-        let scaling_ratio = extended_domain.size() / state.domain.size();
+        let _scaling_ratio = extended_domain.size() / state.domain.size();
 
         // 3. Compute extended evals of each oracle
         for oracle in &mut state.witness_oracles {

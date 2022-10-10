@@ -10,9 +10,9 @@ use ark_poly::{
     Polynomial,
 };
 use ark_poly_commit::{
-    evaluate_query_set, LabeledCommitment, LabeledPolynomial,
+    LabeledCommitment,
 };
-use ark_std::rand::{Rng, RngCore};
+
 
 use crate::{
     commitment::HomomorphicCommitment,
