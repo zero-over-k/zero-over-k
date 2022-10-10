@@ -53,7 +53,7 @@ impl<F: PrimeField> PIOPforPolyIdentity<F> {
         ProverState {
             witness_oracles: witness_oracles.clone(),
             instance_oracles: instance_oracles.clone(),
-            vos: vos,
+            vos,
             domain,
             vanishing_polynomial: vanishing_polynomial.clone(),
             quotient_chunks: None,
@@ -231,10 +231,7 @@ impl<F: PrimeField> PIOPforPolyIdentity<F> {
 
 #[cfg(test)]
 mod test {
-    use crate::{
-        commitment::{HomomorphicCommitment, KZG10},
-        multiproof::poly,
-    };
+    use crate::commitment::{HomomorphicCommitment, KZG10};
     use ark_bls12_381::{Bls12_381, Fr as F};
     use ark_ff::{One, UniformRand};
     use ark_poly::{univariate::DensePolynomial, Polynomial, UVPolynomial};
