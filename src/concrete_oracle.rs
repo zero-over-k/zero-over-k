@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::vo::query::{Rotation, Sign};
-use ark_ff::{Field, PrimeField};
+use ark_ff::{PrimeField};
 use ark_poly::{
     univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
     Polynomial, UVPolynomial,

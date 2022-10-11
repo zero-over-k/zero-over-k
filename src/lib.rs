@@ -2,34 +2,21 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::iter::successors;
 use std::marker::PhantomData;
 
-use crate::concrete_oracle::{OracleType, QuerySetProvider};
-use crate::error::Error;
-use crate::vo::query::{Query, Rotation};
-use ark_ff::{to_bytes, PrimeField, UniformRand, Zero};
+use ark_ff::{to_bytes, PrimeField};
 use ark_poly::univariate::DensePolynomial;
-use ark_poly::{
-    evaluations, EvaluationDomain, GeneralEvaluationDomain, Polynomial,
-};
-use ark_poly_commit::LabeledPolynomial;
-use ark_poly_commit::PCCommitterKey;
-use ark_poly_commit::PCUniversalParams;
-use ark_poly_commit::PolynomialCommitment;
-use ark_poly_commit::QuerySet;
-use ark_poly_commit::{evaluate_query_set, LabeledCommitment};
-use ark_std::rand::Rng;
-use ark_std::rand::RngCore;
+use ark_poly::{EvaluationDomain, GeneralEvaluationDomain, Polynomial};
+use ark_poly_commit::{LabeledPolynomial, PCCommitterKey, PCUniversalParams};
+use error::Error;
+
+use ark_poly_commit::evaluate_query_set;
+use ark_std::rand::{Rng, RngCore};
 use commitment::HomomorphicCommitment;
-use concrete_oracle::CommittedConcreteOracle;
-use concrete_oracle::InstantiableConcreteOracle;
-use data_structures::Proof;
-use data_structures::ProverKey;
-use data_structures::UniversalSRS;
-use data_structures::VerifierKey;
+use concrete_oracle::{CommittedConcreteOracle, InstantiableConcreteOracle};
+use data_structures::{Proof, ProverKey, UniversalSRS, VerifierKey};
 use iop::PIOPforPolyIdentity;
-use multiproof::piop::{Multiopen, PIOP};
+use multiproof::piop::Multiopen;
 use rng::FiatShamirRng;
-use vo::query::InstanceQuery;
-use vo::query::WitnessQuery;
+use vo::query::{InstanceQuery, Query, Rotation, WitnessQuery};
 use vo::VirtualOracle;
 
 pub mod commitment;
@@ -160,7 +147,7 @@ where
 
         fs_rng.absorb(&to_bytes![quotient_chunk_commitments].unwrap());
 
-        let (verifier_second_msg, verifier_state) =
+        let (verifier_second_msg, _verifier_state) =
             PIOPforPolyIdentity::verifier_second_round(
                 verifier_state,
                 &mut fs_rng,
@@ -238,7 +225,7 @@ where
         domain_size: usize,
         vanishing_polynomial: &DensePolynomial<F>,
         srs_size: usize,
-        zk_rng: &mut R,
+        _zk_rng: &mut R,
     ) -> Result<(), Error<PC::Error>> {
         let verifier_init_state = PIOPforPolyIdentity::init_verifier(
             domain_size,
@@ -302,16 +289,17 @@ where
 
         let quotient_degree = max_degree - vanishing_polynomial.degree();
 
-        let num_of_quotient_chunks = quotient_degree / srs_size
-            + if quotient_degree % srs_size != 0 {
-                1
-            } else {
-                0
-            };
+        let num_of_quotient_chunks =
+            quotient_degree.next_power_of_two() / domain_size;
 
         if num_of_quotient_chunks != proof.quotient_chunk_commitments.len()
             || num_of_quotient_chunks != proof.quotient_chunks_evaluations.len()
         {
+            dbg!(
+                num_of_quotient_chunks,
+                proof.quotient_chunk_commitments.len(),
+                proof.quotient_chunks_evaluations.len(),
+            );
             return Err(Error::WrongNumberOfChunks);
         }
 
@@ -333,7 +321,7 @@ where
 
         fs_rng.absorb(&to_bytes![&proof.quotient_chunk_commitments].unwrap());
 
-        let (verifier_second_msg, verifier_state) =
+        let (verifier_second_msg, _verifier_state) =
             PIOPforPolyIdentity::verifier_second_round(
                 verifier_state,
                 &mut fs_rng,
@@ -424,7 +412,7 @@ where
             quotient_eval += powers_of_alpha[vo_index] * vo_evaluation;
         }
 
-        let x_n = verifier_second_msg.xi.pow([srs_size as u64, 0, 0, 0]);
+        let x_n = verifier_second_msg.xi.pow([domain_size as u64, 0, 0, 0]);
         let powers_of_x: Vec<F> =
             successors(Some(F::one()), |x_i| Some(*x_i * x_n))
                 .take(num_of_quotient_chunks)

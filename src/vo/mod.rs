@@ -1,5 +1,5 @@
 use ark_ff::PrimeField;
-use ark_poly_commit::QuerySet;
+
 use query::{InstanceQuery, WitnessQuery};
 
 use self::expression::Expression;

@@ -9,10 +9,8 @@ use ark_poly::{
     univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
     Polynomial,
 };
-use ark_poly_commit::{
-    evaluate_query_set, LabeledCommitment, LabeledPolynomial,
-};
-use ark_std::rand::{Rng, RngCore};
+use ark_poly_commit::LabeledCommitment;
+use ark_std::rand::Rng;
 
 use crate::{
     commitment::HomomorphicCommitment,

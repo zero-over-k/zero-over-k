@@ -1,6 +1,4 @@
 //! Useful commitment stuff
-use std::ops::Add;
-
 use ark_ec::{msm::VariableBaseMSM, AffineCurve, PairingEngine};
 use ark_ff::{One, PrimeField, Zero};
 use ark_poly::univariate::DensePolynomial;

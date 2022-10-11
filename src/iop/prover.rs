@@ -1,14 +1,13 @@
 use std::{cmp::max, collections::BTreeSet, iter::successors};
 
-use ark_ff::{PrimeField, Zero};
+use ark_ff::PrimeField;
 use ark_poly::{
-    domain, univariate::DensePolynomial, EvaluationDomain,
-    GeneralEvaluationDomain, Polynomial, UVPolynomial,
+    univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
+    Polynomial, UVPolynomial,
 };
 use ark_std::rand::Rng;
 
 use crate::{
-    commitment::HomomorphicCommitment,
     concrete_oracle::{InstantiableConcreteOracle, OracleType},
     iop::error::Error,
     iop::{verifier::VerifierFirstMsg, PIOPforPolyIdentity},
@@ -17,8 +16,6 @@ use crate::{
         VirtualOracle,
     },
 };
-
-use super::verifier::VerifierSecondMsg;
 
 // Note: To keep flexible vanishing polynomial should not be strictly domain.vanishing_polynomial
 // For example consider https://hackmd.io/1DaroFVfQwySwZPHMoMdBg?view where we remove some roots from Zh
@@ -56,7 +53,7 @@ impl<F: PrimeField> PIOPforPolyIdentity<F> {
         ProverState {
             witness_oracles: witness_oracles.clone(),
             instance_oracles: instance_oracles.clone(),
-            vos: vos,
+            vos,
             domain,
             vanishing_polynomial: vanishing_polynomial.clone(),
             quotient_chunks: None,
@@ -141,7 +138,7 @@ impl<F: PrimeField> PIOPforPolyIdentity<F> {
         // 2. Compute extended domain
         let extended_domain =
             GeneralEvaluationDomain::new(quotient_degree).unwrap();
-        let scaling_ratio = extended_domain.size() / state.domain.size();
+        let _scaling_ratio = extended_domain.size() / state.domain.size();
 
         // 3. Compute extended evals of each oracle
         for oracle in &mut state.witness_oracles {
@@ -204,22 +201,28 @@ impl<F: PrimeField> PIOPforPolyIdentity<F> {
             &extended_domain.coset_ifft(&quotient_evals),
         );
 
-        let quotient_chunks: Vec<InstantiableConcreteOracle<F>> = quotient
-            .coeffs
-            .chunks(srs_size)
-            .enumerate()
-            .map(|(i, chunk)| {
-                let poly = DensePolynomial::from_coefficients_slice(chunk);
-                InstantiableConcreteOracle {
-                    label: format!("quotient_chunk_{}", i).to_string(),
-                    poly,
-                    evals_at_coset_of_extended_domain: None,
-                    oracle_type: OracleType::Witness,
-                    queried_rotations: BTreeSet::from([Rotation::curr()]),
-                    should_mask: false,
-                }
-            })
-            .collect();
+        let mut quotient_coeffs = Vec::from(quotient.coeffs());
+        let padding_size = extended_domain.size() - quotient_coeffs.len();
+        if padding_size > 0 {
+            quotient_coeffs.extend(vec![F::zero(); padding_size]);
+        }
+
+        let quotient_chunks: Vec<InstantiableConcreteOracle<F>> =
+            quotient_coeffs
+                .chunks(state.domain.size())
+                .enumerate()
+                .map(|(i, chunk)| {
+                    let poly = DensePolynomial::from_coefficients_slice(chunk);
+                    InstantiableConcreteOracle {
+                        label: format!("quotient_chunk_{}", i).to_string(),
+                        poly,
+                        evals_at_coset_of_extended_domain: None,
+                        oracle_type: OracleType::Witness,
+                        queried_rotations: BTreeSet::from([Rotation::curr()]),
+                        should_mask: false,
+                    }
+                })
+                .collect();
 
         state.quotient_chunks = Some(quotient_chunks.clone());
         Ok(quotient_chunks)
@@ -228,10 +231,7 @@ impl<F: PrimeField> PIOPforPolyIdentity<F> {
 
 #[cfg(test)]
 mod test {
-    use crate::{
-        commitment::{HomomorphicCommitment, KZG10},
-        multiproof::poly,
-    };
+    use crate::commitment::{HomomorphicCommitment, KZG10};
     use ark_bls12_381::{Bls12_381, Fr as F};
     use ark_ff::{One, UniformRand};
     use ark_poly::{univariate::DensePolynomial, Polynomial, UVPolynomial};
