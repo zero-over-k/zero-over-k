@@ -50,7 +50,7 @@
 //                         index: instance_indices[vq.index],
 //                         rotation: vq.rotation.clone(),
 //                     };
-                    
+
 //                     self.instance_queries.push(query);
 //                     self.queries.push(Box::new(query.clone()))
 //                 }
@@ -93,16 +93,27 @@
 
 use ark_ff::PrimeField;
 
-use crate::{oracles::{rotation::Rotation, query::{OracleType, OracleQuery}, traits::ConcreteOracle, instance::InstanceOracle, fixed::FixedOracle}, commitment::HomomorphicCommitment};
+use crate::{
+    commitment::HomomorphicCommitment,
+    oracles::{
+        fixed::FixedOracle,
+        instance::InstanceOracle,
+        query::{OracleQuery, OracleType},
+        rotation::Rotation,
+        traits::ConcreteOracle,
+    },
+};
 
-use super::{virtual_expression::VirtualExpression, query::VirtualQuery, new_expression::NewExpression, VirtualOracle};
+use super::{
+    new_expression::NewExpression, query::VirtualQuery,
+    virtual_expression::VirtualExpression, VirtualOracle,
+};
 
 pub trait PrecompiledVO<F: PrimeField> {
     fn get_expr_and_queries() -> (VirtualExpression<F>, Vec<VirtualQuery>);
 }
 
-pub struct PrecompiledMul {
-}
+pub struct PrecompiledMul {}
 
 impl<F: PrimeField> PrecompiledVO<F> for PrecompiledMul {
     fn get_expr_and_queries() -> (VirtualExpression<F>, Vec<VirtualQuery>) {
@@ -123,41 +134,57 @@ impl<F: PrimeField> PrecompiledVO<F> for PrecompiledMul {
 }
 
 pub struct GenericVO<F: PrimeField> {
-    pub(crate) virtual_exp: VirtualExpression<F>, 
+    pub(crate) virtual_exp: VirtualExpression<F>,
     pub(crate) virtual_queries: Vec<VirtualQuery>,
     pub(crate) queries: Option<Vec<OracleQuery>>,
-    pub(crate) expression: Option<NewExpression<F>>
+    pub(crate) expression: Option<NewExpression<F>>,
 }
 
 impl<F: PrimeField> GenericVO<F> {
     pub fn init(cfg: (VirtualExpression<F>, Vec<VirtualQuery>)) -> Self {
         Self {
-            virtual_exp: cfg.0, 
-            virtual_queries: cfg.1, 
-            queries: None, 
-            expression: None
+            virtual_exp: cfg.0,
+            virtual_queries: cfg.1,
+            queries: None,
+            expression: None,
         }
     }
 
     pub fn configure<PC: HomomorphicCommitment<F>>(
-        &mut self, 
+        &mut self,
         witness_oracles: &[impl ConcreteOracle<F>],
         instance_oracles: &[InstanceOracle<F>],
-        fixed_oracles: &[FixedOracle<F, PC>]
+        fixed_oracles: &[FixedOracle<F, PC>],
     ) {
         let mut queries = Vec::with_capacity(self.virtual_queries.len());
         for query in &self.virtual_queries {
             let oracle_query = match query.oracle_type {
-                crate::oracles::query::OracleType::Witness => OracleQuery { label: witness_oracles[query.index].get_label(), rotation: query.rotation, oracle_type: OracleType::Witness },
-                crate::oracles::query::OracleType::Instance => OracleQuery { label: instance_oracles[query.index].get_label(), rotation: query.rotation, oracle_type: OracleType::Instance },
-                crate::oracles::query::OracleType::Fixed => OracleQuery { label: fixed_oracles[query.index].get_label(), rotation: query.rotation, oracle_type: OracleType::Fixed },
+                crate::oracles::query::OracleType::Witness => OracleQuery {
+                    label: witness_oracles[query.index].get_label(),
+                    rotation: query.rotation,
+                    oracle_type: OracleType::Witness,
+                },
+                crate::oracles::query::OracleType::Instance => OracleQuery {
+                    label: instance_oracles[query.index].get_label(),
+                    rotation: query.rotation,
+                    oracle_type: OracleType::Instance,
+                },
+                crate::oracles::query::OracleType::Fixed => OracleQuery {
+                    label: fixed_oracles[query.index].get_label(),
+                    rotation: query.rotation,
+                    oracle_type: OracleType::Fixed,
+                },
             };
 
             queries.push(oracle_query);
         }
 
         self.queries = Some(queries.clone());
-        self.expression = Some(self.virtual_exp.to_expression(witness_oracles, instance_oracles, fixed_oracles));
+        self.expression = Some(self.virtual_exp.to_expression(
+            witness_oracles,
+            instance_oracles,
+            fixed_oracles,
+        ));
     }
 }
 
@@ -181,20 +208,24 @@ impl<F: PrimeField> VirtualOracle<F> for GenericVO<F> {
 mod test {
     use std::collections::BTreeSet;
 
-    use crate::oracles::{witness::WitnessProverOracle, instance::InstanceOracle, fixed::FixedOracle};
+    use crate::oracles::{
+        fixed::FixedOracle, instance::InstanceOracle,
+        witness::WitnessProverOracle,
+    };
 
     use super::{GenericVO, PrecompiledMul, PrecompiledVO};
-    use ark_bls12_381::{Fr as F, Bls12_381};
-    use ark_poly::univariate::DensePolynomial;
     use crate::commitment::KZG10;
+    use ark_bls12_381::{Bls12_381, Fr as F};
+    use ark_poly::univariate::DensePolynomial;
 
     type PC = KZG10<Bls12_381>;
 
     #[test]
     fn test_simple_mul() {
-        let mut mul_vo = GenericVO::<F>::init(PrecompiledMul::get_expr_and_queries());
+        let mut mul_vo =
+            GenericVO::<F>::init(PrecompiledMul::get_expr_and_queries());
 
-        let a = WitnessProverOracle::<F>{
+        let a = WitnessProverOracle::<F> {
             label: "a".to_string(),
             poly: DensePolynomial::default(),
             evals_at_coset_of_extended_domain: None,

@@ -1,8 +1,12 @@
-use std::ops::{Neg, Add, Mul, Sub};
+use std::ops::{Add, Mul, Neg, Sub};
 
 use ark_ff::PrimeField;
 
-use crate::oracles::{query::{OracleQuery, OracleType}, witness, traits::ConcreteOracle};
+use crate::oracles::{
+    query::{OracleQuery, OracleType},
+    traits::ConcreteOracle,
+    witness,
+};
 
 use super::{new_expression::NewExpression, query::VirtualQuery};
 
@@ -18,44 +22,81 @@ pub enum VirtualExpression<F> {
 
 impl<F: PrimeField> VirtualExpression<F> {
     pub fn to_expression(
-        &self, 
+        &self,
         witness_oracles: &[impl ConcreteOracle<F>],
         instance_oracles: &[impl ConcreteOracle<F>],
-        fixed_oracles: &[impl ConcreteOracle<F>]
+        fixed_oracles: &[impl ConcreteOracle<F>],
     ) -> NewExpression<F> {
         match self {
             VirtualExpression::Constant(f) => NewExpression::Constant(*f),
             VirtualExpression::Oracle(query) => {
                 let oracle_query = match query.oracle_type {
-                    crate::oracles::query::OracleType::Witness => OracleQuery { label: witness_oracles[query.index].get_label(), rotation: query.rotation, oracle_type: OracleType::Witness },
-                    crate::oracles::query::OracleType::Instance => OracleQuery { label: instance_oracles[query.index].get_label(), rotation: query.rotation, oracle_type: OracleType::Instance },
-                    crate::oracles::query::OracleType::Fixed => OracleQuery { label: fixed_oracles[query.index].get_label(), rotation: query.rotation, oracle_type: OracleType::Fixed },
+                    crate::oracles::query::OracleType::Witness => OracleQuery {
+                        label: witness_oracles[query.index].get_label(),
+                        rotation: query.rotation,
+                        oracle_type: OracleType::Witness,
+                    },
+                    crate::oracles::query::OracleType::Instance => {
+                        OracleQuery {
+                            label: instance_oracles[query.index].get_label(),
+                            rotation: query.rotation,
+                            oracle_type: OracleType::Instance,
+                        }
+                    }
+                    crate::oracles::query::OracleType::Fixed => OracleQuery {
+                        label: fixed_oracles[query.index].get_label(),
+                        rotation: query.rotation,
+                        oracle_type: OracleType::Fixed,
+                    },
                 };
 
                 NewExpression::Oracle(oracle_query)
-            },
+            }
             VirtualExpression::Negated(expr) => {
-                let expr = expr.to_expression(witness_oracles, instance_oracles, fixed_oracles);
+                let expr = expr.to_expression(
+                    witness_oracles,
+                    instance_oracles,
+                    fixed_oracles,
+                );
                 NewExpression::Negated(Box::new(expr))
-            },
+            }
             VirtualExpression::Sum(lhs_expr, rhs_expr) => {
-                let lhs_expr = lhs_expr.to_expression(witness_oracles, instance_oracles, fixed_oracles);
-                let rhs_expr = rhs_expr.to_expression(witness_oracles, instance_oracles, fixed_oracles);
+                let lhs_expr = lhs_expr.to_expression(
+                    witness_oracles,
+                    instance_oracles,
+                    fixed_oracles,
+                );
+                let rhs_expr = rhs_expr.to_expression(
+                    witness_oracles,
+                    instance_oracles,
+                    fixed_oracles,
+                );
                 NewExpression::Sum(Box::new(lhs_expr), Box::new(rhs_expr))
-            },
+            }
             VirtualExpression::Product(lhs_expr, rhs_expr) => {
-                let lhs_expr = lhs_expr.to_expression(witness_oracles, instance_oracles, fixed_oracles);
-                let rhs_expr = rhs_expr.to_expression(witness_oracles, instance_oracles, fixed_oracles);
+                let lhs_expr = lhs_expr.to_expression(
+                    witness_oracles,
+                    instance_oracles,
+                    fixed_oracles,
+                );
+                let rhs_expr = rhs_expr.to_expression(
+                    witness_oracles,
+                    instance_oracles,
+                    fixed_oracles,
+                );
                 NewExpression::Product(Box::new(lhs_expr), Box::new(rhs_expr))
-            },
+            }
             VirtualExpression::Scaled(expr, f) => {
-                let expr = expr.to_expression(witness_oracles, instance_oracles, fixed_oracles);
+                let expr = expr.to_expression(
+                    witness_oracles,
+                    instance_oracles,
+                    fixed_oracles,
+                );
                 NewExpression::Scaled(Box::new(expr), *f)
             }
         }
     }
 }
-
 
 impl<F: PrimeField> Neg for VirtualExpression<F> {
     type Output = VirtualExpression<F>;
@@ -92,10 +133,8 @@ impl<F: PrimeField> Mul<F> for VirtualExpression<F> {
     }
 }
 
-#[cfg(test)] 
+#[cfg(test)]
 mod test {
     #[test]
-    fn test_new_expression() {
-        
-    }
+    fn test_new_expression() {}
 }

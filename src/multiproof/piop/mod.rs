@@ -14,7 +14,12 @@ use ark_std::rand::Rng;
 
 use crate::{
     commitment::HomomorphicCommitment,
-    rng::FiatShamirRng, oracles::{traits::{Instantiable, CommittedOracle}, rotation::Rotation, query::QueryContext},
+    oracles::{
+        query::QueryContext,
+        rotation::Rotation,
+        traits::{CommittedOracle, Instantiable},
+    },
+    rng::FiatShamirRng,
 };
 
 use self::prover::ProverState;
@@ -193,7 +198,8 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng>
                 let mut evaluation = F::zero();
                 for (i, &oracle) in oracles.iter().enumerate() {
                     evaluation += x1_powers[i]
-                        * oracle.query(&QueryContext::Challenge(evaluation_point));
+                        * oracle
+                            .query(&QueryContext::Challenge(evaluation_point));
                 }
 
                 let prev = q_i_evals_set.insert(evaluation_point, evaluation);
@@ -288,8 +294,12 @@ mod test {
 
     use crate::{
         commitment::KZG10,
-        rng::{FiatShamirRng, SimpleHashFiatShamirRng}, oracles::{witness::WitnessProverOracle, rotation::Rotation},
-        oracles::{traits::{Instantiable, CommittedOracle}, witness::WitnessVerifierOracle}
+        oracles::{rotation::Rotation, witness::WitnessProverOracle},
+        oracles::{
+            traits::{CommittedOracle, Instantiable},
+            witness::WitnessVerifierOracle,
+        },
+        rng::{FiatShamirRng, SimpleHashFiatShamirRng},
     };
     use ark_bls12_381::{Bls12_381, Fr as F};
     use ark_ff::to_bytes;
@@ -443,7 +453,8 @@ mod test {
             commitment: Some(oracles_commitments[3].commitment().clone()),
         };
 
-        let ver_oracles = [a_ver.clone(), b_ver.clone(), c_ver.clone(), d_ver.clone()];
+        let ver_oracles =
+            [a_ver.clone(), b_ver.clone(), c_ver.clone(), d_ver.clone()];
 
         let mut fs_rng = FS::initialize(
             &to_bytes![&oracles_commitments, &evals, &xi].unwrap(),

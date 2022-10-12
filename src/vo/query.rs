@@ -1,6 +1,6 @@
 use ark_ff::PrimeField;
 
-use crate::oracles::{rotation::Rotation, query::OracleType};
+use crate::oracles::{query::OracleType, rotation::Rotation};
 
 use super::virtual_expression::VirtualExpression;
 

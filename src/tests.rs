@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod test {
 
-    use std::collections::{BTreeSet, BTreeMap};
+    use std::collections::{BTreeMap, BTreeSet};
 
     use ark_bls12_381::{Bls12_381, Fr};
     use ark_ff::{One, Zero};
@@ -17,17 +17,17 @@ mod test {
 
     use crate::oracles::fixed::FixedOracle;
     use crate::oracles::instance::InstanceOracle;
-    use crate::oracles::witness::{WitnessProverOracle, WitnessVerifierOracle};
     use crate::oracles::traits::ConcreteOracle;
+    use crate::oracles::witness::{WitnessProverOracle, WitnessVerifierOracle};
     use crate::rng::SimpleHashFiatShamirRng;
+    use crate::vo::precompiled_vos::{
+        GenericVO, PrecompiledMul, PrecompiledVO,
+    };
     use crate::PIL;
-    use crate::vo::precompiled_vos::{GenericVO, PrecompiledMul, PrecompiledVO};
     use blake2::Blake2s;
 
+    use crate::commitment::KZG10;
     use crate::vo::VirtualOracle;
-    use crate::{
-        commitment::KZG10,
-    };
 
     type F = Fr;
     type FS = SimpleHashFiatShamirRng<Blake2s, ChaChaRng>;
@@ -102,7 +102,8 @@ mod test {
             commitment: None,
         };
 
-        let mut mul_vo = GenericVO::<F>::init(PrecompiledMul::get_expr_and_queries());
+        let mut mul_vo =
+            GenericVO::<F>::init(PrecompiledMul::get_expr_and_queries());
 
         let mut witness_oracles = [a, b];
         let mut instance_oracles = [c];
@@ -117,7 +118,7 @@ mod test {
         let proof = PilInstance::prove(
             &pk,
             &mut witness_oracles,
-            &mut instance_oracles, 
+            &mut instance_oracles,
             &mut [],
             vos.as_slice(),
             domain_size,

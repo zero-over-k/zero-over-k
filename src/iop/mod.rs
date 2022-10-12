@@ -9,5 +9,5 @@ use crate::commitment::HomomorphicCommitment;
 
 pub struct PIOPforPolyIdentity<F: PrimeField, PC: HomomorphicCommitment<F>> {
     _field: PhantomData<F>,
-    _pc: PhantomData<PC>
+    _pc: PhantomData<PC>,
 }

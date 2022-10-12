@@ -1,4 +1,4 @@
-use std::ops::{Neg, Add, Mul, Sub};
+use std::ops::{Add, Mul, Neg, Sub};
 
 use ark_ff::PrimeField;
 
@@ -15,16 +15,18 @@ pub enum NewExpression<F> {
 }
 
 impl<F: PrimeField> NewExpression<F> {
-    pub fn degree(
-        &self,
-        oracle_fn: &impl Fn(&OracleQuery) -> usize,
-    ) -> usize {
+    pub fn degree(&self, oracle_fn: &impl Fn(&OracleQuery) -> usize) -> usize {
         match self {
             NewExpression::Constant(_) => 0,
             NewExpression::Oracle(query) => oracle_fn(query),
             NewExpression::Negated(expr) => expr.degree(oracle_fn),
-            NewExpression::Sum(lsh_expr, rhs_expr) => std::cmp::max(lsh_expr.degree(oracle_fn), rhs_expr.degree(oracle_fn)),
-            NewExpression::Product(lsh_expr, rhs_expr) => lsh_expr.degree(oracle_fn) + rhs_expr.degree(oracle_fn),
+            NewExpression::Sum(lsh_expr, rhs_expr) => std::cmp::max(
+                lsh_expr.degree(oracle_fn),
+                rhs_expr.degree(oracle_fn),
+            ),
+            NewExpression::Product(lsh_expr, rhs_expr) => {
+                lsh_expr.degree(oracle_fn) + rhs_expr.degree(oracle_fn)
+            }
             NewExpression::Scaled(expr, _) => expr.degree(oracle_fn),
         }
     }
@@ -46,27 +48,68 @@ impl<F: PrimeField> NewExpression<F> {
             NewExpression::Constant(scalar) => constant_fn(*scalar),
             NewExpression::Oracle(query) => oracle_fn(query),
             NewExpression::Negated(a) => {
-                let a = a.evaluate(constant_fn, oracle_fn, negated_fn, sum_fn, product_fn, scaled_fn);
+                let a = a.evaluate(
+                    constant_fn,
+                    oracle_fn,
+                    negated_fn,
+                    sum_fn,
+                    product_fn,
+                    scaled_fn,
+                );
                 negated_fn(a)
             }
             NewExpression::Sum(a, b) => {
-                let a = a.evaluate(constant_fn, oracle_fn, negated_fn, sum_fn, product_fn, scaled_fn);
-                let b = b.evaluate(constant_fn, oracle_fn, negated_fn, sum_fn, product_fn, scaled_fn);
+                let a = a.evaluate(
+                    constant_fn,
+                    oracle_fn,
+                    negated_fn,
+                    sum_fn,
+                    product_fn,
+                    scaled_fn,
+                );
+                let b = b.evaluate(
+                    constant_fn,
+                    oracle_fn,
+                    negated_fn,
+                    sum_fn,
+                    product_fn,
+                    scaled_fn,
+                );
                 sum_fn(a, b)
             }
             NewExpression::Product(a, b) => {
-                let a = a.evaluate(constant_fn, oracle_fn, negated_fn, sum_fn, product_fn, scaled_fn);
-                let b = b.evaluate(constant_fn, oracle_fn, negated_fn, sum_fn, product_fn, scaled_fn);
+                let a = a.evaluate(
+                    constant_fn,
+                    oracle_fn,
+                    negated_fn,
+                    sum_fn,
+                    product_fn,
+                    scaled_fn,
+                );
+                let b = b.evaluate(
+                    constant_fn,
+                    oracle_fn,
+                    negated_fn,
+                    sum_fn,
+                    product_fn,
+                    scaled_fn,
+                );
                 product_fn(a, b)
             }
             NewExpression::Scaled(a, f) => {
-                let a = a.evaluate(constant_fn, oracle_fn, negated_fn, sum_fn, product_fn, scaled_fn);
+                let a = a.evaluate(
+                    constant_fn,
+                    oracle_fn,
+                    negated_fn,
+                    sum_fn,
+                    product_fn,
+                    scaled_fn,
+                );
                 scaled_fn(a, *f)
             }
         }
     }
 }
-
 
 impl<F: PrimeField> Neg for NewExpression<F> {
     type Output = NewExpression<F>;
@@ -109,10 +152,8 @@ impl<F: PrimeField> From<OracleQuery> for NewExpression<F> {
     }
 }
 
-#[cfg(test)] 
+#[cfg(test)]
 mod test {
     #[test]
-    fn test_new_expression() {
-        
-    }
+    fn test_new_expression() {}
 }

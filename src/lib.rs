@@ -12,13 +12,13 @@ use error::Error;
 use ark_poly_commit::evaluate_query_set;
 use ark_std::rand::{Rng, RngCore};
 use commitment::HomomorphicCommitment;
-use data_structures::{Proof, ProverKey, UniversalSRS, VerifierKey, IndexInfo};
+use data_structures::{IndexInfo, Proof, ProverKey, UniversalSRS, VerifierKey};
 use iop::PIOPforPolyIdentity;
 use multiproof::piop::Multiopen;
 use oracles::fixed::FixedOracle;
 use oracles::instance::InstanceOracle;
 use oracles::query::QueryContext;
-use oracles::traits::{Instantiable, ConcreteOracle};
+use oracles::traits::{ConcreteOracle, Instantiable};
 use oracles::witness::{WitnessProverOracle, WitnessVerifierOracle};
 use rng::FiatShamirRng;
 use vo::VirtualOracle;
@@ -31,8 +31,8 @@ pub mod commitment;
 mod data_structures;
 pub mod error;
 pub mod iop;
-pub mod rng;
 pub mod oracles;
+pub mod rng;
 pub mod vo;
 
 pub mod multiproof;
@@ -57,8 +57,8 @@ where
     //     vos: &Vec<Box<dyn VirtualOracle<F>>>,
     //     witness_oracles: &mut [impl ConcreteOracle],
     //     instance_oracles: &mut [impl ConcreteOracle],
-    //     domain_size: usize, 
-    //     zh_degree: usize, 
+    //     domain_size: usize,
+    //     zh_degree: usize,
     // ) -> IndexInfo<F> {
     //     for vo in vos {
     //         for query in vo.get_queries() {
@@ -92,7 +92,7 @@ where
     //     let extended_coset_domain_size = GeneralEvaluationDomain::<F>::new(quotient_degree).unwrap();
 
     //     IndexInfo {
-    //         quotient_degree, 
+    //         quotient_degree,
     //         extended_coset_domain_size
     //     }
     // }
@@ -125,8 +125,8 @@ where
 
     pub fn prove<'a, R: Rng>(
         pk: &ProverKey<F, PC>,
-        witness_oracles: &'a mut[WitnessProverOracle<F>],
-        instance_oracles: &'a mut[InstanceOracle<F>],
+        witness_oracles: &'a mut [WitnessProverOracle<F>],
+        instance_oracles: &'a mut [InstanceOracle<F>],
         fixed_oracles: &'a mut [FixedOracle<F, PC>],
         vos: &[Box<&'a dyn VirtualOracle<F>>],
         domain_size: usize,
@@ -135,7 +135,7 @@ where
     ) -> Result<Proof<F, PC>, Error<PC::Error>> {
         let mut prover_state = PIOPforPolyIdentity::init_prover(
             witness_oracles,
-            instance_oracles, 
+            instance_oracles,
             fixed_oracles,
             vos,
             domain_size,
@@ -225,7 +225,9 @@ where
                 .collect();
         let quotient_chunks_evaluations: Vec<F> = quotient_chunk_oracles
             .iter()
-            .map(|q_i| q_i.query(&QueryContext::Challenge(verifier_second_msg.xi)))
+            .map(|q_i| {
+                q_i.query(&QueryContext::Challenge(verifier_second_msg.xi))
+            })
             .collect();
 
         let mut evaluations = vec![];
@@ -292,64 +294,90 @@ where
         let mut fs_rng =
             FS::initialize(&to_bytes![&Self::PROTOCOL_NAME].unwrap()); // TODO: add &pk.vk, &public oracles to transcript
 
-
-        let witness_oracles_mapping: BTreeMap<String, usize> = witness_oracles.iter().enumerate().map(|(i, oracle)| (oracle.get_label(), i)).collect();
-        let instance_oracles_mapping: BTreeMap<String, usize> = instance_oracles.iter().enumerate().map(|(i, oracle)| (oracle.get_label(), i)).collect();
-        let fixed_oracles_mapping: BTreeMap<String, usize> = fixed_oracles.iter().enumerate().map(|(i, oracle)| (oracle.get_label(), i)).collect();
+        let witness_oracles_mapping: BTreeMap<String, usize> = witness_oracles
+            .iter()
+            .enumerate()
+            .map(|(i, oracle)| (oracle.get_label(), i))
+            .collect();
+        let instance_oracles_mapping: BTreeMap<String, usize> =
+            instance_oracles
+                .iter()
+                .enumerate()
+                .map(|(i, oracle)| (oracle.get_label(), i))
+                .collect();
+        let fixed_oracles_mapping: BTreeMap<String, usize> = fixed_oracles
+            .iter()
+            .enumerate()
+            .map(|(i, oracle)| (oracle.get_label(), i))
+            .collect();
 
         for vo in vos {
             for query in vo.get_queries() {
                 match query.oracle_type {
                     OracleType::Witness => {
                         match witness_oracles_mapping.get(&query.label) {
-                            Some(index) => witness_oracles[*index].register_rotation(query.rotation),
-                            None => panic!("Witness oracle with label add_label not found") //TODO: Introduce new Error here,
+                            Some(index) => witness_oracles[*index]
+                                .register_rotation(query.rotation),
+                            None => panic!(
+                                "Witness oracle with label add_label not found"
+                            ), //TODO: Introduce new Error here,
                         }
-                    },
+                    }
                     OracleType::Instance => {
                         match instance_oracles_mapping.get(&query.label) {
                             Some(index) => instance_oracles[*index].register_rotation(query.rotation),
                             None => panic!("Instance oracle with label add_label not found") //TODO: Introduce new Error here,
                         }
-                    },
+                    }
                     OracleType::Fixed => {
                         match fixed_oracles_mapping.get(&query.label) {
-                            Some(index) => fixed_oracles[*index].register_rotation(query.rotation),
-                            None => panic!("Fixed oracle with label add_label not found") //TODO: Introduce new Error here,
+                            Some(index) => fixed_oracles[*index]
+                                .register_rotation(query.rotation),
+                            None => panic!(
+                                "Fixed oracle with label add_label not found"
+                            ), //TODO: Introduce new Error here,
                         }
-                    },
+                    }
                 }
             }
         }
 
         let mut max_degree = 0;
         for vo in vos {
-            let vo_degree = vo
-                .get_expression()
-                .degree(
-                    &|query| {
-                        match query.oracle_type {
-                            OracleType::Witness => {
-                                match witness_oracles_mapping.get(&query.label) {
-                                    Some(index) => witness_oracles[*index].get_degree(domain_size),
-                                    None => panic!("Witness oracle with label add_label not found") //TODO: Introduce new Error here,
-                                }
-                            },
-                            OracleType::Instance => {
-                                match instance_oracles_mapping.get(&query.label) {
-                                    Some(index) => instance_oracles[*index].get_degree(domain_size),
-                                    None => panic!("Witness oracle with label add_label not found") //TODO: Introduce new Error here,
-                                }
-                            },
-                            OracleType::Fixed => {
-                                match fixed_oracles_mapping.get(&query.label) {
-                                    Some(index) => fixed_oracles[*index].get_degree(domain_size),
-                                    None => panic!("Witness oracle with label add_label not found") //TODO: Introduce new Error here,
-                                }
-                            },
+            let vo_degree = vo.get_expression().degree(&|query| {
+                match query.oracle_type {
+                    OracleType::Witness => {
+                        match witness_oracles_mapping.get(&query.label) {
+                            Some(index) => {
+                                witness_oracles[*index].get_degree(domain_size)
+                            }
+                            None => panic!(
+                                "Witness oracle with label add_label not found"
+                            ), //TODO: Introduce new Error here,
                         }
                     }
-                );
+                    OracleType::Instance => {
+                        match instance_oracles_mapping.get(&query.label) {
+                            Some(index) => {
+                                instance_oracles[*index].get_degree(domain_size)
+                            }
+                            None => panic!(
+                                "Witness oracle with label add_label not found"
+                            ), //TODO: Introduce new Error here,
+                        }
+                    }
+                    OracleType::Fixed => {
+                        match fixed_oracles_mapping.get(&query.label) {
+                            Some(index) => {
+                                fixed_oracles[*index].get_degree(domain_size)
+                            }
+                            None => panic!(
+                                "Witness oracle with label add_label not found"
+                            ), //TODO: Introduce new Error here,
+                        }
+                    }
+                }
+            });
             max_degree = max(max_degree, vo_degree);
         }
 
@@ -498,7 +526,8 @@ where
         for (&x_i, t_i) in
             powers_of_x.iter().zip(quotient_chunk_oracles.clone())
         {
-            t_part += x_i * t_i.query(&QueryContext::Challenge(verifier_second_msg.xi));
+            t_part += x_i
+                * t_i.query(&QueryContext::Challenge(verifier_second_msg.xi));
         }
 
         t_part *= vanishing_polynomial.evaluate(&verifier_second_msg.xi);

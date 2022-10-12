@@ -1,13 +1,20 @@
-use std::collections::{BTreeSet, BTreeMap};
+use std::collections::{BTreeMap, BTreeSet};
 
 use ark_ff::PrimeField;
-use ark_poly::{univariate::DensePolynomial, GeneralEvaluationDomain, EvaluationDomain, Polynomial, UVPolynomial};
+use ark_poly::{
+    univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
+    Polynomial, UVPolynomial,
+};
 use ark_poly_commit::{LabeledPolynomial, QuerySet};
 use ark_std::rand::Rng;
 
 use crate::commitment::HomomorphicCommitment;
 
-use super::{rotation::{Rotation, Sign}, traits::{ConcreteOracle, Instantiable, CommittedOracle, QuerySetProvider}, query::QueryContext};
+use super::{
+    query::QueryContext,
+    rotation::{Rotation, Sign},
+    traits::{CommittedOracle, ConcreteOracle, Instantiable, QuerySetProvider},
+};
 
 #[derive(Clone)]
 pub struct WitnessProverOracle<F: PrimeField> {
@@ -33,7 +40,6 @@ impl<F: PrimeField> WitnessProverOracle<F> {
     }
 }
 
-
 impl<F: PrimeField> ConcreteOracle<F> for WitnessProverOracle<F> {
     fn register_rotation(&mut self, rotation: Rotation) {
         self.queried_rotations.insert(rotation);
@@ -53,18 +59,24 @@ impl<F: PrimeField> ConcreteOracle<F> for WitnessProverOracle<F> {
         match ctx {
             QueryContext::Challenge(challenge) => {
                 self.poly.evaluate(&challenge)
-            },
-            QueryContext::ExtendedCoset(original_domain_size, rotation, omega_i) => {
+            }
+            QueryContext::ExtendedCoset(
+                original_domain_size,
+                rotation,
+                omega_i,
+            ) => {
                 match &self.evals_at_coset_of_extended_domain {
                     Some(evals) => {
                         if rotation.degree == 0 {
                             return evals[*omega_i];
                         }
                         let extended_domain_size = evals.len();
-                        let scaling_ratio = extended_domain_size / original_domain_size;
+                        let scaling_ratio =
+                            extended_domain_size / original_domain_size;
                         let eval = match &rotation.sign {
                             Sign::Plus => {
-                                evals[(omega_i + rotation.degree * scaling_ratio)
+                                evals[(omega_i
+                                    + rotation.degree * scaling_ratio)
                                     % extended_domain_size]
                             }
                             // TODO: test negative rotations
@@ -74,9 +86,10 @@ impl<F: PrimeField> ConcreteOracle<F> for WitnessProverOracle<F> {
                                 if index >= 0 {
                                     evals[index as usize]
                                 } else {
-                                    let move_from_end =
-                                        (rotation.degree * scaling_ratio - omega_i)
-                                            % extended_domain_size;
+                                    let move_from_end = (rotation.degree
+                                        * scaling_ratio
+                                        - omega_i)
+                                        % extended_domain_size;
                                     evals[extended_domain_size - move_from_end]
                                 }
                             }
@@ -85,7 +98,7 @@ impl<F: PrimeField> ConcreteOracle<F> for WitnessProverOracle<F> {
                     }
                     None => panic!("Evals not provided"),
                 }
-            },
+            }
         }
     }
 
@@ -99,7 +112,10 @@ impl<F: PrimeField> ConcreteOracle<F> for WitnessProverOracle<F> {
 }
 
 impl<F: PrimeField> Instantiable<F> for WitnessProverOracle<F> {
-    fn compute_extended_evals(&mut self, extended_domain: &GeneralEvaluationDomain<F>) {
+    fn compute_extended_evals(
+        &mut self,
+        extended_domain: &GeneralEvaluationDomain<F>,
+    ) {
         self.evals_at_coset_of_extended_domain =
             Some(extended_domain.coset_fft(&self.poly));
     }
@@ -139,11 +155,7 @@ impl<F: PrimeField> QuerySetProvider<F> for WitnessProverOracle<F> {
     }
 }
 
-
-pub struct WitnessVerifierOracle<
-    F: PrimeField,
-    PC: HomomorphicCommitment<F>,
-> {
+pub struct WitnessVerifierOracle<F: PrimeField, PC: HomomorphicCommitment<F>> {
     pub(crate) label: String,
     pub(crate) queried_rotations: BTreeSet<Rotation>,
     pub(crate) should_mask: bool,
@@ -174,7 +186,9 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Clone
     }
 }
 
-impl<F: PrimeField, PC: HomomorphicCommitment<F>> ConcreteOracle<F> for WitnessVerifierOracle<F, PC> {
+impl<F: PrimeField, PC: HomomorphicCommitment<F>> ConcreteOracle<F>
+    for WitnessVerifierOracle<F, PC>
+{
     fn register_rotation(&mut self, rotation: Rotation) {
         self.queried_rotations.insert(rotation);
     }
@@ -197,11 +211,11 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> ConcreteOracle<F> for WitnessV
                         challenge, self.label
                     ),
                 }
-            },
+            }
             QueryContext::ExtendedCoset(_, _, _) => {
                 // NOTE: Seems like this is only place which slightly breaks abstraction of ConcreteOracle in order to make it generic in all other parts
                 panic!("Can't evaluate committed polynomial in coset of extended domain")
-            },
+            }
         }
     }
 
@@ -214,8 +228,9 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> ConcreteOracle<F> for WitnessV
     }
 }
 
-
-impl<F: PrimeField, PC: HomomorphicCommitment<F>> CommittedOracle<F, PC> for WitnessVerifierOracle<F, PC> {
+impl<F: PrimeField, PC: HomomorphicCommitment<F>> CommittedOracle<F, PC>
+    for WitnessVerifierOracle<F, PC>
+{
     fn register_commitment(&mut self, c: <PC>::Commitment) {
         self.commitment = Some(c);
     }
@@ -228,7 +243,9 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> CommittedOracle<F, PC> for Wit
     }
 }
 
-impl<F: PrimeField, PC: HomomorphicCommitment<F>> QuerySetProvider<F> for WitnessVerifierOracle<F, PC> {
+impl<F: PrimeField, PC: HomomorphicCommitment<F>> QuerySetProvider<F>
+    for WitnessVerifierOracle<F, PC>
+{
     fn get_query_set(
         &self,
         opening_challenge_label: &str,
