@@ -132,7 +132,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
     pub fn prover_second_round(
         verifier_msg: &VerifierFirstMsg<F>,
         state: &mut ProverState<F, PC>,
-        srs_size: usize,
+        _srs_size: usize,
     ) -> Result<Vec<WitnessProverOracle<F>>, Error> {
         // 1. compute quotient degree
         let domain_size = state.domain.size();

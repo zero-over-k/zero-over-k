@@ -5,7 +5,6 @@ use ark_ff::PrimeField;
 use crate::oracles::{
     query::{OracleQuery, OracleType},
     traits::ConcreteOracle,
-    witness,
 };
 
 use super::{new_expression::NewExpression, query::VirtualQuery};

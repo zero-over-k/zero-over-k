@@ -4,20 +4,20 @@ mod test {
     use std::collections::{BTreeMap, BTreeSet};
 
     use ark_bls12_381::{Bls12_381, Fr};
-    use ark_ff::{One, Zero};
+    use ark_ff::{Zero};
     use ark_poly::Polynomial;
     use ark_poly::{
         univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
         UVPolynomial,
     };
 
-    use ark_poly_commit::PCCommitterKey;
+    
     use ark_std::test_rng;
     use rand_chacha::ChaChaRng;
 
     use crate::oracles::fixed::FixedOracle;
     use crate::oracles::instance::InstanceOracle;
-    use crate::oracles::traits::ConcreteOracle;
+    
     use crate::oracles::witness::{WitnessProverOracle, WitnessVerifierOracle};
     use crate::rng::SimpleHashFiatShamirRng;
     use crate::vo::precompiled_vos::{

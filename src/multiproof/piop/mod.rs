@@ -296,7 +296,7 @@ mod test {
         commitment::KZG10,
         oracles::{rotation::Rotation, witness::WitnessProverOracle},
         oracles::{
-            traits::{CommittedOracle, Instantiable},
+            traits::{Instantiable},
             witness::WitnessVerifierOracle,
         },
         rng::{FiatShamirRng, SimpleHashFiatShamirRng},

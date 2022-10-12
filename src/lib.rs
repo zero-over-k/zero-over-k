@@ -12,7 +12,7 @@ use error::Error;
 use ark_poly_commit::evaluate_query_set;
 use ark_std::rand::{Rng, RngCore};
 use commitment::HomomorphicCommitment;
-use data_structures::{IndexInfo, Proof, ProverKey, UniversalSRS, VerifierKey};
+use data_structures::{Proof, ProverKey, UniversalSRS, VerifierKey};
 use iop::PIOPforPolyIdentity;
 use multiproof::piop::Multiopen;
 use oracles::fixed::FixedOracle;
