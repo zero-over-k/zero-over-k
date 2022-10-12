@@ -126,7 +126,7 @@ impl<F: PrimeField> PrecompiledVO<F> for PrecompiledMul {
 /// q_2 * w_2^5 +
 /// q_3 * w_3^5 +
 /// q_4 * w_4^5 =
-/// q_5 * w_5
+/// w_5
 pub struct PrecompiledRescue {}
 
 impl<F> PrecompiledVO<F> for PrecompiledRescue
@@ -134,7 +134,7 @@ where
     F: PrimeField,
 {
     fn get_expr_and_queries() -> (VirtualExpression<F>, Vec<VirtualQuery>) {
-        let q = (0..=4).map(|index| {
+        let q = (0..=3).map(|index| {
             VirtualQuery::new(index, Rotation::curr(), OracleType::Fixed)
         });
         let w = (0..=4).map(|index| {
@@ -155,7 +155,7 @@ where
                 + q_expr[1].clone() * pow_5(&w_expr[1])
                 + q_expr[2].clone() * pow_5(&w_expr[2])
                 + q_expr[3].clone() * pow_5(&w_expr[3])
-                - q_expr[4].clone() * w_expr[4].clone()
+                - w_expr[4].clone()
         };
 
         (rescue_expr, oracles)
@@ -234,7 +234,7 @@ mod test {
 
         let instance_oracles = vec![];
 
-        let fixed_oracles: Vec<_> = ["q1", "q2", "q3", "q4", "q5"]
+        let fixed_oracles: Vec<_> = ["q1", "q2", "q3", "q4"]
             .into_iter()
             .map(|label| FixedOracle::<F, PC> {
                 label: label.to_string(),
