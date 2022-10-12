@@ -1,3 +1,4 @@
+use std::cmp::max;
 use std::collections::{BTreeMap, BTreeSet};
 use std::iter::successors;
 use std::marker::PhantomData;
@@ -11,20 +12,27 @@ use error::Error;
 use ark_poly_commit::evaluate_query_set;
 use ark_std::rand::{Rng, RngCore};
 use commitment::HomomorphicCommitment;
-use concrete_oracle::{CommittedConcreteOracle, InstantiableConcreteOracle};
-use data_structures::{Proof, ProverKey, UniversalSRS, VerifierKey};
+use data_structures::{Proof, ProverKey, UniversalSRS, VerifierKey, IndexInfo};
 use iop::PIOPforPolyIdentity;
 use multiproof::piop::Multiopen;
+use oracles::fixed::FixedOracle;
+use oracles::instance::InstanceOracle;
+use oracles::query::QueryContext;
+use oracles::traits::{Instantiable, ConcreteOracle};
+use oracles::witness::{WitnessProverOracle, WitnessVerifierOracle};
 use rng::FiatShamirRng;
-use vo::query::{InstanceQuery, Query, Rotation, WitnessQuery};
 use vo::VirtualOracle;
 
+use crate::oracles::query::OracleType;
+use crate::oracles::rotation::Rotation;
+use crate::oracles::traits::CommittedOracle;
+
 pub mod commitment;
-pub mod concrete_oracle;
 mod data_structures;
 pub mod error;
 pub mod iop;
 pub mod rng;
+pub mod oracles;
 pub mod vo;
 
 pub mod multiproof;
@@ -44,6 +52,50 @@ where
     FS: FiatShamirRng,
 {
     pub const PROTOCOL_NAME: &'static [u8] = b"PIL-0.0.1";
+
+    // pub fn index(
+    //     vos: &Vec<Box<dyn VirtualOracle<F>>>,
+    //     witness_oracles: &mut [impl ConcreteOracle],
+    //     instance_oracles: &mut [impl ConcreteOracle],
+    //     domain_size: usize, 
+    //     zh_degree: usize, 
+    // ) -> IndexInfo<F> {
+    //     for vo in vos {
+    //         for query in vo.get_queries() {
+    //             match query.get_type() {
+    //                 concrete_oracle::OracleType::Witness => witness_oracles[query.get_index()].register_rotation(query.get_rotation()),
+    //                 concrete_oracle::OracleType::Instance => instance_oracles[query.get_index()].register_rotation(query.get_rotation()),
+    //             }
+    //         }
+    //     }
+
+    //     let wnts_get_degree_fn = |query: &WitnessQuery| {
+    //         let oracle = &witness_oracles[query.get_index()];
+    //         oracle.get_degree(domain_size)
+    //     };
+
+    //     let instance_get_degree_fn = |query: &InstanceQuery| {
+    //         let oracle = &instance_oracles[query.get_index()];
+    //         oracle.get_degree(domain_size)
+    //     };
+
+    //     let mut max_degree = 0;
+    //     for vo in vos {
+    //         let vo_degree = vo
+    //             .get_expression()
+    //             .degree(&wnts_get_degree_fn, &instance_get_degree_fn);
+    //         max_degree = max(max_degree, vo_degree);
+    //     }
+
+    //     let quotient_degree = max_degree - zh_degree;
+
+    //     let extended_coset_domain_size = GeneralEvaluationDomain::<F>::new(quotient_degree).unwrap();
+
+    //     IndexInfo {
+    //         quotient_degree, 
+    //         extended_coset_domain_size
+    //     }
+    // }
 
     pub fn universal_setup<R: RngCore>(
         max_degree: usize,
@@ -71,22 +123,26 @@ where
         Ok((pk, vk))
     }
 
-    pub fn prove<R: Rng>(
+    pub fn prove<'a, R: Rng>(
         pk: &ProverKey<F, PC>,
-        concrete_oracles: &[InstantiableConcreteOracle<F>],
-        vos: &Vec<Box<dyn VirtualOracle<F>>>,
+        witness_oracles: &'a mut[WitnessProverOracle<F>],
+        instance_oracles: &'a mut[InstanceOracle<F>],
+        fixed_oracles: &'a mut [FixedOracle<F, PC>],
+        vos: &[Box<&'a dyn VirtualOracle<F>>],
         domain_size: usize,
         vanishing_polynomial: &DensePolynomial<F>,
         zk_rng: &mut R,
     ) -> Result<Proof<F, PC>, Error<PC::Error>> {
         let mut prover_state = PIOPforPolyIdentity::init_prover(
-            concrete_oracles,
+            witness_oracles,
+            instance_oracles, 
+            fixed_oracles,
             vos,
             domain_size,
             vanishing_polynomial,
         );
 
-        let verifier_init_state = PIOPforPolyIdentity::init_verifier(
+        let verifier_init_state = PIOPforPolyIdentity::<F, PC>::init_verifier(
             domain_size,
             vanishing_polynomial,
         );
@@ -116,7 +172,7 @@ where
         fs_rng.absorb(&to_bytes![witness_commitments].unwrap());
 
         let (verifier_first_msg, verifier_state) =
-            PIOPforPolyIdentity::verifier_first_round(
+            PIOPforPolyIdentity::<F, PC>::verifier_first_round(
                 verifier_init_state,
                 &mut fs_rng,
             );
@@ -148,15 +204,15 @@ where
         fs_rng.absorb(&to_bytes![quotient_chunk_commitments].unwrap());
 
         let (verifier_second_msg, _verifier_state) =
-            PIOPforPolyIdentity::verifier_second_round(
+            PIOPforPolyIdentity::<F, PC>::verifier_second_round(
                 verifier_state,
                 &mut fs_rng,
             );
 
         let domain = GeneralEvaluationDomain::new(domain_size).unwrap();
         let omegas: Vec<F> = domain.elements().collect();
-        let query_set = PIOPforPolyIdentity::get_query_set(
-            witness_oracles.iter(),
+        let query_set = PIOPforPolyIdentity::<F, PC>::get_query_set(
+            &witness_oracles,
             verifier_second_msg.label,
             verifier_second_msg.xi,
             &omegas,
@@ -169,7 +225,7 @@ where
                 .collect();
         let quotient_chunks_evaluations: Vec<F> = quotient_chunk_oracles
             .iter()
-            .map(|q_i| q_i.query_at_challenge(&verifier_second_msg.xi))
+            .map(|q_i| q_i.query(&QueryContext::Challenge(verifier_second_msg.xi)))
             .collect();
 
         let mut evaluations = vec![];
@@ -177,7 +233,8 @@ where
         evaluations.extend_from_slice(&quotient_chunks_evaluations);
 
         // Multiopen
-        let oracles: Vec<InstantiableConcreteOracle<F>> = witness_oracles
+        // TODO: Adapt multiproof API so that we skip this BOX part
+        let oracles = witness_oracles
             .iter()
             .chain(quotient_chunk_oracles.iter())
             .map(|oracle| oracle.clone())
@@ -219,15 +276,15 @@ where
     pub fn verify<R: Rng>(
         vk: &VerifierKey<F, PC>,
         proof: Proof<F, PC>,
-        witness_oracles: &mut [CommittedConcreteOracle<F, PC>],
-        instance_oracles: &mut [InstantiableConcreteOracle<F>],
-        vos: &Vec<Box<dyn VirtualOracle<F>>>,
+        witness_oracles: &mut [WitnessVerifierOracle<F, PC>],
+        instance_oracles: &mut [InstanceOracle<F>],
+        fixed_oracles: &mut [FixedOracle<F, PC>],
+        vos: &[Box<&dyn VirtualOracle<F>>],
         domain_size: usize,
         vanishing_polynomial: &DensePolynomial<F>,
-        srs_size: usize,
         _zk_rng: &mut R,
     ) -> Result<(), Error<PC::Error>> {
-        let verifier_init_state = PIOPforPolyIdentity::init_verifier(
+        let verifier_init_state = PIOPforPolyIdentity::<F, PC>::init_verifier(
             domain_size,
             vanishing_polynomial,
         );
@@ -235,56 +292,65 @@ where
         let mut fs_rng =
             FS::initialize(&to_bytes![&Self::PROTOCOL_NAME].unwrap()); // TODO: add &pk.vk, &public oracles to transcript
 
-        let wtns_queries: BTreeSet<WitnessQuery> = vos
-            .iter()
-            .map(|vo| vo.get_wtns_queries())
-            .flatten()
-            .map(|query| query.clone())
-            .map(|wtns_query| wtns_query.clone())
-            .collect();
 
-        let instance_queries: BTreeSet<InstanceQuery> = vos
-            .iter()
-            .map(|vo| vo.get_instance_queries())
-            .flatten()
-            .map(|query| query.clone())
-            .map(|instance_query| instance_query.clone())
-            .collect();
+        let witness_oracles_mapping: BTreeMap<String, usize> = witness_oracles.iter().enumerate().map(|(i, oracle)| (oracle.get_label(), i)).collect();
+        let instance_oracles_mapping: BTreeMap<String, usize> = instance_oracles.iter().enumerate().map(|(i, oracle)| (oracle.get_label(), i)).collect();
+        let fixed_oracles_mapping: BTreeMap<String, usize> = fixed_oracles.iter().enumerate().map(|(i, oracle)| (oracle.get_label(), i)).collect();
 
-        // 2. Assign rotations to matching concrete oracles
-        for query in &wtns_queries {
-            if query.index >= witness_oracles.len() {
-                return Err(Error::IndexTooLarge);
+        for vo in vos {
+            for query in vo.get_queries() {
+                match query.oracle_type {
+                    OracleType::Witness => {
+                        match witness_oracles_mapping.get(&query.label) {
+                            Some(index) => witness_oracles[*index].register_rotation(query.rotation),
+                            None => panic!("Witness oracle with label add_label not found") //TODO: Introduce new Error here,
+                        }
+                    },
+                    OracleType::Instance => {
+                        match instance_oracles_mapping.get(&query.label) {
+                            Some(index) => instance_oracles[*index].register_rotation(query.rotation),
+                            None => panic!("Instance oracle with label add_label not found") //TODO: Introduce new Error here,
+                        }
+                    },
+                    OracleType::Fixed => {
+                        match fixed_oracles_mapping.get(&query.label) {
+                            Some(index) => fixed_oracles[*index].register_rotation(query.rotation),
+                            None => panic!("Fixed oracle with label add_label not found") //TODO: Introduce new Error here,
+                        }
+                    },
+                }
             }
-
-            witness_oracles[query.index]
-                .register_rotation(query.rotation.clone());
         }
-
-        for query in &instance_queries {
-            if query.index >= instance_oracles.len() {
-                return Err(Error::IndexTooLarge);
-            }
-
-            instance_oracles[query.index]
-                .register_rotation(query.rotation.clone());
-        }
-
-        let wtns_degree_fn = |query: &WitnessQuery| {
-            witness_oracles[query.index].get_degree(domain_size)
-        };
-
-        let instance_degree_fn = |query: &InstanceQuery| {
-            instance_oracles[query.index].get_degree(domain_size)
-        };
 
         let mut max_degree = 0;
         for vo in vos {
             let vo_degree = vo
                 .get_expression()
-                .degree(&wtns_degree_fn, &instance_degree_fn);
-
-            max_degree = std::cmp::max(max_degree, vo_degree);
+                .degree(
+                    &|query| {
+                        match query.oracle_type {
+                            OracleType::Witness => {
+                                match witness_oracles_mapping.get(&query.label) {
+                                    Some(index) => witness_oracles[*index].get_degree(domain_size),
+                                    None => panic!("Witness oracle with label add_label not found") //TODO: Introduce new Error here,
+                                }
+                            },
+                            OracleType::Instance => {
+                                match instance_oracles_mapping.get(&query.label) {
+                                    Some(index) => instance_oracles[*index].get_degree(domain_size),
+                                    None => panic!("Witness oracle with label add_label not found") //TODO: Introduce new Error here,
+                                }
+                            },
+                            OracleType::Fixed => {
+                                match fixed_oracles_mapping.get(&query.label) {
+                                    Some(index) => fixed_oracles[*index].get_degree(domain_size),
+                                    None => panic!("Witness oracle with label add_label not found") //TODO: Introduce new Error here,
+                                }
+                            },
+                        }
+                    }
+                );
+            max_degree = max(max_degree, vo_degree);
         }
 
         let quotient_degree = max_degree - vanishing_polynomial.degree();
@@ -309,7 +375,7 @@ where
         fs_rng.absorb(&to_bytes![&proof.witness_commitments].unwrap());
 
         let (verifier_first_msg, verifier_state) =
-            PIOPforPolyIdentity::verifier_first_round(
+            PIOPforPolyIdentity::<F, PC>::verifier_first_round(
                 verifier_init_state,
                 &mut fs_rng,
             );
@@ -322,7 +388,7 @@ where
         fs_rng.absorb(&to_bytes![&proof.quotient_chunk_commitments].unwrap());
 
         let (verifier_second_msg, _verifier_state) =
-            PIOPforPolyIdentity::verifier_second_round(
+            PIOPforPolyIdentity::<F, PC>::verifier_second_round(
                 verifier_state,
                 &mut fs_rng,
             );
@@ -338,7 +404,7 @@ where
         }
 
         let quotient_chunk_oracles =
-            (0..num_of_quotient_chunks).map(|i| CommittedConcreteOracle {
+            (0..num_of_quotient_chunks).map(|i| WitnessVerifierOracle {
                 label: format!("quotient_chunk_{}", i).to_string(),
                 queried_rotations: BTreeSet::from([Rotation::curr()]),
                 should_mask: false,
@@ -351,8 +417,8 @@ where
 
         let domain = GeneralEvaluationDomain::new(domain_size).unwrap();
         let omegas: Vec<F> = domain.elements().collect();
-        let query_set = PIOPforPolyIdentity::get_query_set(
-            witness_oracles.iter(),
+        let query_set = PIOPforPolyIdentity::<F, PC>::get_query_set(
+            witness_oracles,
             verifier_second_msg.label,
             verifier_second_msg.xi,
             &omegas,
@@ -387,21 +453,31 @@ where
         for (vo_index, vo) in vos.iter().enumerate() {
             let vo_evaluation = vo.get_expression().evaluate(
                 &|x: F| x,
-                &|query: &WitnessQuery| {
-                    let oracle = &witness_oracles[query.get_index()];
+                &|query| {
                     let challenge = query.rotation.compute_evaluation_point(
                         verifier_second_msg.xi,
                         &omegas,
                     );
-                    oracle.query_at_challenge(&challenge)
-                },
-                &|query: &InstanceQuery| {
-                    let oracle = &instance_oracles[query.get_index()];
-                    let challenge = query.rotation.compute_evaluation_point(
-                        verifier_second_msg.xi,
-                        &omegas,
-                    );
-                    oracle.query_at_challenge(&challenge)
+                    match query.oracle_type {
+                        OracleType::Witness => {
+                            match witness_oracles_mapping.get(&query.label) {
+                                Some(index) => witness_oracles[*index].query(&QueryContext::Challenge(challenge)),
+                                None => panic!("Witness oracle with label add_label not found") //TODO: Introduce new Error here,
+                            }
+                        },
+                        OracleType::Instance => {
+                            match instance_oracles_mapping.get(&query.label) {
+                                Some(index) => instance_oracles[*index].query(&QueryContext::Challenge(challenge)),
+                                None => panic!("Instance oracle with label add_label not found") //TODO: Introduce new Error here,
+                            }
+                        },
+                        OracleType::Fixed => {
+                            match fixed_oracles_mapping.get(&query.label) {
+                                Some(index) => fixed_oracles[*index].query(&QueryContext::Challenge(challenge)),
+                                None => panic!("Fixed oracle with label add_label not found") //TODO: Introduce new Error here,
+                            }
+                        },
+                    }
                 },
                 &|x: F| -x,
                 &|x: F, y: F| x + y,
@@ -422,7 +498,7 @@ where
         for (&x_i, t_i) in
             powers_of_x.iter().zip(quotient_chunk_oracles.clone())
         {
-            t_part += x_i * t_i.query_at_challenge(&verifier_second_msg.xi);
+            t_part += x_i * t_i.query(&QueryContext::Challenge(verifier_second_msg.xi));
         }
 
         t_part *= vanishing_polynomial.evaluate(&verifier_second_msg.xi);
@@ -438,6 +514,7 @@ where
             .map(|oracle| oracle.clone())
             .chain(quotient_chunk_oracles)
             .collect();
+
         let res = Multiopen::<F, PC, FS>::verify(
             &vk.verifier_key,
             proof.multiopen_proof,

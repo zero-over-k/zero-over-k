@@ -1,5 +1,5 @@
 use ark_ff::PrimeField;
-use ark_poly::univariate::DensePolynomial;
+use ark_poly::{univariate::DensePolynomial, GeneralEvaluationDomain};
 use ark_poly_commit::PolynomialCommitment;
 
 use crate::{
@@ -32,6 +32,11 @@ impl<F: PrimeField, PC: PolynomialCommitment<F, DensePolynomial<F>>> Clone
             verifier_key: self.verifier_key.clone(),
         }
     }
+}
+
+pub struct IndexInfo<F: PrimeField> { 
+    pub quotient_degree: usize, 
+    pub extended_coset_domain_size: GeneralEvaluationDomain<F>
 }
 
 pub struct Proof<F: PrimeField, PC: HomomorphicCommitment<F>> {

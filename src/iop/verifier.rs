@@ -1,4 +1,4 @@
-use crate::concrete_oracle::QuerySetProvider;
+use crate::{commitment::HomomorphicCommitment, oracles::traits::QuerySetProvider};
 use ark_ff::PrimeField;
 use ark_poly::{
     univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
@@ -30,7 +30,7 @@ pub struct VerifierSecondMsg<F: PrimeField> {
     pub(crate) label: &'static str,
 }
 
-impl<F: PrimeField> PIOPforPolyIdentity<F> {
+impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
     pub fn init_verifier(
         domain_size: usize,
         vanishing_polynomial: &DensePolynomial<F>,
@@ -69,7 +69,7 @@ impl<F: PrimeField> PIOPforPolyIdentity<F> {
     }
 
     pub fn get_query_set(
-        oracles: impl Iterator<Item = impl QuerySetProvider<F>>,
+        oracles: &[impl QuerySetProvider<F>],
         evaluation_challenge_label: &str,
         evaluation_challenge: F,
         omegas: &Vec<F>,

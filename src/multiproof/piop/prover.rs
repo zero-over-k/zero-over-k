@@ -8,16 +8,19 @@ use ark_poly_commit::{LabeledPolynomial, PCRandomness};
 
 use crate::commitment::HomomorphicCommitment;
 use crate::multiproof::poly::construct_vanishing;
-use crate::{concrete_oracle::InstantiableConcreteOracle, vo::query::Rotation};
-
+use crate::oracles::query::QueryContext;
+use crate::oracles::rotation::Rotation;
+use crate::oracles::traits::Instantiable;
 use super::verifier::{VerifierFirstMsg, VerifierSecondMsg, VerifierThirdMsg};
 use super::{PIOPError, PIOP};
 
+// &'a Vec<Box<dyn VirtualOracle<F>>>
+
 pub struct ProverState<'a, F: PrimeField, PC: HomomorphicCommitment<F>> {
-    oracles: &'a [InstantiableConcreteOracle<F>],
+    num_of_oracles: usize, 
     opening_sets: BTreeMap<
         BTreeSet<Rotation>,
-        Vec<(&'a InstantiableConcreteOracle<F>, &'a PC::Randomness)>,
+        Vec<(&'a dyn Instantiable<F>, &'a PC::Randomness)>,
     >,
     domain: GeneralEvaluationDomain<F>,
     q_polys: Option<Vec<LabeledPolynomial<F, DensePolynomial<F>>>>,
@@ -28,18 +31,18 @@ pub struct ProverState<'a, F: PrimeField, PC: HomomorphicCommitment<F>> {
 impl<F: PrimeField> PIOP<F> {
     // NOTE: Oracles are already masked
     pub fn init_prover<'a, PC: HomomorphicCommitment<F>>(
-        oracles: &'a [InstantiableConcreteOracle<F>],
+        oracles: &'a Vec<impl Instantiable<F>>,
         oracle_rands: &'a [PC::Randomness],
         domain_size: usize,
     ) -> Result<ProverState<'a, F, PC>, PIOPError> {
         let mut opening_sets = BTreeMap::<
             BTreeSet<Rotation>,
-            Vec<(&'a InstantiableConcreteOracle<F>, &'a PC::Randomness)>,
+            Vec<(&'a dyn Instantiable<F>, &'a PC::Randomness)>,
         >::new();
 
         for (oracle, rand) in oracles.iter().zip(oracle_rands.iter()) {
             let oracles = opening_sets
-                .entry(oracle.queried_rotations.clone())
+                .entry(oracle.get_queried_rotations().clone())
                 .or_insert(vec![]);
             oracles.push((oracle, rand))
         }
@@ -47,7 +50,7 @@ impl<F: PrimeField> PIOP<F> {
         let domain = GeneralEvaluationDomain::<F>::new(domain_size).unwrap();
 
         let state = ProverState {
-            oracles,
+            num_of_oracles: oracles.len(),
             opening_sets,
             domain,
             q_polys: None,
@@ -73,7 +76,7 @@ impl<F: PrimeField> PIOP<F> {
         let x1_powers: Vec<F> = successors(Some(F::one()), |x1_i| {
             Some(*x1_i * verifier_first_msg.x1)
         })
-        .take(state.oracles.len())
+        .take(state.num_of_oracles)
         .collect();
 
         let qs = state.opening_sets.iter().map(|(rotations, oracles_rands)| {
@@ -82,7 +85,7 @@ impl<F: PrimeField> PIOP<F> {
             let mut q_i_evals_set = BTreeMap::<F, F>::new();
 
             for (i, (oracle, rand)) in oracles_rands.iter().enumerate() {
-                q_i = q_i + &oracle.poly * x1_powers[i];
+                q_i = q_i + oracle.polynomial() * x1_powers[i];
                 q_i_rand = PC::add_rands(
                     &q_i_rand,
                     &PC::scale_rand(rand, x1_powers[i]),
@@ -96,7 +99,7 @@ impl<F: PrimeField> PIOP<F> {
                 let mut evaluation = F::zero();
                 for (i, (oracle, _)) in oracles_rands.iter().enumerate() {
                     evaluation += x1_powers[i]
-                        * oracle.query_at_challenge(&evaluation_point);
+                        * oracle.query(&QueryContext::Challenge(evaluation_point));
                 }
 
                 let prev = q_i_evals_set.insert(evaluation_point, evaluation);
@@ -141,13 +144,6 @@ impl<F: PrimeField> PIOP<F> {
                 */
 
                 &q_poly / &z_h
-
-                // LabeledPolynomial::new(
-                //     "f_i".to_string(),
-                //     &q_poly / &z_h,
-                //     None,
-                //     None,
-                // )
             })
             .collect();
 

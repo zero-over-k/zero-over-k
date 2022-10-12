@@ -1,30 +1,25 @@
 use ark_ff::PrimeField;
 
-use query::{InstanceQuery, WitnessQuery};
+use crate::oracles::query::OracleQuery;
 
-use self::expression::Expression;
+use self::new_expression::NewExpression;
+
+// use self::expression::Expression;
 pub mod error;
-pub mod expression;
+// pub mod expression;
 pub mod precompiled;
 pub mod precompiled_vos;
 pub mod query;
-
-// Return expression that will be used to construct query set
-pub trait ExpressionProvider<F: PrimeField> {
-    fn get_expression_for_query_set(&self) -> &Expression<F>;
-}
+pub mod new_expression;
+pub mod virtual_expression;
 
 // Note: VirtualOracle trait is very lightweight such that different use-cases
 // can be built on top of this prover
 
 /// Trait for specifying Virtual Oracle that should be included in batched zero over K check
 pub trait VirtualOracle<F: PrimeField> {
-    /// Returns witness queries given virtual queries and assignment
-    fn get_wtns_queries(&self) -> &[WitnessQuery];
-
-    /// Returns instance queries given virtual queries and assignment
-    fn get_instance_queries(&self) -> &[InstanceQuery];
+    fn get_queries(&self) -> &[OracleQuery];
 
     /// Returns expression that combines concrete oracles
-    fn get_expression(&self) -> &Expression<F>;
+    fn get_expression(&self) -> &NewExpression<F>;
 }

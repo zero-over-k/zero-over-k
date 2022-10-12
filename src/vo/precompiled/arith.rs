@@ -4,7 +4,7 @@ use crate::{
     concrete_oracle::OracleType,
     vo::{
         expression::Expression,
-        query::{InstanceQuery, Rotation, VirtualQuery, WitnessQuery},
+        query::{InstanceQuery, Rotation, VirtualQuery, WitnessQuery, Query},
         VirtualOracle,
     },
 };
@@ -23,6 +23,7 @@ pub struct ArithVO<F: PrimeField> {
     instance_indices: Option<Vec<usize>>,
     wtns_queries: Vec<WitnessQuery>,
     instance_queries: Vec<InstanceQuery>,
+    queries: Vec<Box<dyn Query>>,
     expression: Option<Expression<F>>,
 }
 
@@ -89,6 +90,7 @@ impl<F: PrimeField> ArithVO<F> {
             instance_indices: None,
             wtns_queries: vec![],
             instance_queries: vec![],
+            queries: vec![],
             expression: None,
         }
     }
@@ -103,15 +105,23 @@ impl<F: PrimeField> ArithVO<F> {
         self.instance_indices = Some(vec![]);
         for vq in &self.virtual_queries {
             match vq.oracle_type {
-                OracleType::Witness => self.wtns_queries.push(WitnessQuery {
-                    index: witness_indices[vq.index],
-                    rotation: vq.rotation.clone(),
-                }),
+                OracleType::Witness => {
+                    let query = WitnessQuery {
+                        index: witness_indices[vq.index],
+                        rotation: vq.rotation.clone(),
+                    };
+
+                    self.wtns_queries.push(query);
+                    self.queries.push(Box::new(query.clone()))
+                },
                 OracleType::Instance => {
-                    self.instance_queries.push(InstanceQuery {
+                    let query = InstanceQuery {
                         index: instance_indices[vq.index],
                         rotation: vq.rotation.clone(),
-                    })
+                    };
+                    
+                    self.instance_queries.push(query);
+                    self.queries.push(Box::new(query.clone()))
                 }
             }
         }
@@ -151,5 +161,9 @@ impl<F: PrimeField> VirtualOracle<F> for ArithVO<F> {
             None => panic!("Expression is not defined"),
             Some(expression) => return expression,
         }
+    }
+
+    fn get_queries(&self) -> &[Box<dyn Query>] {
+        &self.queries
     }
 }

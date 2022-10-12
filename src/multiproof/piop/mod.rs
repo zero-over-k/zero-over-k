@@ -14,10 +14,10 @@ use ark_std::rand::Rng;
 
 use crate::{
     commitment::HomomorphicCommitment,
-    concrete_oracle::{CommittedConcreteOracle, InstantiableConcreteOracle},
-    rng::FiatShamirRng,
-    vo::query::Rotation,
+    rng::FiatShamirRng, oracles::{traits::{Instantiable, CommittedOracle}, rotation::Rotation, query::QueryContext},
 };
+
+use self::prover::ProverState;
 
 use super::{
     error::Error,
@@ -60,7 +60,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng>
 
     pub fn prove<R: Rng>(
         ck: &PC::CommitterKey,
-        oracles: &[InstantiableConcreteOracle<F>],
+        oracles: &Vec<impl Instantiable<F>>,
         oracle_rands: &[PC::Randomness],
         evaluation_challenge: F,
         domain_size: usize,
@@ -72,8 +72,8 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng>
         let (verifier_state, verifier_first_msg) =
             PIOP::verifier_first_round(verifier_state, fs_rng);
 
-        let prover_state =
-            PIOP::init_prover::<PC>(oracles, oracle_rands, domain_size)
+        let prover_state: ProverState<F, PC> =
+            PIOP::init_prover(oracles, oracle_rands, domain_size)
                 .map_err(Error::from_piop_err)?;
 
         let (f_agg_poly, prover_state) = PIOP::prover_first_round(
@@ -135,7 +135,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng>
     pub fn verify(
         vk: &PC::VerifierKey,
         proof: Proof<F, PC>,
-        oracles: &[CommittedConcreteOracle<F, PC>], // At this moment challenge -> eval mapping should already be filled
+        oracles: &Vec<impl CommittedOracle<F, PC>>, // At this moment challenge -> eval mapping should already be filled
         evaluation_challenge: F,
         domain_size: usize,
         fs_rng: &mut FS,
@@ -158,12 +158,12 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng>
 
         let mut opening_sets = BTreeMap::<
             BTreeSet<Rotation>,
-            Vec<&CommittedConcreteOracle<F, PC>>,
+            Vec<&dyn CommittedOracle<F, PC>>,
         >::new();
 
         for oracle in oracles.iter() {
             let oracles = opening_sets
-                .entry(oracle.queried_rotations.clone())
+                .entry(oracle.get_queried_rotations().clone())
                 .or_insert(vec![]);
             oracles.push(oracle)
         }
@@ -193,7 +193,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng>
                 let mut evaluation = F::zero();
                 for (i, &oracle) in oracles.iter().enumerate() {
                     evaluation += x1_powers[i]
-                        * oracle.query_at_challenge(&evaluation_point);
+                        * oracle.query(&QueryContext::Challenge(evaluation_point));
                 }
 
                 let prev = q_i_evals_set.insert(evaluation_point, evaluation);
@@ -288,11 +288,8 @@ mod test {
 
     use crate::{
         commitment::KZG10,
-        concrete_oracle::{
-            CommittedConcreteOracle, InstantiableConcreteOracle, OracleType,
-        },
-        rng::{FiatShamirRng, SimpleHashFiatShamirRng},
-        vo::query::Rotation,
+        rng::{FiatShamirRng, SimpleHashFiatShamirRng}, oracles::{witness::WitnessProverOracle, rotation::Rotation},
+        oracles::{traits::{Instantiable, CommittedOracle}, witness::WitnessVerifierOracle}
     };
     use ark_bls12_381::{Bls12_381, Fr as F};
     use ark_ff::to_bytes;
@@ -333,29 +330,26 @@ mod test {
         let c_poly = DensePolynomial::<F>::rand(poly_degree, &mut rng);
         let d_poly = DensePolynomial::<F>::rand(poly_degree, &mut rng);
 
-        let a = InstantiableConcreteOracle {
+        let a = WitnessProverOracle {
             label: "a".to_string(),
             poly: a_poly.clone(),
             evals_at_coset_of_extended_domain: None,
-            oracle_type: OracleType::Witness,
             queried_rotations: BTreeSet::from([Rotation::curr()]),
             should_mask: false,
         };
 
-        let b = InstantiableConcreteOracle {
+        let b = WitnessProverOracle {
             label: "b".to_string(),
             poly: b_poly.clone(),
             evals_at_coset_of_extended_domain: None,
-            oracle_type: OracleType::Witness,
             queried_rotations: BTreeSet::from([Rotation::curr()]),
             should_mask: false,
         };
 
-        let c = InstantiableConcreteOracle {
+        let c = WitnessProverOracle {
             label: "c".to_string(),
             poly: c_poly.clone(),
             evals_at_coset_of_extended_domain: None,
-            oracle_type: OracleType::Witness,
             queried_rotations: BTreeSet::from([
                 Rotation::curr(),
                 Rotation::next(),
@@ -363,11 +357,10 @@ mod test {
             should_mask: false,
         };
 
-        let d = InstantiableConcreteOracle {
+        let d = WitnessProverOracle {
             label: "d".to_string(),
             poly: d_poly.clone(),
             evals_at_coset_of_extended_domain: None,
-            oracle_type: OracleType::Witness,
             queried_rotations: BTreeSet::from([
                 Rotation::curr(),
                 Rotation::next(),
@@ -375,7 +368,8 @@ mod test {
             should_mask: false,
         };
 
-        let oracles = [a, b, c, d];
+        // TODO: Can we remove this Box
+        let oracles = vec![a.clone(), b.clone(), c.clone(), d.clone()];
 
         let labeled_oracles: Vec<LabeledPolynomial<F, DensePolynomial<F>>> =
             oracles.iter().map(|oracle| oracle.to_labeled()).collect();
@@ -405,7 +399,7 @@ mod test {
             d_at_omega_xi,
         ];
 
-        let a_ver = CommittedConcreteOracle {
+        let a_ver = WitnessVerifierOracle {
             label: "a".to_string(),
             queried_rotations: BTreeSet::from([Rotation::curr()]),
             should_mask: false,
@@ -413,7 +407,7 @@ mod test {
             commitment: Some(oracles_commitments[0].commitment().clone()),
         };
 
-        let b_ver = CommittedConcreteOracle {
+        let b_ver = WitnessVerifierOracle {
             label: "b".to_string(),
             queried_rotations: BTreeSet::from([Rotation::curr()]),
             should_mask: false,
@@ -421,7 +415,7 @@ mod test {
             commitment: Some(oracles_commitments[1].commitment().clone()),
         };
 
-        let c_ver = CommittedConcreteOracle {
+        let c_ver = WitnessVerifierOracle {
             label: "c".to_string(),
             queried_rotations: BTreeSet::from([
                 Rotation::curr(),
@@ -435,7 +429,7 @@ mod test {
             commitment: Some(oracles_commitments[2].commitment().clone()),
         };
 
-        let d_ver = CommittedConcreteOracle {
+        let d_ver = WitnessVerifierOracle {
             label: "d".to_string(),
             queried_rotations: BTreeSet::from([
                 Rotation::curr(),
@@ -449,7 +443,7 @@ mod test {
             commitment: Some(oracles_commitments[3].commitment().clone()),
         };
 
-        let ver_oracles = [a_ver, b_ver, c_ver, d_ver];
+        let ver_oracles = [a_ver.clone(), b_ver.clone(), c_ver.clone(), d_ver.clone()];
 
         let mut fs_rng = FS::initialize(
             &to_bytes![&oracles_commitments, &evals, &xi].unwrap(),
@@ -473,7 +467,7 @@ mod test {
         let res = MultiopenInst::verify(
             &verifier_key,
             proof,
-            &ver_oracles,
+            &ver_oracles.to_vec(),
             xi,
             domain_size,
             &mut fs_rng,
