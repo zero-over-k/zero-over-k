@@ -34,9 +34,9 @@ impl<F: PrimeField, PC: PolynomialCommitment<F, DensePolynomial<F>>> Clone
     }
 }
 
-pub struct IndexInfo<F: PrimeField> { 
-    pub quotient_degree: usize, 
-    pub extended_coset_domain_size: GeneralEvaluationDomain<F>
+pub struct IndexInfo<F: PrimeField> {
+    pub quotient_degree: usize,
+    pub extended_coset_domain_size: GeneralEvaluationDomain<F>,
 }
 
 pub struct Proof<F: PrimeField, PC: HomomorphicCommitment<F>> {

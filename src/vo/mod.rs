@@ -7,10 +7,11 @@ use self::new_expression::NewExpression;
 // use self::expression::Expression;
 pub mod error;
 // pub mod expression;
+pub mod generic_vo;
+pub mod new_expression;
 pub mod precompiled;
 pub mod precompiled_vos;
 pub mod query;
-pub mod new_expression;
 pub mod virtual_expression;
 
 // Note: VirtualOracle trait is very lightweight such that different use-cases

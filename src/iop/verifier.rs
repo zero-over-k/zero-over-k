@@ -1,4 +1,6 @@
-use crate::{commitment::HomomorphicCommitment, oracles::traits::QuerySetProvider};
+use crate::{
+    commitment::HomomorphicCommitment, oracles::traits::QuerySetProvider,
+};
 use ark_ff::PrimeField;
 use ark_poly::{
     univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,

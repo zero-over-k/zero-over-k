@@ -12,6 +12,7 @@ ark-poly = { version = "^0.3.0", default-features = false }
 ark-poly-commit = { version = "^0.3.0", default-features = false }
 ark-ec = { version = "0.3", default-features = false }
 regex = "1.6.0"
+itertools = "0.8"
 
 digest = { version = "0.9" }
 

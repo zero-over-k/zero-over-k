@@ -1,10 +1,17 @@
 use std::collections::BTreeSet;
 
 use ark_ff::PrimeField;
-use ark_poly::{univariate::DensePolynomial, GeneralEvaluationDomain, EvaluationDomain, Polynomial};
+use ark_poly::{
+    univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
+    Polynomial,
+};
 use ark_poly_commit::LabeledPolynomial;
 
-use super::{rotation::{Rotation, Sign}, traits::{ConcreteOracle, Instantiable}, query::QueryContext};
+use super::{
+    query::QueryContext,
+    rotation::{Rotation, Sign},
+    traits::{ConcreteOracle, Instantiable},
+};
 
 #[derive(Clone)]
 pub struct InstanceOracle<F: PrimeField> {
@@ -27,18 +34,24 @@ impl<F: PrimeField> ConcreteOracle<F> for InstanceOracle<F> {
         match ctx {
             QueryContext::Challenge(challenge) => {
                 self.poly.evaluate(&challenge)
-            },
-            QueryContext::ExtendedCoset(original_domain_size, rotation, omega_i) => {
+            }
+            QueryContext::ExtendedCoset(
+                original_domain_size,
+                rotation,
+                omega_i,
+            ) => {
                 match &self.evals_at_coset_of_extended_domain {
                     Some(evals) => {
                         if rotation.degree == 0 {
                             return evals[*omega_i];
                         }
                         let extended_domain_size = evals.len();
-                        let scaling_ratio = extended_domain_size / original_domain_size;
+                        let scaling_ratio =
+                            extended_domain_size / original_domain_size;
                         let eval = match &rotation.sign {
                             Sign::Plus => {
-                                evals[(omega_i + rotation.degree * scaling_ratio)
+                                evals[(omega_i
+                                    + rotation.degree * scaling_ratio)
                                     % extended_domain_size]
                             }
                             // TODO: test negative rotations
@@ -48,9 +61,10 @@ impl<F: PrimeField> ConcreteOracle<F> for InstanceOracle<F> {
                                 if index >= 0 {
                                     evals[index as usize]
                                 } else {
-                                    let move_from_end =
-                                        (rotation.degree * scaling_ratio - omega_i)
-                                            % extended_domain_size;
+                                    let move_from_end = (rotation.degree
+                                        * scaling_ratio
+                                        - omega_i)
+                                        % extended_domain_size;
                                     evals[extended_domain_size - move_from_end]
                                 }
                             }
@@ -59,7 +73,7 @@ impl<F: PrimeField> ConcreteOracle<F> for InstanceOracle<F> {
                     }
                     None => panic!("Evals not provided"),
                 }
-            },
+            }
         }
     }
 
@@ -73,7 +87,10 @@ impl<F: PrimeField> ConcreteOracle<F> for InstanceOracle<F> {
 }
 
 impl<F: PrimeField> Instantiable<F> for InstanceOracle<F> {
-    fn compute_extended_evals(&mut self, extended_domain: &GeneralEvaluationDomain<F>) {
+    fn compute_extended_evals(
+        &mut self,
+        extended_domain: &GeneralEvaluationDomain<F>,
+    ) {
         self.evals_at_coset_of_extended_domain =
             Some(extended_domain.coset_fft(&self.poly));
     }

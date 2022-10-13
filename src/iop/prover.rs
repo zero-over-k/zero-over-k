@@ -1,4 +1,8 @@
-use std::{cmp::max, collections::{BTreeSet, BTreeMap}, iter::successors};
+use std::{
+    cmp::max,
+    collections::{BTreeMap, BTreeSet},
+    iter::successors,
+};
 
 use ark_ff::PrimeField;
 use ark_poly::{
@@ -8,11 +12,18 @@ use ark_poly::{
 use ark_std::rand::Rng;
 
 use crate::{
+    commitment::HomomorphicCommitment,
     iop::error::Error,
     iop::{verifier::VerifierFirstMsg, PIOPforPolyIdentity},
-    vo::{
-        VirtualOracle,
-    }, oracles::{witness::WitnessProverOracle, instance::InstanceOracle, query::{OracleType, QueryContext}, fixed::FixedOracle, traits::{Instantiable, ConcreteOracle}, rotation::Rotation}, commitment::HomomorphicCommitment,
+    oracles::{
+        fixed::FixedOracle,
+        instance::InstanceOracle,
+        query::{OracleType, QueryContext},
+        rotation::Rotation,
+        traits::{ConcreteOracle, Instantiable},
+        witness::WitnessProverOracle,
+    },
+    vo::VirtualOracle,
 };
 
 // Note: To keep flexible vanishing polynomial should not be strictly domain.vanishing_polynomial
@@ -36,8 +47,8 @@ pub struct ProverState<'a, F: PrimeField, PC: HomomorphicCommitment<F>> {
 impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
     // NOTE: consider having indexed concrete oracles by initializing evals_at_coset_of_extended_domain (ex. selector polynomials)
     pub fn init_prover<'a>(
-        witness_oracles: &'a mut[WitnessProverOracle<F>],
-        instance_oracles: &'a mut[InstanceOracle<F>],
+        witness_oracles: &'a mut [WitnessProverOracle<F>],
+        instance_oracles: &'a mut [InstanceOracle<F>],
         fixed_oracles: &'a mut [FixedOracle<F, PC>],
         vos: &'a [Box<&'a dyn VirtualOracle<F>>],
         domain_size: usize,
@@ -45,13 +56,25 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
     ) -> ProverState<'a, F, PC> {
         let domain = GeneralEvaluationDomain::new(domain_size).unwrap();
 
-        let witness_oracles_mapping = witness_oracles.iter().enumerate().map(|(i, oracle)| (oracle.get_label(), i)).collect();
-        let instance_oracles_mapping = instance_oracles.iter().enumerate().map(|(i, oracle)| (oracle.get_label(), i)).collect();
-        let fixed_oracles_mapping = fixed_oracles.iter().enumerate().map(|(i, oracle)| (oracle.get_label(), i)).collect();
+        let witness_oracles_mapping = witness_oracles
+            .iter()
+            .enumerate()
+            .map(|(i, oracle)| (oracle.get_label(), i))
+            .collect();
+        let instance_oracles_mapping = instance_oracles
+            .iter()
+            .enumerate()
+            .map(|(i, oracle)| (oracle.get_label(), i))
+            .collect();
+        let fixed_oracles_mapping = fixed_oracles
+            .iter()
+            .enumerate()
+            .map(|(i, oracle)| (oracle.get_label(), i))
+            .collect();
 
         ProverState {
-            witness_oracles_mapping, 
-            instance_oracles_mapping, 
+            witness_oracles_mapping,
+            instance_oracles_mapping,
             fixed_oracles_mapping,
             witness_oracles,
             instance_oracles,
@@ -72,22 +95,28 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
                 match query.oracle_type {
                     OracleType::Witness => {
                         match state.witness_oracles_mapping.get(&query.label) {
-                            Some(index) => state.witness_oracles[*index].register_rotation(query.rotation),
-                            None => panic!("Witness oracle with label add_label not found") //TODO: Introduce new Error here,
+                            Some(index) => state.witness_oracles[*index]
+                                .register_rotation(query.rotation),
+                            None => panic!(
+                                "Witness oracle with label add_label not found"
+                            ), //TODO: Introduce new Error here,
                         }
-                    },
+                    }
                     OracleType::Instance => {
                         match state.instance_oracles_mapping.get(&query.label) {
                             Some(index) => state.instance_oracles[*index].register_rotation(query.rotation),
                             None => panic!("Instance oracle with label add_label not found") //TODO: Introduce new Error here,
                         }
-                    },
+                    }
                     OracleType::Fixed => {
                         match state.fixed_oracles_mapping.get(&query.label) {
-                            Some(index) => state.fixed_oracles[*index].register_rotation(query.rotation),
-                            None => panic!("Fixed oracle with label add_label not found") //TODO: Introduce new Error here,
+                            Some(index) => state.fixed_oracles[*index]
+                                .register_rotation(query.rotation),
+                            None => panic!(
+                                "Fixed oracle with label add_label not found"
+                            ), //TODO: Introduce new Error here,
                         }
-                    },
+                    }
                 }
             }
         }
@@ -103,38 +132,43 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
     pub fn prover_second_round(
         verifier_msg: &VerifierFirstMsg<F>,
         state: &mut ProverState<F, PC>,
-        srs_size: usize,
+        _srs_size: usize,
     ) -> Result<Vec<WitnessProverOracle<F>>, Error> {
         // 1. compute quotient degree
         let domain_size = state.domain.size();
         let mut max_degree = 0;
         for vo in state.vos {
-            let vo_degree = vo
-                .get_expression()
-                .degree(
-                    &|query| {
-                        match query.oracle_type {
-                            OracleType::Witness => {
-                                match state.witness_oracles_mapping.get(&query.label) {
-                                    Some(index) => state.witness_oracles[*index].get_degree(domain_size),
-                                    None => panic!("Witness oracle with label add_label not found") //TODO: Introduce new Error here,
-                                }
-                            },
-                            OracleType::Instance => {
-                                match state.instance_oracles_mapping.get(&query.label) {
-                                    Some(index) => state.instance_oracles[*index].get_degree(domain_size),
-                                    None => panic!("Witness oracle with label add_label not found") //TODO: Introduce new Error here,
-                                }
-                            },
-                            OracleType::Fixed => {
-                                match state.fixed_oracles_mapping.get(&query.label) {
-                                    Some(index) => state.fixed_oracles[*index].get_degree(domain_size),
-                                    None => panic!("Witness oracle with label add_label not found") //TODO: Introduce new Error here,
-                                }
-                            },
+            let vo_degree = vo.get_expression().degree(&|query| {
+                match query.oracle_type {
+                    OracleType::Witness => {
+                        match state.witness_oracles_mapping.get(&query.label) {
+                            Some(index) => state.witness_oracles[*index]
+                                .get_degree(domain_size),
+                            None => panic!(
+                                "Witness oracle with label add_label not found"
+                            ), //TODO: Introduce new Error here,
                         }
                     }
-                );
+                    OracleType::Instance => {
+                        match state.instance_oracles_mapping.get(&query.label) {
+                            Some(index) => state.instance_oracles[*index]
+                                .get_degree(domain_size),
+                            None => panic!(
+                                "Witness oracle with label add_label not found"
+                            ), //TODO: Introduce new Error here,
+                        }
+                    }
+                    OracleType::Fixed => {
+                        match state.fixed_oracles_mapping.get(&query.label) {
+                            Some(index) => state.fixed_oracles[*index]
+                                .get_degree(domain_size),
+                            None => panic!(
+                                "Witness oracle with label add_label not found"
+                            ), //TODO: Introduce new Error here,
+                        }
+                    }
+                }
+            });
             max_degree = max(max_degree, vo_degree);
         }
 
@@ -220,21 +254,20 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
             quotient_coeffs.extend(vec![F::zero(); padding_size]);
         }
 
-        let quotient_chunks: Vec<WitnessProverOracle<F>> =
-            quotient_coeffs
-                .chunks(state.domain.size())
-                .enumerate()
-                .map(|(i, chunk)| {
-                    let poly = DensePolynomial::from_coefficients_slice(chunk);
-                    WitnessProverOracle {
-                        label: format!("quotient_chunk_{}", i).to_string(),
-                        poly,
-                        evals_at_coset_of_extended_domain: None,
-                        queried_rotations: BTreeSet::from([Rotation::curr()]),
-                        should_mask: false,
-                    }
-                })
-                .collect();
+        let quotient_chunks: Vec<WitnessProverOracle<F>> = quotient_coeffs
+            .chunks(state.domain.size())
+            .enumerate()
+            .map(|(i, chunk)| {
+                let poly = DensePolynomial::from_coefficients_slice(chunk);
+                WitnessProverOracle {
+                    label: format!("quotient_chunk_{}", i).to_string(),
+                    poly,
+                    evals_at_coset_of_extended_domain: None,
+                    queried_rotations: BTreeSet::from([Rotation::curr()]),
+                    should_mask: false,
+                }
+            })
+            .collect();
 
         state.quotient_chunks = Some(quotient_chunks.clone());
         Ok(quotient_chunks)

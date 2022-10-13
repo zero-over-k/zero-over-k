@@ -1,33 +1,35 @@
 #[cfg(test)]
 mod test {
 
-    use std::collections::{BTreeSet, BTreeMap};
+    use std::collections::{BTreeMap, BTreeSet};
 
     use ark_bls12_381::{Bls12_381, Fr};
-    use ark_ff::{One, Zero};
+    use ark_ff::Zero;
     use ark_poly::Polynomial;
     use ark_poly::{
         univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
         UVPolynomial,
     };
 
-    use ark_poly_commit::PCCommitterKey;
     use ark_std::test_rng;
     use rand_chacha::ChaChaRng;
 
     use crate::oracles::fixed::FixedOracle;
     use crate::oracles::instance::InstanceOracle;
+
     use crate::oracles::witness::{WitnessProverOracle, WitnessVerifierOracle};
-    use crate::oracles::traits::ConcreteOracle;
     use crate::rng::SimpleHashFiatShamirRng;
+    use crate::vo::generic_vo::GenericVO;
+    use crate::vo::precompiled_vos::{
+        PrecompiledMul, PrecompiledRescue, PrecompiledVO,
+    };
     use crate::PIL;
-    use crate::vo::precompiled_vos::{GenericVO, PrecompiledMul, PrecompiledVO};
     use blake2::Blake2s;
 
+    use crate::commitment::KZG10;
     use crate::vo::VirtualOracle;
-    use crate::{
-        commitment::KZG10,
-    };
+
+    use itertools::izip;
 
     type F = Fr;
     type FS = SimpleHashFiatShamirRng<Blake2s, ChaChaRng>;
@@ -102,7 +104,8 @@ mod test {
             commitment: None,
         };
 
-        let mut mul_vo = GenericVO::<F>::init(PrecompiledMul::get_expr_and_queries());
+        let mut mul_vo =
+            GenericVO::<F>::init(PrecompiledMul::get_expr_and_queries());
 
         let mut witness_oracles = [a, b];
         let mut instance_oracles = [c];
@@ -117,7 +120,7 @@ mod test {
         let proof = PilInstance::prove(
             &pk,
             &mut witness_oracles,
-            &mut instance_oracles, 
+            &mut instance_oracles,
             &mut [],
             vos.as_slice(),
             domain_size,
@@ -170,6 +173,144 @@ mod test {
         assert_eq!(res, ());
     }
 
+    #[test]
+    fn test_rescue_gate() {
+        let max_degree = 17;
+        let mut rng = test_rng();
+
+        let srs = PilInstance::universal_setup(max_degree, &mut rng).unwrap();
+
+        let (pk, vk) = PilInstance::prepare_keys(&srs).unwrap();
+
+        let domain_size = 16;
+        let poly_degree = domain_size - 1;
+        let domain = GeneralEvaluationDomain::<F>::new(domain_size).unwrap();
+
+        let witness_polys: Vec<_> = (0..=4)
+            .map(|_| DensePolynomial::<F>::rand(poly_degree, &mut rng))
+            .collect();
+        let witness_evals: Vec<Vec<F>> =
+            witness_polys.iter().map(|poly| domain.fft(&poly)).collect();
+
+        let fixed_polys: Vec<_> = (0..=3)
+            .map(|_| DensePolynomial::<F>::rand(poly_degree, &mut rng))
+            .collect();
+        let fixed_evals: Vec<Vec<F>> =
+            fixed_polys.iter().map(|poly| domain.fft(&poly)).collect();
+
+        let pow_5 = |v: &F| *v * v * v * v * v;
+        let w5_evals: Vec<F> = izip!(
+            &witness_evals[0],
+            &witness_evals[1],
+            &witness_evals[2],
+            &witness_evals[3],
+            &witness_evals[4],
+            &fixed_evals[0],
+            &fixed_evals[1],
+            &fixed_evals[2],
+            &fixed_evals[3],
+        )
+        .map(|(w1, w2, w3, w4, w5, &q1, &q2, &q3, &q4)| {
+            q1 * pow_5(w1) + q2 * pow_5(w2) + q3 * pow_5(w3) + q4 * pow_5(w4)
+                - pow_5(w5)
+        })
+        .collect();
+
+        let w5_poly =
+            DensePolynomial::from_coefficients_slice(&domain.ifft(&w5_evals));
+
+        // for elem in domain.elements() {
+        //     assert_eq!(
+        //         a_poly.evaluate(&elem) * b_poly.evaluate(&elem)
+        //             - c_poly.evaluate(&elem),
+        //         F::zero()
+        //     );
+        // }
+
+        let mut rescue_vo =
+            GenericVO::<F>::init(PrecompiledRescue::get_expr_and_queries());
+
+        let mut witness_oracles: Vec<_> = [
+            (witness_polys[0].clone(), "a"),
+            (witness_polys[1].clone(), "b"),
+            (witness_polys[2].clone(), "c"),
+            (witness_polys[3].clone(), "d"),
+            (w5_poly, "e"),
+        ]
+        .into_iter()
+        .map(|(poly, label)| WitnessProverOracle::<F> {
+            label: label.to_string(),
+            poly,
+            evals_at_coset_of_extended_domain: None,
+            queried_rotations: BTreeSet::new(),
+            should_mask: true,
+        })
+        .collect();
+
+        let mut instance_oracles = vec![];
+
+        let mut fixed_oracles: Vec<_> = [
+            (fixed_polys[0].clone(), "q1"),
+            (fixed_polys[1].clone(), "q2"),
+            (fixed_polys[2].clone(), "q3"),
+            (fixed_polys[3].clone(), "q4"),
+        ]
+        .into_iter()
+        .map(|(poly, label)| FixedOracle::<F, PC> {
+            label: label.to_string(),
+            poly,
+            evals_at_coset_of_extended_domain: None,
+            queried_rotations: BTreeSet::new(),
+            commitment: None,
+        })
+        .collect();
+
+        rescue_vo.configure(
+            &witness_oracles,
+            &instance_oracles,
+            &fixed_oracles,
+        );
+
+        let vos: Vec<Box<&dyn VirtualOracle<F>>> = vec![Box::new(&rescue_vo)];
+
+        let proof = PilInstance::prove(
+            &pk,
+            &mut witness_oracles,
+            &mut instance_oracles,
+            &mut fixed_oracles,
+            vos.as_slice(),
+            domain_size,
+            &domain.vanishing_polynomial().into(),
+            &mut rng,
+        )
+        .unwrap();
+
+        let mut witness_ver_oracles: Vec<_> = ["a", "b", "c", "d", "e"]
+            .into_iter()
+            .map(|label| WitnessVerifierOracle {
+                label: label.to_string(),
+                queried_rotations: BTreeSet::new(),
+                should_mask: true,
+                evals_at_challenges: BTreeMap::default(),
+                commitment: None,
+            })
+            .collect();
+
+        let res = PilInstance::verify(
+            &vk,
+            proof,
+            &mut witness_ver_oracles,
+            &mut [],
+            &mut fixed_oracles,
+            vos.as_slice(),
+            domain_size,
+            &domain.vanishing_polynomial().into(),
+            &mut rng,
+        )
+        .unwrap();
+
+        assert_eq!(res, ());
+    }
     // #[test]
     // fn test_arith_add() {
     //     let max_degree = 17;

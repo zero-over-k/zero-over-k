@@ -2,14 +2,13 @@ use ark_ff::{Field, PrimeField};
 
 use super::rotation::Rotation;
 
-pub type DomainSize = usize; 
+pub type DomainSize = usize;
 pub type OmegaI = usize;
 
 pub enum QueryContext<F: Field> {
-    Challenge(F), 
-    ExtendedCoset(DomainSize, Rotation, OmegaI)
+    Challenge(F),
+    ExtendedCoset(DomainSize, Rotation, OmegaI),
 }
-
 
 impl<F: PrimeField> QueryContext<F> {
     pub fn replace_omega(&mut self, new_row: usize) {
@@ -37,16 +36,15 @@ impl<F: PrimeField> QueryContext<F> {
 
 #[derive(Clone)]
 pub enum OracleType {
-    Witness, 
-    Instance, 
-    Fixed, 
+    Witness,
+    Instance,
+    Fixed,
     // TODO: add Selector
 }
 
 #[derive(Clone)]
 pub struct OracleQuery {
-    pub label: String,   //TODO: maybe consider: pub oracle: Box<&'a dyn ConcreteOracle<F>>,
-    pub rotation: Rotation, 
-    pub oracle_type: OracleType
+    pub label: String, //TODO: maybe consider: pub oracle: Box<&'a dyn ConcreteOracle<F>>,
+    pub rotation: Rotation,
+    pub oracle_type: OracleType,
 }
-

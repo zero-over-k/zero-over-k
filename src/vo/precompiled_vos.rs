@@ -50,7 +50,7 @@
 //                         index: instance_indices[vq.index],
 //                         rotation: vq.rotation.clone(),
 //                     };
-                    
+
 //                     self.instance_queries.push(query);
 //                     self.queries.push(Box::new(query.clone()))
 //                 }
@@ -93,16 +93,15 @@
 
 use ark_ff::PrimeField;
 
-use crate::{oracles::{rotation::Rotation, query::{OracleType, OracleQuery}, traits::ConcreteOracle, instance::InstanceOracle, fixed::FixedOracle}, commitment::HomomorphicCommitment};
+use crate::oracles::{query::OracleType, rotation::Rotation};
 
-use super::{virtual_expression::VirtualExpression, query::VirtualQuery, new_expression::NewExpression, VirtualOracle};
+use super::{query::VirtualQuery, virtual_expression::VirtualExpression};
 
 pub trait PrecompiledVO<F: PrimeField> {
     fn get_expr_and_queries() -> (VirtualExpression<F>, Vec<VirtualQuery>);
 }
 
-pub struct PrecompiledMul {
-}
+pub struct PrecompiledMul {}
 
 impl<F: PrimeField> PrecompiledVO<F> for PrecompiledMul {
     fn get_expr_and_queries() -> (VirtualExpression<F>, Vec<VirtualQuery>) {
@@ -122,58 +121,44 @@ impl<F: PrimeField> PrecompiledVO<F> for PrecompiledMul {
     }
 }
 
-pub struct GenericVO<F: PrimeField> {
-    pub(crate) virtual_exp: VirtualExpression<F>, 
-    pub(crate) virtual_queries: Vec<VirtualQuery>,
-    pub(crate) queries: Option<Vec<OracleQuery>>,
-    pub(crate) expression: Option<NewExpression<F>>
-}
+/// Implements 4-width rescue:
+/// q_1 * w_1^5 +
+/// q_2 * w_2^5 +
+/// q_3 * w_3^5 +
+/// q_4 * w_4^5 =
+/// w_5
+pub struct PrecompiledRescue {}
 
-impl<F: PrimeField> GenericVO<F> {
-    pub fn init(cfg: (VirtualExpression<F>, Vec<VirtualQuery>)) -> Self {
-        Self {
-            virtual_exp: cfg.0, 
-            virtual_queries: cfg.1, 
-            queries: None, 
-            expression: None
-        }
-    }
+impl<F> PrecompiledVO<F> for PrecompiledRescue
+where
+    F: PrimeField,
+{
+    fn get_expr_and_queries() -> (VirtualExpression<F>, Vec<VirtualQuery>) {
+        let q = (0..=3).map(|index| {
+            VirtualQuery::new(index, Rotation::curr(), OracleType::Fixed)
+        });
+        let w = (0..=4).map(|index| {
+            VirtualQuery::new(index, Rotation::curr(), OracleType::Witness)
+        });
+        let oracles = q.clone().chain(w.clone()).collect();
 
-    pub fn configure<PC: HomomorphicCommitment<F>>(
-        &mut self, 
-        witness_oracles: &[impl ConcreteOracle<F>],
-        instance_oracles: &[InstanceOracle<F>],
-        fixed_oracles: &[FixedOracle<F, PC>]
-    ) {
-        let mut queries = Vec::with_capacity(self.virtual_queries.len());
-        for query in &self.virtual_queries {
-            let oracle_query = match query.oracle_type {
-                crate::oracles::query::OracleType::Witness => OracleQuery { label: witness_oracles[query.index].get_label(), rotation: query.rotation, oracle_type: OracleType::Witness },
-                crate::oracles::query::OracleType::Instance => OracleQuery { label: instance_oracles[query.index].get_label(), rotation: query.rotation, oracle_type: OracleType::Instance },
-                crate::oracles::query::OracleType::Fixed => OracleQuery { label: fixed_oracles[query.index].get_label(), rotation: query.rotation, oracle_type: OracleType::Fixed },
+        let rescue_expr = {
+            let q_expr: Vec<VirtualExpression<F>> =
+                q.map(|query| query.into()).collect();
+            let w_expr: Vec<VirtualExpression<F>> =
+                w.map(|query| query.into()).collect();
+            let pow_5 = |e: &VirtualExpression<F>| {
+                e.clone() * e.clone() * e.clone() * e.clone() * e.clone()
             };
 
-            queries.push(oracle_query);
-        }
+            q_expr[0].clone() * pow_5(&w_expr[0])
+                + q_expr[1].clone() * pow_5(&w_expr[1])
+                + q_expr[2].clone() * pow_5(&w_expr[2])
+                + q_expr[3].clone() * pow_5(&w_expr[3])
+                - w_expr[4].clone()
+        };
 
-        self.queries = Some(queries.clone());
-        self.expression = Some(self.virtual_exp.to_expression(witness_oracles, instance_oracles, fixed_oracles));
-    }
-}
-
-impl<F: PrimeField> VirtualOracle<F> for GenericVO<F> {
-    fn get_queries(&self) -> &[OracleQuery] {
-        match &self.queries {
-            Some(queries) => &queries,
-            None => panic!("Queries are not initialized"),
-        }
-    }
-
-    fn get_expression(&self) -> &NewExpression<F> {
-        match &self.expression {
-            Some(expr) => &expr,
-            None => panic!("Expression are not initialized"),
-        }
+        (rescue_expr, oracles)
     }
 }
 
@@ -181,20 +166,27 @@ impl<F: PrimeField> VirtualOracle<F> for GenericVO<F> {
 mod test {
     use std::collections::BTreeSet;
 
-    use crate::oracles::{witness::WitnessProverOracle, instance::InstanceOracle, fixed::FixedOracle};
+    use crate::{
+        oracles::{
+            fixed::FixedOracle, instance::InstanceOracle,
+            witness::WitnessProverOracle,
+        },
+        vo::generic_vo::GenericVO,
+    };
 
-    use super::{GenericVO, PrecompiledMul, PrecompiledVO};
-    use ark_bls12_381::{Fr as F, Bls12_381};
-    use ark_poly::univariate::DensePolynomial;
+    use super::{PrecompiledMul, PrecompiledRescue, PrecompiledVO};
     use crate::commitment::KZG10;
+    use ark_bls12_381::{Bls12_381, Fr as F};
+    use ark_poly::univariate::DensePolynomial;
 
     type PC = KZG10<Bls12_381>;
 
     #[test]
     fn test_simple_mul() {
-        let mut mul_vo = GenericVO::<F>::init(PrecompiledMul::get_expr_and_queries());
+        let mut mul_vo =
+            GenericVO::<F>::init(PrecompiledMul::get_expr_and_queries());
 
-        let a = WitnessProverOracle::<F>{
+        let a = WitnessProverOracle::<F> {
             label: "a".to_string(),
             poly: DensePolynomial::default(),
             evals_at_coset_of_extended_domain: None,
@@ -222,5 +214,41 @@ mod test {
         let fixed_oracles: Vec<FixedOracle<F, PC>> = vec![];
 
         mul_vo.configure(&witness_oracles, &instance_oracles, &fixed_oracles);
+    }
+
+    #[test]
+    fn test_rescue_gate() {
+        let mut rescue_vo =
+            GenericVO::<F>::init(PrecompiledRescue::get_expr_and_queries());
+
+        let witness_oracles: Vec<_> = ["a", "b", "c", "d", "e"]
+            .into_iter()
+            .map(|label| WitnessProverOracle::<F> {
+                label: label.to_string(),
+                poly: DensePolynomial::default(),
+                evals_at_coset_of_extended_domain: None,
+                queried_rotations: BTreeSet::new(),
+                should_mask: true,
+            })
+            .collect();
+
+        let instance_oracles = vec![];
+
+        let fixed_oracles: Vec<_> = ["q1", "q2", "q3", "q4"]
+            .into_iter()
+            .map(|label| FixedOracle::<F, PC> {
+                label: label.to_string(),
+                poly: DensePolynomial::default(),
+                evals_at_coset_of_extended_domain: None,
+                queried_rotations: BTreeSet::new(),
+                commitment: None,
+            })
+            .collect();
+
+        rescue_vo.configure(
+            &witness_oracles,
+            &instance_oracles,
+            &fixed_oracles,
+        );
     }
 }

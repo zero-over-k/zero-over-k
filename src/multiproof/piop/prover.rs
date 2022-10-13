@@ -6,18 +6,18 @@ use ark_poly::univariate::DensePolynomial;
 use ark_poly::{EvaluationDomain, GeneralEvaluationDomain, Polynomial};
 use ark_poly_commit::{LabeledPolynomial, PCRandomness};
 
+use super::verifier::{VerifierFirstMsg, VerifierSecondMsg, VerifierThirdMsg};
+use super::{PIOPError, PIOP};
 use crate::commitment::HomomorphicCommitment;
 use crate::multiproof::poly::construct_vanishing;
 use crate::oracles::query::QueryContext;
 use crate::oracles::rotation::Rotation;
 use crate::oracles::traits::Instantiable;
-use super::verifier::{VerifierFirstMsg, VerifierSecondMsg, VerifierThirdMsg};
-use super::{PIOPError, PIOP};
 
 // &'a Vec<Box<dyn VirtualOracle<F>>>
 
 pub struct ProverState<'a, F: PrimeField, PC: HomomorphicCommitment<F>> {
-    num_of_oracles: usize, 
+    num_of_oracles: usize,
     opening_sets: BTreeMap<
         BTreeSet<Rotation>,
         Vec<(&'a dyn Instantiable<F>, &'a PC::Randomness)>,
@@ -99,7 +99,8 @@ impl<F: PrimeField> PIOP<F> {
                 let mut evaluation = F::zero();
                 for (i, (oracle, _)) in oracles_rands.iter().enumerate() {
                     evaluation += x1_powers[i]
-                        * oracle.query(&QueryContext::Challenge(evaluation_point));
+                        * oracle
+                            .query(&QueryContext::Challenge(evaluation_point));
                 }
 
                 let prev = q_i_evals_set.insert(evaluation_point, evaluation);
