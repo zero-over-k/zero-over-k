@@ -1,8 +1,6 @@
-use ark_ff::PrimeField;
-
-use crate::oracles::{query::OracleType, rotation::Rotation};
-
 use super::{query::VirtualQuery, virtual_expression::VirtualExpression};
+use crate::oracles::{query::OracleType, rotation::Rotation};
+use ark_ff::PrimeField;
 
 pub trait PrecompiledVO<F: PrimeField> {
     fn get_expr_and_queries() -> (VirtualExpression<F>, Vec<VirtualQuery>);
@@ -78,7 +76,7 @@ impl<F: PrimeField> PrecompiledVO<F> for PrecompiledPlonkArith {
         let ql = VirtualQuery::new(1, Rotation::curr(), OracleType::Fixed);
         let qr = VirtualQuery::new(2, Rotation::curr(), OracleType::Fixed);
         let qo = VirtualQuery::new(3, Rotation::curr(), OracleType::Fixed);
-        let qpi = VirtualQuery::new(4, Rotation::curr(), OracleType::Fixed);
+        let qc = VirtualQuery::new(4, Rotation::curr(), OracleType::Fixed);
 
         // Pub input
         let pi = VirtualQuery::new(0, Rotation::curr(), OracleType::Instance);
@@ -93,7 +91,7 @@ impl<F: PrimeField> PrecompiledVO<F> for PrecompiledPlonkArith {
             let ql: VirtualExpression<F> = ql.clone().into();
             let qr: VirtualExpression<F> = qr.clone().into();
             let qo: VirtualExpression<F> = qo.clone().into();
-            let qpi: VirtualExpression<F> = qpi.clone().into();
+            let qc: VirtualExpression<F> = qc.clone().into();
 
             let pi: VirtualExpression<F> = pi.clone().into();
 
@@ -101,10 +99,122 @@ impl<F: PrimeField> PrecompiledVO<F> for PrecompiledPlonkArith {
             let b: VirtualExpression<F> = b.clone().into();
             let c: VirtualExpression<F> = c.clone().into();
 
-            a.clone() * b.clone() * qm + a * ql + b * qr + c * qo + pi + qpi
+            a.clone() * b.clone() * qm + a * ql + b * qr + c * qo + qc + pi
         };
 
-        (plonk_expression, vec![qm, ql, qr, qo, qpi, pi, a, b, c])
+        (plonk_expression, vec![qm, ql, qr, qo, qc, pi, a, b, c])
+    }
+}
+
+pub struct PlonkArith4 {}
+
+impl<F: PrimeField> PrecompiledVO<F> for PlonkArith4 {
+    fn get_expr_and_queries() -> (VirtualExpression<F>, Vec<VirtualQuery>) {
+        // Selectors
+        let qm = VirtualQuery::new(0, Rotation::curr(), OracleType::Fixed);
+        let ql = VirtualQuery::new(1, Rotation::curr(), OracleType::Fixed);
+        let qr = VirtualQuery::new(2, Rotation::curr(), OracleType::Fixed);
+        let q4 = VirtualQuery::new(3, Rotation::curr(), OracleType::Fixed);
+        let qo = VirtualQuery::new(4, Rotation::curr(), OracleType::Fixed);
+        let qc = VirtualQuery::new(5, Rotation::curr(), OracleType::Fixed);
+
+        // Pub input
+        let pi = VirtualQuery::new(0, Rotation::curr(), OracleType::Instance);
+
+        // Witnesses
+        let a = VirtualQuery::new(0, Rotation::curr(), OracleType::Witness);
+        let b = VirtualQuery::new(1, Rotation::curr(), OracleType::Witness);
+        let c = VirtualQuery::new(2, Rotation::curr(), OracleType::Witness);
+        let d = VirtualQuery::new(2, Rotation::curr(), OracleType::Witness);
+
+        let plonk_expression = {
+            let qm: VirtualExpression<F> = qm.clone().into();
+            let ql: VirtualExpression<F> = ql.clone().into();
+            let qr: VirtualExpression<F> = qr.clone().into();
+            let q4: VirtualExpression<F> = q4.clone().into();
+            let qo: VirtualExpression<F> = qo.clone().into();
+            let qc: VirtualExpression<F> = qc.clone().into();
+
+            let pi: VirtualExpression<F> = pi.clone().into();
+
+            let a: VirtualExpression<F> = a.clone().into();
+            let b: VirtualExpression<F> = b.clone().into();
+            let c: VirtualExpression<F> = c.clone().into();
+            let d: VirtualExpression<F> = d.clone().into();
+
+            a.clone() * b.clone() * qm
+                + a * ql
+                + b * qr
+                + d * q4
+                + c * qo
+                + pi
+                + qc
+        };
+
+        (plonk_expression, vec![qm, ql, qr, q4, qo, qc, pi, a, b, c])
+    }
+}
+
+pub struct PrecompiledLogic4 {}
+
+impl<F: PrimeField> PrecompiledVO<F> for PrecompiledLogic4 {
+    /// The identity we want to check is `q_logic * A = 0` where:
+    ///
+    /// ```text
+    /// G = H + E
+    /// H = q_c * [9c - 3(a+b)]
+    /// E = 3(a+b+c) - 2F
+    /// F = d[d(4d - 18(a+b) + 81) + 18(a^2 + b^2) - 81(a+b) + 83]
+    /// ```
+    fn get_expr_and_queries() -> (VirtualExpression<F>, Vec<VirtualQuery>) {
+        // Witnesses
+        let a = VirtualQuery::new(0, Rotation::curr(), OracleType::Witness);
+        let b = VirtualQuery::new(1, Rotation::curr(), OracleType::Witness);
+        let c = VirtualQuery::new(2, Rotation::curr(), OracleType::Witness);
+        let d = VirtualQuery::new(2, Rotation::curr(), OracleType::Witness);
+        // Selector
+        let qc = VirtualQuery::new(4, Rotation::curr(), OracleType::Fixed);
+
+        let logic_expr = {
+            let qc: VirtualExpression<F> = qc.clone().into();
+
+            let a: VirtualExpression<F> = a.clone().into();
+            let b: VirtualExpression<F> = b.clone().into();
+            let c: VirtualExpression<F> = c.clone().into();
+            let d: VirtualExpression<F> = d.clone().into();
+
+            let const_2: VirtualExpression<F> =
+                VirtualExpression::Constant(F::from(2u32));
+            let const_3: VirtualExpression<F> =
+                VirtualExpression::Constant(F::from(3u32));
+            let const_4: VirtualExpression<F> =
+                VirtualExpression::Constant(F::from(4u32));
+            let const_9: VirtualExpression<F> =
+                VirtualExpression::Constant(F::from(9u32));
+            let const_18: VirtualExpression<F> =
+                VirtualExpression::Constant(F::from(18u32));
+            let const_81: VirtualExpression<F> =
+                VirtualExpression::Constant(F::from(81u32));
+            let const_83: VirtualExpression<F> =
+                VirtualExpression::Constant(F::from(83u32));
+
+            let f = d.clone()
+                * (d.clone()
+                    * (const_4 * d
+                        - const_18.clone() * (a.clone() + b.clone())
+                        + const_81.clone())
+                    + const_18
+                        * (a.clone() * a.clone() + b.clone() * b.clone())
+                    - const_81 * (a.clone() + b.clone())
+                    + const_83);
+            let e = const_3.clone() * (a.clone() + b.clone() + c.clone())
+                - const_2 * f;
+            let h = qc * (const_9 * c - const_3 * (a + b));
+            let a = h + e;
+            a
+        };
+
+        (logic_expr, vec![qc, a, b, c, d])
     }
 }
 
