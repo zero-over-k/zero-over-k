@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use ark_ff::PrimeField;
 use ark_poly::{
@@ -20,7 +20,33 @@ pub struct FixedOracle<F: PrimeField, PC: HomomorphicCommitment<F>> {
     pub(crate) poly: DensePolynomial<F>,
     pub(crate) evals_at_coset_of_extended_domain: Option<Vec<F>>,
     pub(crate) queried_rotations: BTreeSet<Rotation>,
+    pub(crate) evals_at_challenges: BTreeMap<F, F>,
     pub(crate) commitment: Option<PC::Commitment>,
+}
+
+impl<F: PrimeField, PC: HomomorphicCommitment<F>> Clone for FixedOracle<F, PC> {
+    fn clone(&self) -> Self {
+        Self {
+            label: self.label.clone(),
+            poly: self.poly.clone(),
+            evals_at_coset_of_extended_domain: self
+                .evals_at_coset_of_extended_domain
+                .clone(),
+            queried_rotations: self.queried_rotations.clone(),
+            evals_at_challenges: self.evals_at_challenges.clone(),
+            commitment: self.commitment.clone(),
+        }
+    }
+}
+
+//TODO: move this to committed trait
+impl<F: PrimeField, PC: HomomorphicCommitment<F>> FixedOracle<F, PC> {
+    pub fn register_eval_at_challenge(&mut self, challenge: F, eval: F) {
+        let _ = self.evals_at_challenges.insert(challenge, eval);
+        // if !prev_eval.is_none() {
+        //     panic!("Same eval already registered for challenge {}", challenge);
+        // }
+    }
 }
 
 impl<F: PrimeField, PC: HomomorphicCommitment<F>> ConcreteOracle<F>
@@ -37,6 +63,15 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> ConcreteOracle<F>
     fn query(&self, ctx: &QueryContext<F>) -> F {
         match ctx {
             QueryContext::Challenge(challenge) => {
+                // TODO: when on verifier side we should keep poly to None and eval as Committed oracle
+                // on verifier side we keep poly and evaluate normaly
+                // match self.evals_at_challenges.get(&challenge) {
+                //     Some(eval) => *eval,
+                //     None => panic!(
+                //         "No eval at challenge: {} of oracle {}",
+                //         challenge, self.label
+                //     ),
+                // }
                 self.poly.evaluate(&challenge)
             }
             QueryContext::ExtendedCoset(

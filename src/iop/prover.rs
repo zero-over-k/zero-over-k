@@ -1,3 +1,4 @@
+use core::num;
 use std::{
     cmp::max,
     collections::{BTreeMap, BTreeSet},
@@ -7,12 +8,13 @@ use std::{
 use ark_ff::PrimeField;
 use ark_poly::{
     univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
-    Polynomial, UVPolynomial,
+    Polynomial, UVPolynomial, domain,
 };
 use ark_std::rand::Rng;
 
 use crate::{
     commitment::HomomorphicCommitment,
+    data_structures::{IndexInfo, VerifierKey},
     iop::error::Error,
     iop::{verifier::VerifierFirstMsg, PIOPforPolyIdentity},
     oracles::{
@@ -31,13 +33,12 @@ use crate::{
 
 // #[derive(Clone)]
 /// State of the prover
-pub struct ProverState<'a, F: PrimeField, PC: HomomorphicCommitment<F>> {
+pub struct ProverState<'a, F: PrimeField> {
     pub(crate) witness_oracles_mapping: BTreeMap<String, usize>, // TODO: introduce &str here maybe
     pub(crate) instance_oracles_mapping: BTreeMap<String, usize>,
     pub(crate) fixed_oracles_mapping: BTreeMap<String, usize>,
     pub(crate) witness_oracles: &'a mut [WitnessProverOracle<F>],
     pub(crate) instance_oracles: &'a mut [InstanceOracle<F>],
-    pub(crate) fixed_oracles: &'a mut [FixedOracle<F, PC>],
     pub(crate) vos: &'a [Box<&'a dyn VirtualOracle<F>>],
     pub(crate) domain: GeneralEvaluationDomain<F>,
     pub(crate) vanishing_polynomial: DensePolynomial<F>,
@@ -49,11 +50,11 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
     pub fn init_prover<'a>(
         witness_oracles: &'a mut [WitnessProverOracle<F>],
         instance_oracles: &'a mut [InstanceOracle<F>],
-        fixed_oracles: &'a mut [FixedOracle<F, PC>],
         vos: &'a [Box<&'a dyn VirtualOracle<F>>],
         domain_size: usize,
         vanishing_polynomial: &DensePolynomial<F>,
-    ) -> ProverState<'a, F, PC> {
+        vk: &VerifierKey<F, PC>,
+    ) -> ProverState<'a, F> {
         let domain = GeneralEvaluationDomain::new(domain_size).unwrap();
 
         let witness_oracles_mapping = witness_oracles
@@ -66,7 +67,8 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
             .enumerate()
             .map(|(i, oracle)| (oracle.get_label(), i))
             .collect();
-        let fixed_oracles_mapping = fixed_oracles
+        let fixed_oracles_mapping = vk
+            .fixed_oracles
             .iter()
             .enumerate()
             .map(|(i, oracle)| (oracle.get_label(), i))
@@ -78,7 +80,6 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
             fixed_oracles_mapping,
             witness_oracles,
             instance_oracles,
-            fixed_oracles,
             vos,
             domain,
             vanishing_polynomial: vanishing_polynomial.clone(),
@@ -86,41 +87,9 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
         }
     }
     pub fn prover_first_round<'a, R: Rng>(
-        state: &'a mut ProverState<F, PC>,
+        state: &'a mut ProverState<F>,
         rng: &mut R,
     ) -> Result<Vec<WitnessProverOracle<F>>, Error> {
-        // 1. Get all different witness queries
-        for vo in state.vos {
-            for query in vo.get_queries() {
-                match query.oracle_type {
-                    OracleType::Witness => {
-                        match state.witness_oracles_mapping.get(&query.label) {
-                            Some(index) => state.witness_oracles[*index]
-                                .register_rotation(query.rotation),
-                            None => panic!(
-                                "Witness oracle with label add_label not found"
-                            ), //TODO: Introduce new Error here,
-                        }
-                    }
-                    OracleType::Instance => {
-                        match state.instance_oracles_mapping.get(&query.label) {
-                            Some(index) => state.instance_oracles[*index].register_rotation(query.rotation),
-                            None => panic!("Instance oracle with label add_label not found") //TODO: Introduce new Error here,
-                        }
-                    }
-                    OracleType::Fixed => {
-                        match state.fixed_oracles_mapping.get(&query.label) {
-                            Some(index) => state.fixed_oracles[*index]
-                                .register_rotation(query.rotation),
-                            None => panic!(
-                                "Fixed oracle with label add_label not found"
-                            ), //TODO: Introduce new Error here,
-                        }
-                    }
-                }
-            }
-        }
-
         // 3. Mask wtns oracles
         for oracle in state.witness_oracles.iter_mut() {
             oracle.mask(&state.vanishing_polynomial, rng);
@@ -131,61 +100,17 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
 
     pub fn prover_second_round(
         verifier_msg: &VerifierFirstMsg<F>,
-        state: &mut ProverState<F, PC>,
-        _srs_size: usize,
+        state: &mut ProverState<F>,
+        index_info: &IndexInfo<F>,
+        vk: &VerifierKey<F, PC>,
     ) -> Result<Vec<WitnessProverOracle<F>>, Error> {
-        // 1. compute quotient degree
-        let domain_size = state.domain.size();
-        let mut max_degree = 0;
-        for vo in state.vos {
-            let vo_degree = vo.get_expression().degree(&|query| {
-                match query.oracle_type {
-                    OracleType::Witness => {
-                        match state.witness_oracles_mapping.get(&query.label) {
-                            Some(index) => state.witness_oracles[*index]
-                                .get_degree(domain_size),
-                            None => panic!(
-                                "Witness oracle with label add_label not found"
-                            ), //TODO: Introduce new Error here,
-                        }
-                    }
-                    OracleType::Instance => {
-                        match state.instance_oracles_mapping.get(&query.label) {
-                            Some(index) => state.instance_oracles[*index]
-                                .get_degree(domain_size),
-                            None => panic!(
-                                "Witness oracle with label add_label not found"
-                            ), //TODO: Introduce new Error here,
-                        }
-                    }
-                    OracleType::Fixed => {
-                        match state.fixed_oracles_mapping.get(&query.label) {
-                            Some(index) => state.fixed_oracles[*index]
-                                .get_degree(domain_size),
-                            None => panic!(
-                                "Witness oracle with label add_label not found"
-                            ), //TODO: Introduce new Error here,
-                        }
-                    }
-                }
-            });
-            max_degree = max(max_degree, vo_degree);
-        }
-
-        let quotient_degree = max_degree - state.vanishing_polynomial.degree();
-
-        // 2. Compute extended domain
-        let extended_domain =
-            GeneralEvaluationDomain::new(quotient_degree).unwrap();
-        let _scaling_ratio = extended_domain.size() / state.domain.size();
-
         // 3. Compute extended evals of each oracle
         for oracle in state.witness_oracles.iter_mut() {
-            oracle.compute_extended_evals(&extended_domain);
+            oracle.compute_extended_evals(&index_info.extended_coset_domain);
         }
 
         for oracle in state.instance_oracles.iter_mut() {
-            oracle.compute_extended_evals(&extended_domain);
+            oracle.compute_extended_evals(&index_info.extended_coset_domain);
         }
 
         let powers_of_alpha: Vec<F> = successors(Some(F::one()), |alpha_i| {
@@ -194,9 +119,10 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
         .take(state.vos.len())
         .collect();
 
-        let mut numerator_evals = vec![F::zero(); extended_domain.size()];
+        let mut numerator_evals =
+            vec![F::zero(); index_info.extended_coset_domain.size()];
 
-        for i in 0..extended_domain.size() {
+        for i in 0..index_info.extended_coset_domain.size() {
             for (vo_index, vo) in state.vos.iter().enumerate() {
                 let vo_evaluation = vo.get_expression().evaluate(
                     &|x: F| x,
@@ -213,13 +139,13 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
                             OracleType::Instance => {
                                 match state.instance_oracles_mapping.get(&query.label) {
                                     Some(index) => state.instance_oracles[*index].query(&ctx),
-                                    None => panic!("Witness oracle with label add_label not found") //TODO: Introduce new Error here,
+                                    None => panic!("Instance oracle with label add_label not found") //TODO: Introduce new Error here,
                                 }
                             },
                             OracleType::Fixed => {
                                 match state.fixed_oracles_mapping.get(&query.label) {
-                                    Some(index) => state.fixed_oracles[*index].query(&ctx),
-                                    None => panic!("Witness oracle with label add_label not found") //TODO: Introduce new Error here,
+                                    Some(index) => vk.fixed_oracles[*index].query(&ctx),
+                                    None => panic!("Fixed oracle with label add_label not found") //TODO: Introduce new Error here,
                                 }
                             },
                         }
@@ -233,23 +159,21 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
                 numerator_evals[i] += powers_of_alpha[vo_index] * vo_evaluation;
             }
         }
-
-        let mut zh_evals =
-            extended_domain.coset_fft(&state.vanishing_polynomial);
-        ark_ff::batch_inversion(&mut zh_evals);
+        
 
         let quotient_evals: Vec<_> = numerator_evals
             .iter()
-            .zip(zh_evals.iter())
+            .zip(vk.zh_inverses_over_coset.iter())
             .map(|(&nom, &denom)| nom * denom)
             .collect();
 
         let quotient = DensePolynomial::from_coefficients_slice(
-            &extended_domain.coset_ifft(&quotient_evals),
+            &index_info.extended_coset_domain.coset_ifft(&quotient_evals),
         );
 
         let mut quotient_coeffs = Vec::from(quotient.coeffs());
-        let padding_size = extended_domain.size() - quotient_coeffs.len();
+        let padding_size =
+            index_info.extended_coset_domain.size() - quotient_coeffs.len();
         if padding_size > 0 {
             quotient_coeffs.extend(vec![F::zero(); padding_size]);
         }
@@ -328,11 +252,6 @@ mod test {
             LabeledCommitment::new("r_comm".to_string(), r_comm.clone(), None);
         let r_rand = PC::add_rands(&rands[0], &PC::scale_rand(&rands[1], x1));
 
-        // let r_rand = rands[0] + rands[1];
-
-        // let (r_comm, r_rands) = PC::commit(&committer_key, &[r.clone()], Some(&mut rng)).unwrap();
-        // println!("r_rand {:?}", r_rands[0]);
-
         let proof = PC::open(
             &committer_key,
             &[r.clone()],
@@ -343,16 +262,6 @@ mod test {
             Some(&mut rng),
         )
         .unwrap();
-
-        // let proof = PC::open(
-        //     &committer_key,
-        //     polys.iter(),
-        //     comms.iter(),
-        //     &challenge,
-        //     x1,
-        //     rands.iter(),
-        //     Some(&mut rng)
-        // ).unwrap();
 
         let r_comm = PC::add(
             comms[0].commitment(),

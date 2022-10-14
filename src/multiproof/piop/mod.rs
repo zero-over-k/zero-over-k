@@ -65,7 +65,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng>
 
     pub fn prove<R: Rng>(
         ck: &PC::CommitterKey,
-        oracles: &Vec<impl Instantiable<F>>,
+        oracles: &[&dyn Instantiable<F>],
         oracle_rands: &[PC::Randomness],
         evaluation_challenge: F,
         domain_size: usize,
@@ -140,7 +140,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng>
     pub fn verify(
         vk: &PC::VerifierKey,
         proof: Proof<F, PC>,
-        oracles: &Vec<impl CommittedOracle<F, PC>>, // At this moment challenge -> eval mapping should already be filled
+        oracles: &[&dyn CommittedOracle<F, PC>], // At this moment challenge -> eval mapping should already be filled
         evaluation_challenge: F,
         domain_size: usize,
         fs_rng: &mut FS,
@@ -166,7 +166,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng>
             Vec<&dyn CommittedOracle<F, PC>>,
         >::new();
 
-        for oracle in oracles.iter() {
+        for &oracle in oracles.iter() {
             let oracles = opening_sets
                 .entry(oracle.get_queried_rotations().clone())
                 .or_insert(vec![]);
@@ -296,7 +296,7 @@ mod test {
         commitment::KZG10,
         oracles::{rotation::Rotation, witness::WitnessProverOracle},
         oracles::{
-            traits::{Instantiable},
+            traits::{CommittedOracle, Instantiable},
             witness::WitnessVerifierOracle,
         },
         rng::{FiatShamirRng, SimpleHashFiatShamirRng},
@@ -379,7 +379,12 @@ mod test {
         };
 
         // TODO: Can we remove this Box
-        let oracles = vec![a.clone(), b.clone(), c.clone(), d.clone()];
+        let oracles: Vec<&dyn Instantiable<F>> = vec![
+            &a as &dyn Instantiable<F>,
+            &b as &dyn Instantiable<F>,
+            &c as &dyn Instantiable<F>,
+            &d as &dyn Instantiable<F>,
+        ];
 
         let labeled_oracles: Vec<LabeledPolynomial<F, DensePolynomial<F>>> =
             oracles.iter().map(|oracle| oracle.to_labeled()).collect();
@@ -453,8 +458,12 @@ mod test {
             commitment: Some(oracles_commitments[3].commitment().clone()),
         };
 
-        let ver_oracles =
-            [a_ver.clone(), b_ver.clone(), c_ver.clone(), d_ver.clone()];
+        let ver_oracles: Vec<&dyn CommittedOracle<F, PC>> = vec![
+            &a_ver as &dyn CommittedOracle<F, PC>,
+            &b_ver as &dyn CommittedOracle<F, PC>,
+            &c_ver as &dyn CommittedOracle<F, PC>,
+            &d_ver as &dyn CommittedOracle<F, PC>,
+        ];
 
         let mut fs_rng = FS::initialize(
             &to_bytes![&oracles_commitments, &evals, &xi].unwrap(),

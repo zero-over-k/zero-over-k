@@ -1,3 +1,5 @@
+use core::fmt;
+
 use ark_ff::{Field, PrimeField};
 
 use super::rotation::Rotation;
@@ -40,6 +42,16 @@ pub enum OracleType {
     Instance,
     Fixed,
     // TODO: add Selector
+}
+
+impl fmt::Display for OracleType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            OracleType::Witness => write!(f, "Witness oracle"),
+            OracleType::Instance => write!(f, "Instance oracle"),
+            OracleType::Fixed => write!(f, "Fixed oracle"),
+        }
+    }
 }
 
 #[derive(Clone)]

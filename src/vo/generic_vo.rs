@@ -15,6 +15,7 @@ use super::{
     virtual_expression::VirtualExpression, VirtualOracle,
 };
 
+#[derive(Clone)]
 pub struct GenericVO<F: PrimeField> {
     pub(crate) virtual_exp: VirtualExpression<F>,
     pub(crate) virtual_queries: Vec<VirtualQuery>,

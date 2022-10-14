@@ -163,12 +163,13 @@ pub struct WitnessVerifierOracle<F: PrimeField, PC: HomomorphicCommitment<F>> {
     pub(crate) commitment: Option<PC::Commitment>,
 }
 
+//TODO: move this to committed trait
 impl<F: PrimeField, PC: HomomorphicCommitment<F>> WitnessVerifierOracle<F, PC> {
     pub fn register_eval_at_challenge(&mut self, challenge: F, eval: F) {
-        let prev_eval = self.evals_at_challenges.insert(challenge, eval);
-        if !prev_eval.is_none() {
-            panic!("Same eval already registered for challenge {}", challenge);
-        }
+        let _ = self.evals_at_challenges.insert(challenge, eval);
+        // if !prev_eval.is_none() {
+        //     panic!("Same eval already registered for challenge {}", challenge);
+        // }
     }
 }
 

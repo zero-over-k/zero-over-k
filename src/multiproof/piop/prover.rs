@@ -31,7 +31,7 @@ pub struct ProverState<'a, F: PrimeField, PC: HomomorphicCommitment<F>> {
 impl<F: PrimeField> PIOP<F> {
     // NOTE: Oracles are already masked
     pub fn init_prover<'a, PC: HomomorphicCommitment<F>>(
-        oracles: &'a Vec<impl Instantiable<F>>,
+        oracles: &'a [&dyn Instantiable<F>],
         oracle_rands: &'a [PC::Randomness],
         domain_size: usize,
     ) -> Result<ProverState<'a, F, PC>, PIOPError> {
@@ -40,7 +40,7 @@ impl<F: PrimeField> PIOP<F> {
             Vec<(&'a dyn Instantiable<F>, &'a PC::Randomness)>,
         >::new();
 
-        for (oracle, rand) in oracles.iter().zip(oracle_rands.iter()) {
+        for (&oracle, rand) in oracles.iter().zip(oracle_rands.iter()) {
             let oracles = opening_sets
                 .entry(oracle.get_queried_rotations().clone())
                 .or_insert(vec![]);

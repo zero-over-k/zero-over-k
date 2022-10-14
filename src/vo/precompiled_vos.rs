@@ -162,9 +162,48 @@ where
     }
 }
 
+pub struct PrecompiledPlonkArith {}
+
+impl<F: PrimeField> PrecompiledVO<F> for PrecompiledPlonkArith {
+    fn get_expr_and_queries() -> (VirtualExpression<F>, Vec<VirtualQuery>) {
+        // Selectors
+        let qm = VirtualQuery::new(0, Rotation::curr(), OracleType::Fixed);
+        let ql = VirtualQuery::new(1, Rotation::curr(), OracleType::Fixed);
+        let qr = VirtualQuery::new(2, Rotation::curr(), OracleType::Fixed);
+        let qo = VirtualQuery::new(3, Rotation::curr(), OracleType::Fixed);
+        let qpi = VirtualQuery::new(4, Rotation::curr(), OracleType::Fixed);
+
+        // Pub input
+        let pi = VirtualQuery::new(0, Rotation::curr(), OracleType::Instance);
+
+        // Witnesses
+        let a = VirtualQuery::new(0, Rotation::curr(), OracleType::Witness);
+        let b = VirtualQuery::new(1, Rotation::curr(), OracleType::Witness);
+        let c = VirtualQuery::new(2, Rotation::curr(), OracleType::Witness);
+
+        let plonk_expression = {
+            let qm: VirtualExpression<F> = qm.clone().into();
+            let ql: VirtualExpression<F> = ql.clone().into();
+            let qr: VirtualExpression<F> = qr.clone().into();
+            let qo: VirtualExpression<F> = qo.clone().into();
+            let qpi: VirtualExpression<F> = qpi.clone().into();
+
+            let pi: VirtualExpression<F> = pi.clone().into();
+
+            let a: VirtualExpression<F> = a.clone().into();
+            let b: VirtualExpression<F> = b.clone().into();
+            let c: VirtualExpression<F> = c.clone().into();
+
+            a.clone() * b.clone() * qm + a * ql + b * qr + c * qo + pi + qpi
+        };
+
+        (plonk_expression, vec![qm, ql, qr, qo, qpi, pi, a, b, c])
+    }
+}
+
 #[cfg(test)]
 mod test {
-    use std::collections::BTreeSet;
+    use std::collections::{BTreeMap, BTreeSet};
 
     use crate::{
         oracles::{
@@ -240,7 +279,8 @@ mod test {
                 label: label.to_string(),
                 poly: DensePolynomial::default(),
                 evals_at_coset_of_extended_domain: None,
-                queried_rotations: BTreeSet::new(),
+                queried_rotations: BTreeSet::default(),
+                evals_at_challenges: BTreeMap::default(),
                 commitment: None,
             })
             .collect();
