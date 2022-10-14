@@ -1,13 +1,12 @@
-use core::num;
+
 use std::{
-    cmp::max,
     collections::{BTreeMap, BTreeSet},
     iter::successors,
 };
 
 use ark_ff::PrimeField;
 use ark_poly::{
-    domain, univariate::DensePolynomial, EvaluationDomain,
+    univariate::DensePolynomial, EvaluationDomain,
     GeneralEvaluationDomain, Polynomial, UVPolynomial,
 };
 use ark_std::rand::Rng;
@@ -18,7 +17,6 @@ use crate::{
     iop::error::Error,
     iop::{verifier::VerifierFirstMsg, PIOPforPolyIdentity},
     oracles::{
-        fixed::FixedOracle,
         instance::InstanceOracle,
         query::{OracleType, QueryContext},
         rotation::Rotation,

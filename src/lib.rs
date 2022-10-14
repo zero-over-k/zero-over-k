@@ -2,7 +2,7 @@ use std::cmp::max;
 use std::collections::{BTreeMap, BTreeSet};
 use std::iter::{self, successors};
 use std::marker::PhantomData;
-use std::option::Iter;
+
 
 use ark_ff::{to_bytes, PrimeField};
 use ark_poly::univariate::DensePolynomial;
@@ -10,7 +10,7 @@ use ark_poly::{EvaluationDomain, GeneralEvaluationDomain, Polynomial};
 use ark_poly_commit::{
     LabeledPolynomial, PCCommitterKey, PCRandomness, PCUniversalParams,
 };
-use digest::generic_array::typenum::Quot;
+
 use error::Error;
 
 use ark_poly_commit::evaluate_query_set;
@@ -27,7 +27,7 @@ use oracles::witness::{WitnessProverOracle, WitnessVerifierOracle};
 use rng::FiatShamirRng;
 use vo::VirtualOracle;
 
-use crate::iop::prover;
+
 use crate::oracles::query::OracleType;
 use crate::oracles::rotation::Rotation;
 use crate::oracles::traits::CommittedOracle;

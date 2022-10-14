@@ -4,7 +4,7 @@ mod test {
     use std::collections::{BTreeMap, BTreeSet};
 
     use ark_bls12_381::{Bls12_381, Fr};
-    use ark_ff::{FftField, Field, One, PrimeField, UniformRand, Zero};
+    use ark_ff::{One, UniformRand, Zero};
     use ark_poly::Polynomial;
     use ark_poly::{
         univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
@@ -19,9 +19,9 @@ mod test {
     use crate::indexer::{Adversary, Indexer};
     use crate::multiproof::poly;
     use crate::oracles::fixed::{self, FixedOracle};
+
     use crate::oracles::instance::InstanceOracle;
 
-    use crate::oracles::query;
     use crate::oracles::traits::Instantiable;
     use crate::oracles::witness::{WitnessProverOracle, WitnessVerifierOracle};
     use crate::rng::SimpleHashFiatShamirRng;
@@ -145,7 +145,6 @@ mod test {
         println!("{}", proof.info());
         println!("{}", proof.cumulative_info());
 
-
         // Verifier
         let a_ver = WitnessVerifierOracle {
             label: "a".to_string(),
@@ -250,7 +249,7 @@ mod test {
             &fixed_evals[2],
             &fixed_evals[3],
         )
-        .map(|(w1, w2, w3, w4, w5, &q1, &q2, &q3, &q4)| {
+        .map(|(w1, w2, w3, w4, _w5, &q1, &q2, &q3, &q4)| {
             q1 * pow_5(w1) + q2 * pow_5(w2) + q3 * pow_5(w3) + q4 * pow_5(w4)
             // - pow_5(w5) //TODO: should this value be here
         })
@@ -523,7 +522,7 @@ mod test {
         let qpi_poly =
             DensePolynomial::from_coefficients_slice(&domain.ifft(&qpi_evals));
 
-        for (i, elem) in domain.elements().enumerate() {
+        for (_i, elem) in domain.elements().enumerate() {
             let a = a_poly.evaluate(&elem);
             let b = b_poly.evaluate(&elem);
             let c = c_poly.evaluate(&elem);
