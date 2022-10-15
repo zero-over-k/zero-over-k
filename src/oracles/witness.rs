@@ -13,7 +13,7 @@ use crate::commitment::HomomorphicCommitment;
 use super::{
     query::QueryContext,
     rotation::{Rotation, Sign},
-    traits::{CommittedOracle, ConcreteOracle, Instantiable, QuerySetProvider},
+    traits::{CommittedOracle, ConcreteOracle, Instantiable, QuerySetProvider, WitnessOracle},
 };
 
 #[derive(Clone)]
@@ -24,6 +24,8 @@ pub struct WitnessProverOracle<F: PrimeField> {
     pub(crate) queried_rotations: BTreeSet<Rotation>,
     pub(crate) should_mask: bool,
 }
+
+impl<F: PrimeField> WitnessOracle<F> for WitnessProverOracle<F> {}
 
 impl<F: PrimeField> WitnessProverOracle<F> {
     pub fn mask<R: Rng>(
@@ -172,6 +174,9 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> WitnessVerifierOracle<F, PC> {
         // }
     }
 }
+
+impl<F: PrimeField, PC: HomomorphicCommitment<F>> WitnessOracle<F> for WitnessVerifierOracle<F, PC> {}
+
 
 impl<F: PrimeField, PC: HomomorphicCommitment<F>> Clone
     for WitnessVerifierOracle<F, PC>

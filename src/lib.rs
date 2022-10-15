@@ -44,6 +44,8 @@ pub mod vo;
 
 pub mod multiproof;
 
+pub mod permutation;
+
 mod tests;
 
 pub struct PIL<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng> {

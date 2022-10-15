@@ -32,6 +32,8 @@ pub trait CommittedOracle<F: PrimeField, PC: HomomorphicCommitment<F>>:
     fn get_commitment(&self) -> &PC::Commitment;
 }
 
+pub trait WitnessOracle<F: PrimeField>: ConcreteOracle<F> {}
+
 pub trait QuerySetProvider<F: PrimeField>: ConcreteOracle<F> {
     fn get_query_set(
         &self,
