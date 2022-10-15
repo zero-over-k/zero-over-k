@@ -16,7 +16,7 @@ mod test {
 
     use crate::data_structures::ProverKey;
     use crate::multiproof::poly;
-    use crate::oracles::fixed::{FixedOracle, self};
+    use crate::oracles::fixed::{self, FixedOracle};
     use crate::oracles::instance::InstanceOracle;
 
     use crate::oracles::query;
@@ -245,7 +245,7 @@ mod test {
         )
         .map(|(w1, w2, w3, w4, w5, &q1, &q2, &q3, &q4)| {
             q1 * pow_5(w1) + q2 * pow_5(w2) + q3 * pow_5(w3) + q4 * pow_5(w4)
-                // - pow_5(w5) //TODO: should this value be here
+            // - pow_5(w5) //TODO: should this value be here
         })
         .collect();
 

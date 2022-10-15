@@ -13,7 +13,10 @@ use crate::commitment::HomomorphicCommitment;
 use super::{
     query::QueryContext,
     rotation::{Rotation, Sign},
-    traits::{CommittedOracle, ConcreteOracle, Instantiable, QuerySetProvider, WitnessOracle},
+    traits::{
+        CommittedOracle, ConcreteOracle, Instantiable, QuerySetProvider,
+        WitnessOracle,
+    },
 };
 
 #[derive(Clone)]
@@ -175,8 +178,10 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> WitnessVerifierOracle<F, PC> {
     }
 }
 
-impl<F: PrimeField, PC: HomomorphicCommitment<F>> WitnessOracle<F> for WitnessVerifierOracle<F, PC> {}
-
+impl<F: PrimeField, PC: HomomorphicCommitment<F>> WitnessOracle<F>
+    for WitnessVerifierOracle<F, PC>
+{
+}
 
 impl<F: PrimeField, PC: HomomorphicCommitment<F>> Clone
     for WitnessVerifierOracle<F, PC>

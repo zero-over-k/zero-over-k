@@ -628,10 +628,8 @@ where
             fixed_query_set.iter().zip(proof.fixed_oracle_evals.iter())
         {
             match fixed_oracles_mapping.get(poly_label) {
-                Some(index) => { 
-                    vk.fixed_oracles[*index]
-                    .register_eval_at_challenge(*point, evaluation)
-                },
+                Some(index) => vk.fixed_oracles[*index]
+                    .register_eval_at_challenge(*point, evaluation),
                 None => panic!("Missing poly: {}", poly_label),
             };
         }
@@ -691,7 +689,6 @@ where
 
             quotient_eval += powers_of_alpha[vo_index] * vo_evaluation;
         }
-
 
         let x_n = verifier_second_msg.xi.pow([domain_size as u64, 0, 0, 0]);
         let powers_of_x: Vec<F> =

@@ -7,8 +7,8 @@ use std::{
 
 use ark_ff::PrimeField;
 use ark_poly::{
-    univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
-    Polynomial, UVPolynomial, domain,
+    domain, univariate::DensePolynomial, EvaluationDomain,
+    GeneralEvaluationDomain, Polynomial, UVPolynomial,
 };
 use ark_std::rand::Rng;
 
@@ -159,7 +159,6 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
                 numerator_evals[i] += powers_of_alpha[vo_index] * vo_evaluation;
             }
         }
-        
 
         let quotient_evals: Vec<_> = numerator_evals
             .iter()
