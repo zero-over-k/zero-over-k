@@ -21,7 +21,7 @@ use crate::{
 
 /// This module constructs one zero knowledge adjusted permutation check
 /// (1 - (q_blind + q_last)) * (z(wX) * product_0,m-1 (vi(X) + beta*sigma_i(X) + gamma) - z(X) * product_0,m-1 (vi(X) + beta*sigma^i*X + gamma))
-/// It isn't aware of outer context where splitting, copying across aggregation polynomials, beginning and ending checks are happening
+/// It isn't aware of outer context where splitting, copying across aggregation polynomials, beginning and ending constraints are happening
 pub struct GrandProductArgument<F: PrimeField, PC: HomomorphicCommitment<F>> {
     _field: PhantomData<F>,
     _pc: PhantomData<PC>,
@@ -31,6 +31,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> GrandProductArgument<F, PC> {
     /// Given oracles constructs Z(X) polynomial that prover commits to
     pub fn construct_agg_poly<R: RngCore>(
         chunk_index: usize,
+        init_value: F, // this is F::one() for Z_0 and Z_[i-1][u] for Z[i], i>0
         permutation_oracles: &[FixedOracle<F, PC>],
         witness_oracles: &[WitnessProverOracle<F>],
         deltas: &[F],
@@ -52,7 +53,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> GrandProductArgument<F, PC> {
             .collect();
 
         let mut z_evals = Vec::<F>::with_capacity(domain.size());
-        let mut z_prev = F::one();
+        let mut z_prev = init_value;
         z_evals.push(z_prev);
 
         for i in 0..u {
@@ -68,9 +69,6 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> GrandProductArgument<F, PC> {
             z_prev *= nom * denom.inverse().unwrap();
             z_evals.push(z_prev);
         }
-
-        // sanity
-        assert_eq!(F::one(), z_evals[u]);
 
         // allowed rows is: u = domain_size - t - 1
         // t = domain_size - 1 - u
@@ -97,12 +95,71 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> GrandProductArgument<F, PC> {
         }
     }
 
+    /// Instantiates argument at specific root of unity
+    pub fn instantiate_argument_at_omega_i(
+        q_last: &FixedOracle<F, PC>,
+        q_blind: &FixedOracle<F, PC>,
+        z: &WitnessProverOracle<F>,
+        permutation_oracles: &[FixedOracle<F, PC>],
+        witness_oracles: &[impl WitnessOracle<F>],
+        deltas: &[F],
+        beta: F,
+        gamma: F,
+        domain_size: usize,
+        omega: F,
+        omega_index: usize,
+    ) -> F {
+        let zk_ctx = QueryContext::<F>::ExtendedCoset(
+            domain_size,
+            Rotation::curr(),
+            omega_index,
+        );
+        let zk_part =
+            F::one() - (q_last.query(&zk_ctx) + q_blind.query(&zk_ctx));
+
+        let z_wx_ctx = QueryContext::<F>::ExtendedCoset(
+            domain_size,
+            Rotation::next(),
+            omega_index,
+        );
+
+        let mut lhs = z.query(&z_wx_ctx);
+
+        let z_x_ctx = QueryContext::<F>::ExtendedCoset(
+            domain_size,
+            Rotation::curr(),
+            omega_index,
+        );
+        let mut rhs = z.query(&z_x_ctx);
+
+        let oracle_ctx = QueryContext::<F>::ExtendedCoset(
+            domain_size,
+            Rotation::curr(),
+            omega_index,
+        );
+
+        for ((w_i, sigma_i), &delta_i) in witness_oracles
+            .iter()
+            .zip(permutation_oracles.iter())
+            .zip(deltas.iter())
+        {
+            let w_res = w_i.query(&oracle_ctx);
+            lhs *= w_res + beta * sigma_i.query(&oracle_ctx) + gamma;
+            rhs *= w_res
+                + beta * delta_i * F::multiplicative_generator() * omega
+                + gamma;
+        }
+
+        zk_part * (lhs - rhs)
+    }
+
+    // TODO: this function will probably be removed
     pub fn instantiate_argument(
         q_last: &FixedOracle<F, PC>,
         q_blind: &FixedOracle<F, PC>,
-        z: &impl WitnessOracle<F>,
+        z: &WitnessProverOracle<F>,
         permutation_oracles: &[FixedOracle<F, PC>],
-        witness_oracles: &[impl WitnessOracle<F>],
+        witness_oracles: &[WitnessProverOracle<F>],
         deltas: &[F],
         beta: F,
         gamma: F,
@@ -165,8 +222,8 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> GrandProductArgument<F, PC> {
     pub fn open_argument(
         q_last: &FixedOracle<F, PC>,
         q_blind: &FixedOracle<F, PC>,
-        z: &impl WitnessOracle<F>,
-        permutation_oracles: &[FixedOracle<F, PC>],
+        z: &impl WitnessOracle<F>, //TODO: make this verifier witness oracle
+        permutation_oracles: &[FixedOracle<F, PC>], //TODO: make this verifier witness oracle
         witness_oracles: &[impl WitnessOracle<F>],
         deltas: &[F],
         beta: F,
@@ -516,6 +573,7 @@ mod test {
 
         let agg_poly = GrandProductArgument::<F, PC>::construct_agg_poly(
             0,
+            F::one(),
             &permutation_oracles,
             &witness_oracles,
             &deltas,
@@ -575,6 +633,12 @@ mod test {
             evaluation_challenge,
         );
 
-        assert_eq!(opening, q_eval * domain.vanishing_polynomial().evaluate(&evaluation_challenge));
+        assert_eq!(
+            opening,
+            q_eval
+                * domain
+                    .vanishing_polynomial()
+                    .evaluate(&evaluation_challenge)
+        );
     }
 }

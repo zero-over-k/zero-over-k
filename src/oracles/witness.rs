@@ -31,6 +31,7 @@ pub struct WitnessProverOracle<F: PrimeField> {
 impl<F: PrimeField> WitnessOracle<F> for WitnessProverOracle<F> {}
 
 impl<F: PrimeField> WitnessProverOracle<F> {
+    // TODO: remove
     pub fn mask<R: Rng>(
         &mut self,
         vanishing_polynomial: &DensePolynomial<F>,
@@ -42,6 +43,13 @@ impl<F: PrimeField> WitnessProverOracle<F> {
 
         let masking = DensePolynomial::rand(self.queried_rotations.len(), rng);
         self.poly += &(vanishing_polynomial * &masking);
+    }
+
+    pub fn get_evals_at_coset_of_extended_domain(&self) -> &Vec<F> {
+        match &self.evals_at_coset_of_extended_domain {
+            Some(evals) => evals,
+            None => panic!("Commitment not provided"),
+        }
     }
 }
 
