@@ -155,9 +155,42 @@ impl<F: PrimeField> PrecompiledVO<F> for PlonkArith4 {
     }
 }
 
-pub struct PrecompiledLogic4 {}
+// Precompiled VOs related to 4-wire LogicGate
 
-impl<F: PrimeField> PrecompiledVO<F> for PrecompiledLogic4 {
+pub struct Delta {}
+
+impl<F: PrimeField> PrecompiledVO<F> for Delta {
+    fn get_expr_and_queries() -> (VirtualExpression<F>, Vec<VirtualQuery>) {
+        // Witnesses
+        let a = VirtualQuery::new(0, Rotation::curr(), OracleType::Witness);
+        let a_next =
+            VirtualQuery::new(0, Rotation::next(), OracleType::Witness);
+        let expr = {
+            let a: VirtualExpression<F> = a.clone().into();
+            let a_next: VirtualExpression<F> = a_next.clone().into();
+            let const_4: VirtualExpression<F> =
+                VirtualExpression::Constant(F::from(4u32));
+            let delta = |e: VirtualExpression<F>| -> VirtualExpression<F> {
+                let const_1: VirtualExpression<F> =
+                    VirtualExpression::Constant(F::one());
+                let const_2: VirtualExpression<F> =
+                    VirtualExpression::Constant(F::from(2u32));
+                let const_3: VirtualExpression<F> =
+                    VirtualExpression::Constant(F::from(3u32));
+                (e.clone() - const_3)
+                    * (e.clone() - const_2)
+                    * (e.clone() - const_1)
+                    * e
+            };
+            delta(a_next - const_4 * a)
+        };
+
+        (expr, vec![a])
+    }
+}
+pub struct DeltaXorAnd {}
+
+impl<F: PrimeField> PrecompiledVO<F> for DeltaXorAnd {
     /// The identity we want to check is `q_logic * A = 0` where:
     ///
     /// ```text
@@ -175,7 +208,7 @@ impl<F: PrimeField> PrecompiledVO<F> for PrecompiledLogic4 {
         // Selector
         let qc = VirtualQuery::new(4, Rotation::curr(), OracleType::Fixed);
 
-        let logic_expr = {
+        let expr = {
             let qc: VirtualExpression<F> = qc.clone().into();
 
             let a: VirtualExpression<F> = a.clone().into();
@@ -214,7 +247,7 @@ impl<F: PrimeField> PrecompiledVO<F> for PrecompiledLogic4 {
             a
         };
 
-        (logic_expr, vec![qc, a, b, c, d])
+        (expr, vec![qc, a, b, c, d])
     }
 }
 
