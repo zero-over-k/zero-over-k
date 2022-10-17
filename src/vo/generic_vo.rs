@@ -6,9 +6,10 @@ use crate::{
     commitment::HomomorphicCommitment,
     oracles::{
         fixed::FixedOracle,
-        instance::InstanceOracle,
+        instance::{self, InstanceOracle},
         query::{OracleQuery, OracleType},
-        traits::ConcreteOracle,
+        rotation::Rotation,
+        traits::{ConcreteOracle, WitnessOracle},
     },
 };
 
@@ -23,7 +24,7 @@ pub struct GenericVO<F: PrimeField, PC: HomomorphicCommitment<F>> {
     pub(crate) virtual_queries: Vec<VirtualQuery>,
     pub(crate) queries: Option<Vec<OracleQuery>>,
     pub(crate) expression: Option<NewExpression<F>>,
-    _pc: PhantomData<PC>
+    _pc: PhantomData<PC>,
 }
 
 impl<F: PrimeField, PC: HomomorphicCommitment<F>> GenericVO<F, PC> {
@@ -33,34 +34,46 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> GenericVO<F, PC> {
             virtual_queries: cfg.1,
             queries: None,
             expression: None,
-            _pc: PhantomData
+            _pc: PhantomData,
         }
     }
 
     pub fn configure(
         &mut self,
-        witness_oracles: &[impl ConcreteOracle<F>],
-        instance_oracles: &[InstanceOracle<F>],
-        fixed_oracles: &[FixedOracle<F, PC>],
+        witness_oracles: &mut [impl WitnessOracle<F>],
+        instance_oracles: &mut [InstanceOracle<F>],
+        fixed_oracles: &mut [FixedOracle<F, PC>],
     ) {
         let mut queries = Vec::with_capacity(self.virtual_queries.len());
         for query in &self.virtual_queries {
             let oracle_query = match query.oracle_type {
-                crate::oracles::query::OracleType::Witness => OracleQuery {
-                    label: witness_oracles[query.index].get_label(),
-                    rotation: query.rotation,
-                    oracle_type: OracleType::Witness,
-                },
-                crate::oracles::query::OracleType::Instance => OracleQuery {
-                    label: instance_oracles[query.index].get_label(),
-                    rotation: query.rotation,
-                    oracle_type: OracleType::Instance,
-                },
-                crate::oracles::query::OracleType::Fixed => OracleQuery {
-                    label: fixed_oracles[query.index].get_label(),
-                    rotation: query.rotation,
-                    oracle_type: OracleType::Fixed,
-                },
+                crate::oracles::query::OracleType::Witness => {
+                    witness_oracles[query.index]
+                        .register_rotation(query.rotation);
+                    OracleQuery {
+                        label: witness_oracles[query.index].get_label(),
+                        rotation: query.rotation,
+                        oracle_type: OracleType::Witness,
+                    }
+                }
+                crate::oracles::query::OracleType::Instance => {
+                    instance_oracles[query.index]
+                        .register_rotation(query.rotation);
+                    OracleQuery {
+                        label: instance_oracles[query.index].get_label(),
+                        rotation: query.rotation,
+                        oracle_type: OracleType::Instance,
+                    }
+                }
+                crate::oracles::query::OracleType::Fixed => {
+                    fixed_oracles[query.index]
+                        .register_rotation(query.rotation);
+                    OracleQuery {
+                        label: fixed_oracles[query.index].get_label(),
+                        rotation: query.rotation,
+                        oracle_type: OracleType::Fixed,
+                    }
+                }
             };
 
             queries.push(oracle_query);
@@ -75,7 +88,9 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> GenericVO<F, PC> {
     }
 }
 
-impl<F: PrimeField, PC: HomomorphicCommitment<F>> VirtualOracle<F> for GenericVO<F, PC> {
+impl<F: PrimeField, PC: HomomorphicCommitment<F>> VirtualOracle<F>
+    for GenericVO<F, PC>
+{
     fn get_queries(&self) -> &[OracleQuery] {
         match &self.queries {
             Some(queries) => &queries,

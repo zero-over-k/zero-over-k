@@ -121,7 +121,10 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> ConcreteOracle<F>
                         };
                         return eval;
                     }
-                    None => panic!("Evals not provided"),
+                    None => panic!(
+                        "Evals not provided for oracle with label {}",
+                        self.label
+                    ),
                 }
             }
         }

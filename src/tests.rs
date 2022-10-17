@@ -11,10 +11,12 @@ mod test {
         UVPolynomial,
     };
 
+    use ark_serialize::CanonicalSerialize;
     use ark_std::test_rng;
     use rand_chacha::ChaChaRng;
 
     use crate::data_structures::ProverKey;
+    use crate::indexer::{Adversary, Indexer};
     use crate::multiproof::poly;
     use crate::oracles::fixed::{self, FixedOracle};
     use crate::oracles::instance::InstanceOracle;
@@ -109,19 +111,21 @@ mod test {
         let mut instance_oracles = [c];
         // let fixed_oracles: Vec<FixedOracle<F, PC>> = [];
 
-        mul_vo.configure(&witness_oracles, &instance_oracles, &[]);
+        mul_vo.configure(&mut witness_oracles, &mut instance_oracles, &mut []);
 
         let vos: Vec<&dyn VirtualOracle<F>> = vec![&mul_vo];
 
-        let vk = PilInstance::index(
+        let vk = Indexer::index(
             &ck,
             &verifier_key,
             &vos,
-            &mut witness_oracles,
-            &mut instance_oracles,
-            &mut [],
+            &witness_oracles,
+            &instance_oracles,
+            &[],
+            &[],
             domain,
-            domain.vanishing_polynomial().into(),
+            &domain.vanishing_polynomial().into(),
+            Adversary::Prover,
         )
         .unwrap();
 
@@ -138,6 +142,11 @@ mod test {
         )
         .unwrap();
 
+        println!("{}", proof.info());
+        println!("{}", proof.cumulative_info());
+
+
+        // Verifier
         let a_ver = WitnessVerifierOracle {
             label: "a".to_string(),
             queried_rotations: BTreeSet::default(),
@@ -165,16 +174,25 @@ mod test {
         let mut ver_wtns_oracles = [a_ver, b_ver];
         let mut instance_oracles = [c];
 
+        let mut mul_vo =
+            GenericVO::<F, PC>::init(PrecompiledMul::get_expr_and_queries());
+
+        mul_vo.configure(&mut ver_wtns_oracles, &mut instance_oracles, &mut []);
+
+        let vos: Vec<&dyn VirtualOracle<F>> = vec![&mul_vo];
+
         // Repeat but this time provide verifier witness oracles
-        let mut vk = PilInstance::index(
+        let mut vk = Indexer::index(
             &ck,
             &verifier_key,
             &vos,
             &mut ver_wtns_oracles,
-            &mut instance_oracles,
-            &mut [],
+            &instance_oracles,
+            &[],
+            &[],
             domain,
-            domain.vanishing_polynomial().into(),
+            &domain.vanishing_polynomial().into(),
+            Adversary::Verifier,
         )
         .unwrap();
 
@@ -195,7 +213,7 @@ mod test {
 
     #[test]
     fn test_rescue_gate() {
-        let max_degree = 17;
+        let max_degree = 15;
         let mut rng = test_rng();
 
         let srs = PilInstance::universal_setup(max_degree, &mut rng).unwrap();
@@ -212,11 +230,13 @@ mod test {
         let witness_evals: Vec<Vec<F>> =
             witness_polys.iter().map(|poly| domain.fft(&poly)).collect();
 
-        let fixed_polys: Vec<_> = (0..=3)
+        let selector_polys: Vec<_> = (0..=3)
             .map(|_| DensePolynomial::<F>::rand(poly_degree, &mut rng))
             .collect();
-        let fixed_evals: Vec<Vec<F>> =
-            fixed_polys.iter().map(|poly| domain.fft(&poly)).collect();
+        let fixed_evals: Vec<Vec<F>> = selector_polys
+            .iter()
+            .map(|poly| domain.fft(&poly))
+            .collect();
 
         let pow_5 = |v: &F| *v * v * v * v * v;
         let w5_evals: Vec<F> = izip!(
@@ -262,11 +282,11 @@ mod test {
 
         let mut instance_oracles = vec![];
 
-        let mut fixed_oracles: Vec<_> = [
-            (fixed_polys[0].clone(), "q1"),
-            (fixed_polys[1].clone(), "q2"),
-            (fixed_polys[2].clone(), "q3"),
-            (fixed_polys[3].clone(), "q4"),
+        let mut selector_oracles: Vec<_> = [
+            (selector_polys[0].clone(), "q1"),
+            (selector_polys[1].clone(), "q2"),
+            (selector_polys[2].clone(), "q3"),
+            (selector_polys[3].clone(), "q4"),
         ]
         .into_iter()
         .map(|(poly, label)| FixedOracle::<F, PC> {
@@ -281,9 +301,9 @@ mod test {
         .collect();
 
         rescue_vo.configure(
-            &witness_oracles,
-            &instance_oracles,
-            &fixed_oracles,
+            &mut witness_oracles,
+            &mut instance_oracles,
+            &mut selector_oracles,
         );
 
         // q_expr[0].clone() * pow_5(&w_expr[0])
@@ -292,10 +312,10 @@ mod test {
         // + q_expr[3].clone() * pow_5(&w_expr[3])
         // - w_expr[4].clone()
         for elem in domain.elements() {
-            let q1 = fixed_oracles[0].polynomial().evaluate(&elem);
-            let q2 = fixed_oracles[1].polynomial().evaluate(&elem);
-            let q3 = fixed_oracles[2].polynomial().evaluate(&elem);
-            let q4 = fixed_oracles[3].polynomial().evaluate(&elem);
+            let q1 = selector_oracles[0].polynomial().evaluate(&elem);
+            let q2 = selector_oracles[1].polynomial().evaluate(&elem);
+            let q3 = selector_oracles[2].polynomial().evaluate(&elem);
+            let q4 = selector_oracles[3].polynomial().evaluate(&elem);
 
             let w1 = witness_oracles[0].polynomial().evaluate(&elem);
             let w2 = witness_oracles[1].polynomial().evaluate(&elem);
@@ -314,15 +334,17 @@ mod test {
 
         let vos: Vec<&dyn VirtualOracle<F>> = vec![&rescue_vo];
 
-        let vk = PilInstance::index(
+        let vk = Indexer::index(
             &ck,
             &verifier_key,
             &vos,
-            &mut witness_oracles,
-            &mut instance_oracles,
-            &mut fixed_oracles,
+            &witness_oracles,
+            &instance_oracles,
+            &selector_oracles,
+            &[],
             domain,
-            domain.vanishing_polynomial().into(),
+            &domain.vanishing_polynomial().into(),
+            Adversary::Prover,
         )
         .unwrap();
 
@@ -339,9 +361,16 @@ mod test {
         )
         .unwrap();
 
+        println!("{}", proof.info());
+        println!("{}", proof.cumulative_info());
+        println!("in bytes: {}", proof.serialized_size());
+
+        // Verifier
+        // Repeat everything to make sure that we are not implicitly using something from prover
+
         let mut witness_ver_oracles: Vec<_> = ["a", "b", "c", "d", "e"]
             .into_iter()
-            .map(|label| WitnessVerifierOracle {
+            .map(|label| WitnessVerifierOracle::<F, PC> {
                 label: label.to_string(),
                 queried_rotations: BTreeSet::new(),
                 should_mask: false,
@@ -350,16 +379,48 @@ mod test {
             })
             .collect();
 
-        // Repeat but this time provide verifier witness oracles
-        let mut vk = PilInstance::index(
+        let mut instance_oracles = vec![];
+
+        let mut selector_oracles: Vec<_> = [
+            (selector_polys[0].clone(), "q1"),
+            (selector_polys[1].clone(), "q2"),
+            (selector_polys[2].clone(), "q3"),
+            (selector_polys[3].clone(), "q4"),
+        ]
+        .into_iter()
+        .map(|(poly, label)| FixedOracle::<F, PC> {
+            label: label.to_string(),
+            poly,
+            evals_at_coset_of_extended_domain: None,
+            evals: None,
+            queried_rotations: BTreeSet::new(),
+            evals_at_challenges: BTreeMap::default(),
+            commitment: None,
+        })
+        .collect();
+
+        let mut rescue_vo =
+            GenericVO::<F, PC>::init(PrecompiledRescue::get_expr_and_queries());
+
+        rescue_vo.configure(
+            &mut witness_ver_oracles,
+            &mut instance_oracles,
+            &mut selector_oracles,
+        );
+
+        let vos: Vec<&dyn VirtualOracle<F>> = vec![&rescue_vo];
+
+        let mut vk = Indexer::index(
             &ck,
             &verifier_key,
             &vos,
-            &mut witness_ver_oracles,
-            &mut instance_oracles,
-            &mut fixed_oracles,
+            &witness_ver_oracles,
+            &instance_oracles,
+            &selector_oracles,
+            &[],
             domain,
-            domain.vanishing_polynomial().into(),
+            &domain.vanishing_polynomial().into(),
+            Adversary::Verifier,
         )
         .unwrap();
 
@@ -516,7 +577,7 @@ mod test {
         let mut witness_oracles = [a, b, c];
         let mut instance_oracles = [pi];
 
-        let mut fixed_oracles: Vec<_> = [
+        let mut selector_oracles: Vec<_> = [
             (qm_poly.clone(), "qm"),
             (ql_poly.clone(), "ql"),
             (qr_poly.clone(), "qr"),
@@ -535,21 +596,29 @@ mod test {
         })
         .collect();
 
-        let mut plonk_vo =
-            GenericVO::<F, PC>::init(PrecompiledPlonkArith::get_expr_and_queries());
-        plonk_vo.configure(&witness_oracles, &instance_oracles, &fixed_oracles);
+        let mut plonk_vo = GenericVO::<F, PC>::init(
+            PrecompiledPlonkArith::get_expr_and_queries(),
+        );
+
+        plonk_vo.configure(
+            &mut witness_oracles,
+            &mut instance_oracles,
+            &mut selector_oracles,
+        );
 
         let vos: Vec<&dyn VirtualOracle<F>> = vec![&plonk_vo];
 
-        let vk = PilInstance::index(
+        let mut vk = Indexer::index(
             &ck,
             &verifier_key,
             &vos,
             &mut witness_oracles,
             &mut instance_oracles,
-            &mut fixed_oracles,
+            &mut selector_oracles,
+            &mut [],
             domain,
-            domain.vanishing_polynomial().into(),
+            &domain.vanishing_polynomial().into(),
+            Adversary::Prover,
         )
         .unwrap();
 
@@ -566,6 +635,8 @@ mod test {
         )
         .unwrap();
 
+        // Verifier
+
         let mut witness_ver_oracles: Vec<_> = ["a", "b", "c"]
             .into_iter()
             .map(|label| WitnessVerifierOracle {
@@ -577,7 +648,25 @@ mod test {
             })
             .collect();
 
-        // repeat pi
+        let mut selector_oracles: Vec<_> = [
+            (qm_poly.clone(), "qm"),
+            (ql_poly.clone(), "ql"),
+            (qr_poly.clone(), "qr"),
+            (qo_poly.clone(), "qo"),
+            (qpi_poly.clone(), "qpi"),
+        ]
+        .into_iter()
+        .map(|(poly, label)| FixedOracle::<F, PC> {
+            label: label.to_string(),
+            poly,
+            evals_at_coset_of_extended_domain: None,
+            evals: None,
+            queried_rotations: BTreeSet::new(),
+            evals_at_challenges: BTreeMap::default(),
+            commitment: None,
+        })
+        .collect();
+
         let pi = InstanceOracle {
             label: "pi".to_string(),
             poly: pi_poly.clone(),
@@ -587,16 +676,30 @@ mod test {
 
         let mut instance_oracles = [pi];
 
+        let mut plonk_vo = GenericVO::<F, PC>::init(
+            PrecompiledPlonkArith::get_expr_and_queries(),
+        );
+
+        plonk_vo.configure(
+            &mut witness_ver_oracles,
+            &mut instance_oracles,
+            &mut selector_oracles,
+        );
+
+        let vos: Vec<&dyn VirtualOracle<F>> = vec![&plonk_vo];
+
         // Repeat but this time provide verifier witness oracles
-        let mut vk = PilInstance::index(
+        let mut vk = Indexer::index(
             &ck,
             &verifier_key,
             &vos,
             &mut witness_ver_oracles,
             &mut instance_oracles,
-            &mut fixed_oracles,
+            &mut selector_oracles,
+            &mut [],
             domain,
-            domain.vanishing_polynomial().into(),
+            &domain.vanishing_polynomial().into(),
+            Adversary::Verifier,
         )
         .unwrap();
 

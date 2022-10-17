@@ -1,7 +1,5 @@
 7. remove coset evals and poly from fixed when stored on verifier side
-8. enable fast lagrange evaluation on verifier side
 10. dev proof functions
 
 ========
-1. include selector&permutation polynomials in vk 
 2. design circuit with copy constraints

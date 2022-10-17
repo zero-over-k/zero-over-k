@@ -157,11 +157,15 @@ mod test {
             queried_rotations: BTreeSet::new(),
         };
 
-        let witness_oracles = vec![a, b];
-        let instance_oracles = vec![c];
-        let fixed_oracles: Vec<FixedOracle<F, PC>> = vec![];
+        let mut witness_oracles = vec![a, b];
+        let mut instance_oracles = vec![c];
+        let mut fixed_oracles: Vec<FixedOracle<F, PC>> = vec![];
 
-        mul_vo.configure(&witness_oracles, &instance_oracles, &fixed_oracles);
+        mul_vo.configure(
+            &mut witness_oracles,
+            &mut instance_oracles,
+            &mut fixed_oracles,
+        );
     }
 
     #[test]
@@ -169,7 +173,7 @@ mod test {
         let mut rescue_vo =
             GenericVO::<F, PC>::init(PrecompiledRescue::get_expr_and_queries());
 
-        let witness_oracles: Vec<_> = ["a", "b", "c", "d", "e"]
+        let mut witness_oracles: Vec<_> = ["a", "b", "c", "d", "e"]
             .into_iter()
             .map(|label| WitnessProverOracle::<F> {
                 label: label.to_string(),
@@ -181,9 +185,9 @@ mod test {
             })
             .collect();
 
-        let instance_oracles = vec![];
+        let mut instance_oracles = vec![];
 
-        let fixed_oracles: Vec<_> = ["q1", "q2", "q3", "q4"]
+        let mut fixed_oracles: Vec<_> = ["q1", "q2", "q3", "q4"]
             .into_iter()
             .map(|label| FixedOracle::<F, PC> {
                 label: label.to_string(),
@@ -197,9 +201,9 @@ mod test {
             .collect();
 
         rescue_vo.configure(
-            &witness_oracles,
-            &instance_oracles,
-            &fixed_oracles,
+            &mut witness_oracles,
+            &mut instance_oracles,
+            &mut fixed_oracles,
         );
     }
 }

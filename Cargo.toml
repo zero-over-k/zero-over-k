@@ -15,6 +15,7 @@ regex = "1.6.0"
 itertools = "0.8"
 
 digest = { version = "0.9" }
+ark-serialize = { version = "^0.3.0", default-features = false, features = [ "derive" ] }
 
 [dev-dependencies]
 ark-bls12-381 = { version = "^0.3.0", default-features = false, features = [ "curve" ] }
