@@ -1,7 +1,5 @@
-6. add witness prover/verifier oracles handling 
 7. remove coset evals and poly from fixed when stored on verifier side
 8. enable fast lagrange evaluation on verifier side
-9. keep array of empty rands in vk 
 10. dev proof functions
 
 ========

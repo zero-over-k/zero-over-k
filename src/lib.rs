@@ -404,13 +404,13 @@ where
         oracles.extend_from_slice(&fixed_oracles.as_slice());
 
         //TODO: move rands into vk
-        let fixed_rands = iter::repeat(PC::Randomness::empty())
-            .take(fixed_oracles.len())
-            .collect::<Vec<PC::Randomness>>();
+        // let fixed_rands = iter::repeat(PC::Randomness::empty())
+        //     .take(fixed_oracles.len())
+        //     .collect::<Vec<PC::Randomness>>();
         let oracle_rands: Vec<PC::Randomness> = wtns_rands
             .iter()
             .chain(quotient_rands.iter())
-            .chain(fixed_rands.iter())
+            .chain(pk.empty_rands_for_fixed.iter())
             .map(|rand| rand.clone())
             .collect();
 

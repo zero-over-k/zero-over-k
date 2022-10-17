@@ -125,10 +125,7 @@ mod test {
         )
         .unwrap();
 
-        let pk = ProverKey {
-            committer_key: ck.clone(),
-            vk: vk.clone(),
-        };
+        let pk = ProverKey::from_ck_and_vk(&ck, &vk);
 
         let proof = PilInstance::prove(
             &pk,
@@ -329,10 +326,7 @@ mod test {
         )
         .unwrap();
 
-        let pk = ProverKey {
-            committer_key: ck.clone(),
-            vk: vk.clone(),
-        };
+        let pk = ProverKey::from_ck_and_vk(&ck, &vk);
 
         let proof = PilInstance::prove(
             &pk,
@@ -559,10 +553,7 @@ mod test {
         )
         .unwrap();
 
-        let pk = ProverKey {
-            committer_key: ck.clone(),
-            vk: vk.clone(),
-        };
+        let pk = ProverKey::from_ck_and_vk(&ck, &vk);
 
         let proof = PilInstance::prove(
             &pk,

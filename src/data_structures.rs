@@ -1,6 +1,6 @@
 use ark_ff::PrimeField;
 use ark_poly::{univariate::DensePolynomial, GeneralEvaluationDomain};
-use ark_poly_commit::PolynomialCommitment;
+use ark_poly_commit::{PolynomialCommitment, PCRandomness};
 
 use crate::{
     commitment::HomomorphicCommitment, multiproof::Proof as MultiOpenProof,
@@ -38,6 +38,17 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Clone for VerifierKey<F, PC> {
 pub struct ProverKey<F: PrimeField, PC: HomomorphicCommitment<F>> {
     pub vk: VerifierKey<F, PC>,
     pub committer_key: PC::CommitterKey,
+    pub empty_rands_for_fixed: Vec<PC::Randomness>
+}
+
+impl<F: PrimeField, PC: HomomorphicCommitment<F>> ProverKey<F, PC> {
+    pub fn from_ck_and_vk(ck: &PC::CommitterKey, vk: &VerifierKey<F, PC>) -> Self {
+        Self {
+            vk: vk.clone(), 
+            committer_key: ck.clone(), 
+            empty_rands_for_fixed: vec![PC::Randomness::empty(); vk.fixed_oracles.len()]
+        }
+    }
 }
 
 pub struct Proof<F: PrimeField, PC: HomomorphicCommitment<F>> {
