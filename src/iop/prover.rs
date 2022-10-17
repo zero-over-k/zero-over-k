@@ -37,8 +37,8 @@ pub struct ProverState<'a, F: PrimeField> {
     pub(crate) witness_oracles_mapping: BTreeMap<String, usize>, // TODO: introduce &str here maybe
     pub(crate) instance_oracles_mapping: BTreeMap<String, usize>,
     pub(crate) fixed_oracles_mapping: BTreeMap<String, usize>,
-    pub(crate) witness_oracles: &'a mut [WitnessProverOracle<F>],
-    pub(crate) instance_oracles: &'a mut [InstanceOracle<F>],
+    pub(crate) witness_oracles: &'a [WitnessProverOracle<F>],
+    pub(crate) instance_oracles: &'a [InstanceOracle<F>],
     pub(crate) vos: &'a [Box<&'a dyn VirtualOracle<F>>],
     pub(crate) domain: GeneralEvaluationDomain<F>,
     pub(crate) vanishing_polynomial: DensePolynomial<F>,
@@ -48,8 +48,8 @@ pub struct ProverState<'a, F: PrimeField> {
 impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
     // NOTE: consider having indexed concrete oracles by initializing evals_at_coset_of_extended_domain (ex. selector polynomials)
     pub fn init_prover<'a>(
-        witness_oracles: &'a mut [WitnessProverOracle<F>],
-        instance_oracles: &'a mut [InstanceOracle<F>],
+        witness_oracles: &'a [WitnessProverOracle<F>],
+        instance_oracles: &'a [InstanceOracle<F>],
         vos: &'a [Box<&'a dyn VirtualOracle<F>>],
         domain_size: usize,
         vanishing_polynomial: &DensePolynomial<F>,
@@ -86,33 +86,21 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
             quotient_chunks: None,
         }
     }
-    // TODO: remove this round
-    pub fn prover_first_round<'a, R: Rng>(
-        state: &'a mut ProverState<F>,
-        rng: &mut R,
-    ) -> Result<Vec<WitnessProverOracle<F>>, Error> {
-        // 3. Mask wtns oracles
-        // for oracle in state.witness_oracles.iter_mut() {
-        //     oracle.mask(&state.vanishing_polynomial, rng);
-        // }
 
-        Ok(state.witness_oracles.to_vec())
-    }
-
-    pub fn prover_second_round(
+    pub fn prover_first_round(
         verifier_msg: &VerifierFirstMsg<F>,
         state: &mut ProverState<F>,
         index_info: &IndexInfo<F>,
         vk: &VerifierKey<F, PC>,
     ) -> Result<Vec<WitnessProverOracle<F>>, Error> {
         // 3. Compute extended evals of each oracle
-        for oracle in state.witness_oracles.iter_mut() {
-            oracle.compute_extended_evals(&index_info.extended_coset_domain);
-        }
+        // for oracle in state.witness_oracles.iter_mut() {
+        //     oracle.compute_extended_evals(&index_info.extended_coset_domain);
+        // }
 
-        for oracle in state.instance_oracles.iter_mut() {
-            oracle.compute_extended_evals(&index_info.extended_coset_domain);
-        }
+        // for oracle in state.instance_oracles.iter_mut() {
+        //     oracle.compute_extended_evals(&index_info.extended_coset_domain);
+        // }
 
         let powers_of_alpha: Vec<F> = successors(Some(F::one()), |alpha_i| {
             Some(*alpha_i * verifier_msg.alpha)

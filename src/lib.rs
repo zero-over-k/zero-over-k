@@ -262,6 +262,37 @@ where
         vanishing_polynomial: &DensePolynomial<F>,
         zk_rng: &mut R,
     ) -> Result<Proof<F, PC>, Error<PC::Error>> {
+        let mut fs_rng =
+            FS::initialize(&to_bytes![&Self::PROTOCOL_NAME].unwrap()); // TODO: add &pk.vk, &public oracles to transcript
+
+        // compute extended evals of each oracle
+        for oracle in witness_oracles.iter_mut() {
+            oracle.compute_extended_evals(&pk.vk.index_info.extended_coset_domain);
+        }
+
+        for oracle in instance_oracles.iter_mut() {
+            oracle.compute_extended_evals(&pk.vk.index_info.extended_coset_domain);
+        }
+
+        // get labeled polys of witness oracles
+        let witness_oracles_labeled: Vec<
+        LabeledPolynomial<F, DensePolynomial<F>>,
+        > = witness_oracles
+        .iter()
+        .map(|oracle| oracle.to_labeled())
+        .collect();
+
+        // commit to witness oracles
+        let (witness_commitments, wtns_rands) = PC::commit(
+            &pk.committer_key,
+            &witness_oracles_labeled,
+            Some(zk_rng),
+        )
+        .map_err(Error::from_pc_err)?;
+
+        fs_rng.absorb(&to_bytes![witness_commitments].unwrap());
+
+        // begin PIOP
         let mut prover_state = PIOPforPolyIdentity::init_prover(
             witness_oracles,
             instance_oracles,
@@ -276,43 +307,16 @@ where
             vanishing_polynomial,
         );
 
-        let mut fs_rng =
-            FS::initialize(&to_bytes![&Self::PROTOCOL_NAME].unwrap()); // TODO: add &pk.vk, &public oracles to transcript
-
-        // --------------------------------------------------------------------
-        // First round
-
-        let witness_oracles = PIOPforPolyIdentity::<F, PC>::prover_first_round(
-            &mut prover_state,
-            zk_rng,
-        )?;
-        let witness_oracles_labeled: Vec<
-            LabeledPolynomial<F, DensePolynomial<F>>,
-        > = witness_oracles
-            .iter()
-            .map(|oracle| oracle.to_labeled())
-            .collect();
-
-        let (witness_commitments, wtns_rands) = PC::commit(
-            &pk.committer_key,
-            &witness_oracles_labeled,
-            Some(zk_rng),
-        )
-        .map_err(Error::from_pc_err)?;
-
-        fs_rng.absorb(&to_bytes![witness_commitments].unwrap());
-
         let (verifier_first_msg, verifier_state) =
             PIOPforPolyIdentity::<F, PC>::verifier_first_round(
                 verifier_init_state,
                 &mut fs_rng,
             );
-        // --------------------------------------------------------------------
 
         // --------------------------------------------------------------------
-        // Second round
+        // First round
 
-        let quotient_chunk_oracles = PIOPforPolyIdentity::prover_second_round(
+        let quotient_chunk_oracles = PIOPforPolyIdentity::prover_first_round(
             &verifier_first_msg,
             &mut prover_state,
             &pk.vk.index_info, //TOOD: remove this arg
@@ -340,6 +344,7 @@ where
                 verifier_state,
                 &mut fs_rng,
             );
+        // --------------------------------------------------------------------
 
         let domain = GeneralEvaluationDomain::new(domain_size).unwrap();
         let omegas: Vec<F> = domain.elements().collect();
