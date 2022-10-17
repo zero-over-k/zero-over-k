@@ -25,26 +25,22 @@ pub struct WitnessProverOracle<F: PrimeField> {
     pub(crate) poly: DensePolynomial<F>,
     pub(crate) evals_at_coset_of_extended_domain: Option<Vec<F>>,
     pub(crate) queried_rotations: BTreeSet<Rotation>,
-    pub(crate) should_mask: bool,
+    pub(crate) should_permute: bool,
+    pub(crate) evals: Option<Vec<F>>, // For now evals are needed for constructing aggregation polynomials in permutation (and lookups)
+}
+
+impl<F: PrimeField> WitnessProverOracle<F> {
+    pub fn get_evals(&self) -> &Vec<F> {
+        match &self.evals {
+            Some(evals) => evals,
+            None => panic!("Evals for oracle {} are not provided", self.label),
+        }
+    }
 }
 
 impl<F: PrimeField> WitnessOracle<F> for WitnessProverOracle<F> {}
 
 impl<F: PrimeField> WitnessProverOracle<F> {
-    // TODO: remove
-    pub fn mask<R: Rng>(
-        &mut self,
-        vanishing_polynomial: &DensePolynomial<F>,
-        rng: &mut R,
-    ) {
-        if !self.should_mask {
-            return;
-        }
-
-        let masking = DensePolynomial::rand(self.queried_rotations.len(), rng);
-        self.poly += &(vanishing_polynomial * &masking);
-    }
-
     pub fn get_evals_at_coset_of_extended_domain(&self) -> &Vec<F> {
         match &self.evals_at_coset_of_extended_domain {
             Some(evals) => evals,
@@ -61,11 +57,7 @@ impl<F: PrimeField> ConcreteOracle<F> for WitnessProverOracle<F> {
     // NOTE: We always want degree to be calculated same for all types of oracles
     // consider example when some witness poly is just 0, P side will derive different quotient degree then V
     fn get_degree(&self, domain_size: usize) -> usize {
-        if self.should_mask {
-            domain_size + self.queried_rotations.len()
-        } else {
-            domain_size - 1
-        }
+        domain_size - 1
     }
 
     fn query(&self, ctx: &QueryContext<F>) -> F {

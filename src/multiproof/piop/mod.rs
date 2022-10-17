@@ -345,7 +345,8 @@ mod test {
             poly: a_poly.clone(),
             evals_at_coset_of_extended_domain: None,
             queried_rotations: BTreeSet::from([Rotation::curr()]),
-            should_mask: false,
+            should_permute: false,
+            evals: None,
         };
 
         let b = WitnessProverOracle {
@@ -353,7 +354,8 @@ mod test {
             poly: b_poly.clone(),
             evals_at_coset_of_extended_domain: None,
             queried_rotations: BTreeSet::from([Rotation::curr()]),
-            should_mask: false,
+            should_permute: false,
+            evals: None,
         };
 
         let c = WitnessProverOracle {
@@ -364,7 +366,8 @@ mod test {
                 Rotation::curr(),
                 Rotation::next(),
             ]),
-            should_mask: false,
+            should_permute: false,
+            evals: None,
         };
 
         let d = WitnessProverOracle {
@@ -375,7 +378,8 @@ mod test {
                 Rotation::curr(),
                 Rotation::next(),
             ]),
-            should_mask: false,
+            should_permute: false,
+            evals: None,
         };
 
         // TODO: Can we remove this Box

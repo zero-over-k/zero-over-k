@@ -17,23 +17,11 @@ use crate::{
         traits::{ConcreteOracle, Instantiable, WitnessOracle},
         witness::WitnessProverOracle,
     },
-    permutation::{grand_product::GrandProductArgument, self},
+    permutation::grand_product::GrandProductArgument,
 };
 
 pub mod grand_product;
 mod playground;
-
-/*
-    (1 - (q_last + q_blind)) * zp(wX) * Product_i(oracle(x) + sigma(x) + gamma) NOTE: second part is symmetrical
-    degree of this will always be:
-    2n - 2 + num_of_oracles * n - num_of_oracles
-
-    so for num_of_oracles = 2
-        (1 - (q_last + q_blind)) * zp(wX) * (oracle1(x) + sigma1(x) + gamma) * (oracle2(x) + sigma2(x) + gamma)
-        4n - 4
-
-    for classic plonk arith we have qm * a * b - zh = 3n - 3 - n = 2n - 3
-*/
 
 pub struct PermutationArgument<F: PrimeField, PC: HomomorphicCommitment<F>> {
     m: usize, // max number of columns that can be included per single grand product argument such that it does not exceed quotient degree
@@ -96,9 +84,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PermutationArgument<F, PC> {
             let init_value = if i == 0 {
                 F::one()
             } else {
-                // TODO: this fft will be moved in constructor of concrete oracle
-                let z_prev_evals = domain.fft(agg_polys[i - 1].polynomial());
-                z_prev_evals[self.u]
+                agg_polys[i - 1].get_evals()[self.u]
             };
 
             let agg_i = GrandProductArgument::construct_agg_poly(
@@ -135,7 +121,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PermutationArgument<F, PC> {
     pub fn instantiate_argument_at_omega_i(
         &self,
         l_0_coset_evals: &Vec<F>, // lagrange poly should not be fixed column, it's not committed since it can be evaluated in O(log(N))
-        q_last: &FixedOracle<F, PC>,
+        q_last_coset_evals: &Vec<F>, // q_last is 1 only at index u, so it can also be treated as Lu(X)
         q_blind: &FixedOracle<F, PC>,
         witness_oracles: &[WitnessProverOracle<F>], // Only oracles that are included in permutation
         permutation_oracles: &[FixedOracle<F, PC>],
@@ -189,7 +175,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PermutationArgument<F, PC> {
         {
             permutation_eval += alpha_powers[i + alpha_shift]
                 * GrandProductArgument::instantiate_argument_at_omega_i(
-                    q_last,
+                    q_last_coset_evals,
                     q_blind,
                     &agg_polys[i],
                     sigmas,
@@ -219,7 +205,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PermutationArgument<F, PC> {
 
         let z_last_eval = agg_polys.last().unwrap().query(&ctx);
         permutation_eval += alpha_powers.last().unwrap().clone()
-            * q_last.query(&ctx)
+            * q_last_coset_evals[omega_index]
             * (z_last_eval * z_last_eval - z_last_eval);
 
         permutation_eval
@@ -228,7 +214,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PermutationArgument<F, PC> {
     pub fn open_argument(
         &self,
         l_0_eval: F,
-        q_last: &FixedOracle<F, PC>,
+        q_last_eval: F,
         q_blind: &FixedOracle<F, PC>,
         agg_polys: &[impl WitnessOracle<F>], // TODO: make this verifier concrete oracle
         permutation_oracles: &[FixedOracle<F, PC>],
@@ -274,7 +260,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PermutationArgument<F, PC> {
         {
             permutation_eval += alpha_powers[i + alpha_shift]
                 * GrandProductArgument::open_argument(
-                    q_last,
+                    q_last_eval,
                     q_blind,
                     &agg_polys[i],
                     sigmas,
@@ -301,7 +287,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PermutationArgument<F, PC> {
 
         let z_last_eval = agg_polys.last().unwrap().query(&ctx);
         permutation_eval += alpha_powers.last().unwrap().clone()
-            * q_last.query(&ctx)
+            * q_last_eval
             * (z_last_eval * z_last_eval - z_last_eval);
 
         permutation_eval
@@ -320,8 +306,8 @@ mod test {
     use crate::{
         commitment::KZG10,
         oracles::{
-            fixed::FixedOracle, rotation::Rotation,
-            witness::WitnessProverOracle, traits::Instantiable,
+            fixed::FixedOracle, rotation::Rotation, traits::Instantiable,
+            witness::WitnessProverOracle,
         },
         permutation,
         util::compute_vanishing_poly_over_coset,
@@ -486,7 +472,8 @@ mod test {
                 extended_coset_domain.coset_fft(&a),
             ),
             queried_rotations: BTreeSet::from([Rotation::curr()]),
-            should_mask: false,
+            should_permute: true,
+            evals: Some(a_evals),
         };
 
         let b = WitnessProverOracle {
@@ -496,7 +483,8 @@ mod test {
                 extended_coset_domain.coset_fft(&b),
             ),
             queried_rotations: BTreeSet::from([Rotation::curr()]),
-            should_mask: false,
+            should_permute: true,
+            evals: Some(b_evals),
         };
 
         let sigma_1 = FixedOracle::<F, PC> {
@@ -505,6 +493,7 @@ mod test {
             evals_at_coset_of_extended_domain: Some(
                 extended_coset_domain.coset_fft(&sigma_1),
             ),
+            evals: Some(sigma_1_evals),
             queried_rotations: BTreeSet::from([Rotation::curr()]),
             evals_at_challenges: BTreeMap::default(),
             commitment: None,
@@ -516,6 +505,7 @@ mod test {
             evals_at_coset_of_extended_domain: Some(
                 extended_coset_domain.coset_fft(&sigma_2),
             ),
+            evals: Some(sigma_2_evals),
             queried_rotations: BTreeSet::from([Rotation::curr()]),
             evals_at_challenges: BTreeMap::default(),
             commitment: None,
@@ -527,17 +517,7 @@ mod test {
             evals_at_coset_of_extended_domain: Some(
                 extended_coset_domain.coset_fft(&q_blind),
             ),
-            queried_rotations: BTreeSet::from([Rotation::curr()]),
-            evals_at_challenges: BTreeMap::default(),
-            commitment: None,
-        };
-
-        let q_last = FixedOracle::<F, PC> {
-            label: "q_last".to_string(),
-            poly: q_last.clone(),
-            evals_at_coset_of_extended_domain: Some(
-                extended_coset_domain.coset_fft(&q_last),
-            ),
+            evals: None,
             queried_rotations: BTreeSet::from([Rotation::curr()]),
             evals_at_challenges: BTreeMap::default(),
             commitment: None,
@@ -565,19 +545,16 @@ mod test {
             &mut rng,
         );
 
-        for z in &z_polys {
-            let z_evals = domain.fft(z.polynomial());
-
-            for (i, z) in z_evals.iter().enumerate() {
-                println!("{}:{}", i, z);
-            }
-        }
-
         let mut l_0_evals = vec![F::zero(); domain.size()];
         l_0_evals[0] = F::one();
         let l0 =
             DensePolynomial::from_coefficients_slice(&domain.ifft(&l_0_evals));
         let l_0_coset_evals = extended_coset_domain.coset_fft(&l0);
+
+        let lu = DensePolynomial::from_coefficients_slice(
+            &domain.ifft(&q_last_evals),
+        );
+        let l_u_coset_evals = extended_coset_domain.coset_fft(&lu);
 
         let expected_alphas_len = 2 * z_polys.len() + 1 + 1 - 1;
         let alpha = F::rand(&mut rng);
@@ -591,7 +568,7 @@ mod test {
         for i in 0..extended_coset_domain.size() {
             let pe = permutation_argument.instantiate_argument_at_omega_i(
                 &l_0_coset_evals,
-                &q_last,
+                &l_u_coset_evals,
                 &q_blind,
                 &witness_oracles,
                 &permutation_oracles,
@@ -605,7 +582,7 @@ mod test {
                 &powers_of_alpha,
             );
 
-            permutation_coset_evals.push(pe); 
+            permutation_coset_evals.push(pe);
         }
 
         let mut zh_evals = compute_vanishing_poly_over_coset(
@@ -632,10 +609,11 @@ mod test {
             .evaluate(&evaluation_challenge);
 
         let l_0_eval = l0.evaluate(&evaluation_challenge);
+        let l_u_eval = lu.evaluate(&evaluation_challenge);
 
         let permutation_eval = permutation_argument.open_argument(
             l_0_eval,
-            &q_last,
+            l_u_eval,
             &q_blind,
             &z_polys,
             &permutation_oracles,

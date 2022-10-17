@@ -86,14 +86,15 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
             quotient_chunks: None,
         }
     }
+    // TODO: remove this round
     pub fn prover_first_round<'a, R: Rng>(
         state: &'a mut ProverState<F>,
         rng: &mut R,
     ) -> Result<Vec<WitnessProverOracle<F>>, Error> {
         // 3. Mask wtns oracles
-        for oracle in state.witness_oracles.iter_mut() {
-            oracle.mask(&state.vanishing_polynomial, rng);
-        }
+        // for oracle in state.witness_oracles.iter_mut() {
+        //     oracle.mask(&state.vanishing_polynomial, rng);
+        // }
 
         Ok(state.witness_oracles.to_vec())
     }
@@ -187,7 +188,8 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
                     poly,
                     evals_at_coset_of_extended_domain: None,
                     queried_rotations: BTreeSet::from([Rotation::curr()]),
-                    should_mask: false,
+                    should_permute: false,
+                    evals: None,
                 }
             })
             .collect();

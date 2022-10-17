@@ -1,0 +1,10 @@
+3. remove first round from prover (where we were masking)
+4. remove vk.index_info argument from one of the functions
+5. remove dummy vo clone 
+6. add witness prover/verifier oracles handling 
+7. remove coset evals and poly from fixed when stored on verifier side
+8. enable fast lagrange evaluation on verifier side
+
+========
+1. include selector&permutation polynomials in vk 
+2. design circuit with copy constraints

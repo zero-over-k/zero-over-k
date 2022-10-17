@@ -82,7 +82,8 @@ mod test {
             poly: a_poly,
             evals_at_coset_of_extended_domain: None,
             queried_rotations: BTreeSet::new(),
-            should_mask: false,
+            should_permute: false,
+            evals: None,
         };
 
         let b = WitnessProverOracle {
@@ -90,7 +91,8 @@ mod test {
             poly: b_poly,
             evals_at_coset_of_extended_domain: None,
             queried_rotations: BTreeSet::new(),
-            should_mask: false,
+            should_permute: false,
+            evals: None,
         };
 
         let c = InstanceOracle {
@@ -104,6 +106,7 @@ mod test {
             label: "dummy".to_string(),
             poly: DensePolynomial::default(),
             evals_at_coset_of_extended_domain: None,
+            evals: None,
             queried_rotations: BTreeSet::default(),
             evals_at_challenges: BTreeMap::default(),
             commitment: None,
@@ -268,7 +271,8 @@ mod test {
             poly,
             evals_at_coset_of_extended_domain: None,
             queried_rotations: BTreeSet::new(),
-            should_mask: false,
+            should_permute: false,
+            evals: None,
         })
         .collect();
 
@@ -285,6 +289,7 @@ mod test {
             label: label.to_string(),
             poly,
             evals_at_coset_of_extended_domain: None,
+            evals: None,
             queried_rotations: BTreeSet::new(),
             evals_at_challenges: BTreeMap::default(),
             commitment: None,
@@ -501,7 +506,8 @@ mod test {
             poly: a_poly,
             evals_at_coset_of_extended_domain: None,
             queried_rotations: BTreeSet::new(),
-            should_mask: false,
+            should_permute: false,
+            evals: None,
         };
 
         let b = WitnessProverOracle {
@@ -509,7 +515,8 @@ mod test {
             poly: b_poly,
             evals_at_coset_of_extended_domain: None,
             queried_rotations: BTreeSet::new(),
-            should_mask: false,
+            should_permute: false,
+            evals: None,
         };
 
         let c = WitnessProverOracle {
@@ -517,7 +524,8 @@ mod test {
             poly: c_poly,
             evals_at_coset_of_extended_domain: None,
             queried_rotations: BTreeSet::new(),
-            should_mask: false,
+            should_permute: false,
+            evals: None,
         };
 
         let pi = InstanceOracle {
@@ -542,6 +550,7 @@ mod test {
             label: label.to_string(),
             poly,
             evals_at_coset_of_extended_domain: None,
+            evals: None,
             queried_rotations: BTreeSet::new(),
             evals_at_challenges: BTreeMap::default(),
             commitment: None,

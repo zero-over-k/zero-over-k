@@ -1,96 +1,3 @@
-// use ark_ff::PrimeField;
-
-// use crate::oracles::query::OracleQuery;
-
-// use super::{
-//     query::{VirtualQuery},
-//     VirtualOracle, new_expression::NewExpression,
-// };
-
-// pub struct MulVO<F: PrimeField> {
-//     virtual_queries: [VirtualQuery; 3],
-//     witness_indices: Option<Vec<usize>>,
-//     instance_indices: Option<Vec<usize>>,
-//     queries: Vec<OracleQuery>,
-//     expression: Option<NewExpression<F>>,
-// }
-
-// impl<F: PrimeField> MulVO<F> {
-//     pub fn new(virtual_queries: [VirtualQuery; 3]) -> Self {
-//         Self {
-//             virtual_queries,
-//             witness_indices: None,
-//             instance_indices: None,
-//             queries: vec![],
-//             expression: None,
-//         }
-//     }
-
-//     // TODO: consider abstracting
-//     pub fn configure(
-//         &mut self,
-//         witness_indices: Vec<usize>,
-//         instance_indices: Vec<usize>,
-//     ) {
-//         self.witness_indices = Some(vec![]);
-//         self.instance_indices = Some(vec![]);
-//         for vq in &self.virtual_queries {
-//             match vq.oracle_type {
-//                 OracleType::Witness => {
-//                     let query = WitnessQuery {
-//                         index: witness_indices[vq.index],
-//                         rotation: vq.rotation.clone(),
-//                     };
-
-//                     self.wtns_queries.push(query);
-//                     self.queries.push(Box::new(query.clone()))
-//                 },
-//                 OracleType::Instance => {
-//                     let query = InstanceQuery {
-//                         index: instance_indices[vq.index],
-//                         rotation: vq.rotation.clone(),
-//                     };
-
-//                     self.instance_queries.push(query);
-//                     self.queries.push(Box::new(query.clone()))
-//                 }
-//             }
-//         }
-
-//         let mul_expression = || {
-//             let a: Expression<F> = self.wtns_queries[0].into();
-//             let b: Expression<F> = self.wtns_queries[1].into();
-//             let c: Expression<F> = self.instance_queries[0].into();
-
-//             a * b - c
-//         };
-
-//         self.expression = Some(mul_expression());
-//     }
-// }
-
-// impl<F: PrimeField> VirtualOracle<F> for MulVO<F> {
-//     fn get_wtns_queries(&self) -> &[WitnessQuery] {
-//         &self.wtns_queries
-//     }
-
-//     fn get_instance_queries(&self) -> &[InstanceQuery] {
-//         &self.instance_queries
-//     }
-
-//     // panics if expression is not defined before proving started
-//     fn get_expression(&self) -> &Expression<F> {
-//         match self.expression.as_ref() {
-//             None => panic!("Expression is not defined"),
-//             Some(expression) => return expression,
-//         }
-//     }
-
-//     fn get_queries(&self) -> &[Box<dyn Query>] {
-//         &self.queries
-//     }
-// }
-
 use ark_ff::PrimeField;
 
 use crate::oracles::{query::OracleType, rotation::Rotation};
@@ -230,7 +137,8 @@ mod test {
             poly: DensePolynomial::default(),
             evals_at_coset_of_extended_domain: None,
             queried_rotations: BTreeSet::new(),
-            should_mask: true,
+            should_permute: false,
+            evals: None,
         };
 
         let b = WitnessProverOracle::<F> {
@@ -238,7 +146,8 @@ mod test {
             poly: DensePolynomial::default(),
             evals_at_coset_of_extended_domain: None,
             queried_rotations: BTreeSet::new(),
-            should_mask: true,
+            should_permute: false,
+            evals: None,
         };
 
         let c = InstanceOracle::<F> {
@@ -267,7 +176,8 @@ mod test {
                 poly: DensePolynomial::default(),
                 evals_at_coset_of_extended_domain: None,
                 queried_rotations: BTreeSet::new(),
-                should_mask: true,
+                should_permute: false,
+                evals: None,
             })
             .collect();
 
@@ -279,6 +189,7 @@ mod test {
                 label: label.to_string(),
                 poly: DensePolynomial::default(),
                 evals_at_coset_of_extended_domain: None,
+                evals: None,
                 queried_rotations: BTreeSet::default(),
                 evals_at_challenges: BTreeMap::default(),
                 commitment: None,

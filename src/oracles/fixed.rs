@@ -19,9 +19,19 @@ pub struct FixedOracle<F: PrimeField, PC: HomomorphicCommitment<F>> {
     pub(crate) label: String,
     pub(crate) poly: DensePolynomial<F>,
     pub(crate) evals_at_coset_of_extended_domain: Option<Vec<F>>,
+    pub(crate) evals: Option<Vec<F>>,
     pub(crate) queried_rotations: BTreeSet<Rotation>,
     pub(crate) evals_at_challenges: BTreeMap<F, F>,
     pub(crate) commitment: Option<PC::Commitment>,
+}
+
+impl<F: PrimeField, PC: HomomorphicCommitment<F>> FixedOracle<F, PC> {
+    pub fn get_evals(&self) -> &Vec<F> {
+        match &self.evals {
+            Some(evals) => evals,
+            None => panic!("Evals for oracle {} are not provided", self.label),
+        }
+    }
 }
 
 impl<F: PrimeField, PC: HomomorphicCommitment<F>> Clone for FixedOracle<F, PC> {
@@ -32,6 +42,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Clone for FixedOracle<F, PC> {
             evals_at_coset_of_extended_domain: self
                 .evals_at_coset_of_extended_domain
                 .clone(),
+            evals: self.evals.clone(),
             queried_rotations: self.queried_rotations.clone(),
             evals_at_challenges: self.evals_at_challenges.clone(),
             commitment: self.commitment.clone(),
