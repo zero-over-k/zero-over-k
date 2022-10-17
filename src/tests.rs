@@ -102,24 +102,14 @@ mod test {
             queried_rotations: BTreeSet::new(),
         };
 
-        let dummy_fixed = FixedOracle::<F, PC> {
-            label: "dummy".to_string(),
-            poly: DensePolynomial::default(),
-            evals_at_coset_of_extended_domain: None,
-            evals: None,
-            queried_rotations: BTreeSet::default(),
-            evals_at_challenges: BTreeMap::default(),
-            commitment: None,
-        };
-
         let mut mul_vo =
-            GenericVO::<F>::init(PrecompiledMul::get_expr_and_queries());
+            GenericVO::<F, PC>::init(PrecompiledMul::get_expr_and_queries());
 
         let mut witness_oracles = [a, b];
         let mut instance_oracles = [c];
         // let fixed_oracles: Vec<FixedOracle<F, PC>> = [];
 
-        mul_vo.configure(&witness_oracles, &instance_oracles, &[dummy_fixed]);
+        mul_vo.configure(&witness_oracles, &instance_oracles, &[]);
 
         let vos: Vec<&dyn VirtualOracle<F>> = vec![&mul_vo];
 
@@ -253,7 +243,7 @@ mod test {
             DensePolynomial::from_coefficients_slice(&domain.ifft(&w5_evals));
 
         let mut rescue_vo =
-            GenericVO::<F>::init(PrecompiledRescue::get_expr_and_queries());
+            GenericVO::<F, PC>::init(PrecompiledRescue::get_expr_and_queries());
 
         let mut witness_oracles: Vec<_> = [
             (witness_polys[0].clone(), "a"),
@@ -552,7 +542,7 @@ mod test {
         .collect();
 
         let mut plonk_vo =
-            GenericVO::<F>::init(PrecompiledPlonkArith::get_expr_and_queries());
+            GenericVO::<F, PC>::init(PrecompiledPlonkArith::get_expr_and_queries());
         plonk_vo.configure(&witness_oracles, &instance_oracles, &fixed_oracles);
 
         let vos: Vec<&dyn VirtualOracle<F>> = vec![&plonk_vo];

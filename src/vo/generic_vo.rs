@@ -1,3 +1,5 @@
+use std::marker::PhantomData;
+
 use ark_ff::PrimeField;
 
 use crate::{
@@ -16,24 +18,26 @@ use super::{
 };
 
 #[derive(Clone)]
-pub struct GenericVO<F: PrimeField> {
+pub struct GenericVO<F: PrimeField, PC: HomomorphicCommitment<F>> {
     pub(crate) virtual_exp: VirtualExpression<F>,
     pub(crate) virtual_queries: Vec<VirtualQuery>,
     pub(crate) queries: Option<Vec<OracleQuery>>,
     pub(crate) expression: Option<NewExpression<F>>,
+    _pc: PhantomData<PC>
 }
 
-impl<F: PrimeField> GenericVO<F> {
+impl<F: PrimeField, PC: HomomorphicCommitment<F>> GenericVO<F, PC> {
     pub fn init(cfg: (VirtualExpression<F>, Vec<VirtualQuery>)) -> Self {
         Self {
             virtual_exp: cfg.0,
             virtual_queries: cfg.1,
             queries: None,
             expression: None,
+            _pc: PhantomData
         }
     }
 
-    pub fn configure<PC: HomomorphicCommitment<F>>(
+    pub fn configure(
         &mut self,
         witness_oracles: &[impl ConcreteOracle<F>],
         instance_oracles: &[InstanceOracle<F>],
@@ -71,7 +75,7 @@ impl<F: PrimeField> GenericVO<F> {
     }
 }
 
-impl<F: PrimeField> VirtualOracle<F> for GenericVO<F> {
+impl<F: PrimeField, PC: HomomorphicCommitment<F>> VirtualOracle<F> for GenericVO<F, PC> {
     fn get_queries(&self) -> &[OracleQuery] {
         match &self.queries {
             Some(queries) => &queries,

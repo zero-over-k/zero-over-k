@@ -130,7 +130,7 @@ mod test {
     #[test]
     fn test_simple_mul() {
         let mut mul_vo =
-            GenericVO::<F>::init(PrecompiledMul::get_expr_and_queries());
+            GenericVO::<F, PC>::init(PrecompiledMul::get_expr_and_queries());
 
         let a = WitnessProverOracle::<F> {
             label: "a".to_string(),
@@ -167,7 +167,7 @@ mod test {
     #[test]
     fn test_rescue_gate() {
         let mut rescue_vo =
-            GenericVO::<F>::init(PrecompiledRescue::get_expr_and_queries());
+            GenericVO::<F, PC>::init(PrecompiledRescue::get_expr_and_queries());
 
         let witness_oracles: Vec<_> = ["a", "b", "c", "d", "e"]
             .into_iter()
