@@ -1,5 +1,4 @@
 7. remove coset evals and poly from fixed when stored on verifier side
-10. dev proof functions
 
 ========
 2. design circuit with copy constraints
