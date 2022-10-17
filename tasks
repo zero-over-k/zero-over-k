@@ -1,4 +1,3 @@
-3. remove first round from prover (where we were masking)
 4. remove vk.index_info argument from one of the functions
 5. remove dummy vo clone 
 6. add witness prover/verifier oracles handling 

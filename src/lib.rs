@@ -319,7 +319,6 @@ where
         let quotient_chunk_oracles = PIOPforPolyIdentity::prover_first_round(
             &verifier_first_msg,
             &mut prover_state,
-            &pk.vk.index_info, //TOOD: remove this arg
             &pk.vk,
         )?;
 

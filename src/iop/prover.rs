@@ -90,18 +90,8 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
     pub fn prover_first_round(
         verifier_msg: &VerifierFirstMsg<F>,
         state: &mut ProverState<F>,
-        index_info: &IndexInfo<F>,
         vk: &VerifierKey<F, PC>,
     ) -> Result<Vec<WitnessProverOracle<F>>, Error> {
-        // 3. Compute extended evals of each oracle
-        // for oracle in state.witness_oracles.iter_mut() {
-        //     oracle.compute_extended_evals(&index_info.extended_coset_domain);
-        // }
-
-        // for oracle in state.instance_oracles.iter_mut() {
-        //     oracle.compute_extended_evals(&index_info.extended_coset_domain);
-        // }
-
         let powers_of_alpha: Vec<F> = successors(Some(F::one()), |alpha_i| {
             Some(*alpha_i * verifier_msg.alpha)
         })
@@ -109,9 +99,9 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
         .collect();
 
         let mut numerator_evals =
-            vec![F::zero(); index_info.extended_coset_domain.size()];
+            vec![F::zero(); vk.index_info.extended_coset_domain.size()];
 
-        for i in 0..index_info.extended_coset_domain.size() {
+        for i in 0..vk.index_info.extended_coset_domain.size() {
             for (vo_index, vo) in state.vos.iter().enumerate() {
                 let vo_evaluation = vo.get_expression().evaluate(
                     &|x: F| x,
@@ -156,12 +146,12 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
             .collect();
 
         let quotient = DensePolynomial::from_coefficients_slice(
-            &index_info.extended_coset_domain.coset_ifft(&quotient_evals),
+            &vk.index_info.extended_coset_domain.coset_ifft(&quotient_evals),
         );
 
         let mut quotient_coeffs = Vec::from(quotient.coeffs());
         let padding_size =
-            index_info.extended_coset_domain.size() - quotient_coeffs.len();
+            vk.index_info.extended_coset_domain.size() - quotient_coeffs.len();
         if padding_size > 0 {
             quotient_coeffs.extend(vec![F::zero(); padding_size]);
         }
