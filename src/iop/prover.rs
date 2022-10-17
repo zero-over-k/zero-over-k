@@ -39,7 +39,7 @@ pub struct ProverState<'a, F: PrimeField> {
     pub(crate) fixed_oracles_mapping: BTreeMap<String, usize>,
     pub(crate) witness_oracles: &'a [WitnessProverOracle<F>],
     pub(crate) instance_oracles: &'a [InstanceOracle<F>],
-    pub(crate) vos: &'a [Box<&'a dyn VirtualOracle<F>>],
+    vos: &'a [&'a dyn VirtualOracle<F>],
     pub(crate) domain: GeneralEvaluationDomain<F>,
     pub(crate) vanishing_polynomial: DensePolynomial<F>,
     pub(crate) quotient_chunks: Option<Vec<WitnessProverOracle<F>>>,
@@ -50,7 +50,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
     pub fn init_prover<'a>(
         witness_oracles: &'a [WitnessProverOracle<F>],
         instance_oracles: &'a [InstanceOracle<F>],
-        vos: &'a [Box<&'a dyn VirtualOracle<F>>],
+        vos: &'a [&'a dyn VirtualOracle<F>],
         domain_size: usize,
         vanishing_polynomial: &DensePolynomial<F>,
         vk: &VerifierKey<F, PC>,

@@ -1,4 +1,3 @@
-4. remove vk.index_info argument from one of the functions
 5. remove dummy vo clone 
 6. add witness prover/verifier oracles handling 
 7. remove coset evals and poly from fixed when stored on verifier side

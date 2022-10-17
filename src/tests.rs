@@ -121,15 +121,12 @@ mod test {
 
         mul_vo.configure(&witness_oracles, &instance_oracles, &[dummy_fixed]);
 
-        //TODO: remove once we remove box from VOs
-        let dummy_mul_vo_copy = mul_vo.clone();
-
-        let vos: Vec<Box<&dyn VirtualOracle<F>>> = vec![Box::new(&mul_vo)];
+        let vos: Vec<&dyn VirtualOracle<F>> = vec![&mul_vo];
 
         let vk = PilInstance::index(
             &ck,
             &verifier_key,
-            &[dummy_mul_vo_copy.clone()],
+            &vos,
             &mut witness_oracles,
             &mut instance_oracles,
             &mut [],
@@ -147,7 +144,7 @@ mod test {
             &pk,
             &mut witness_oracles,
             &mut instance_oracles,
-            vos.as_slice(),
+            &vos,
             domain_size,
             &domain.vanishing_polynomial().into(),
             &mut rng,
@@ -185,7 +182,7 @@ mod test {
         let mut vk = PilInstance::index(
             &ck,
             &verifier_key,
-            &[dummy_mul_vo_copy],
+            &vos,
             &mut ver_wtns_oracles,
             &mut instance_oracles,
             &mut [],
@@ -199,7 +196,7 @@ mod test {
             proof,
             &mut ver_wtns_oracles,
             &mut instance_oracles,
-            vos.as_slice(),
+            &vos,
             domain_size,
             &domain.vanishing_polynomial().into(),
             &mut rng,
@@ -328,15 +325,12 @@ mod test {
             assert_eq!(rescue, F::zero())
         }
 
-        //TODO: remove once we remove box from VOs
-        let dummy_rescue_vo_copy = rescue_vo.clone();
-
-        let vos: Vec<Box<&dyn VirtualOracle<F>>> = vec![Box::new(&rescue_vo)];
+        let vos: Vec<&dyn VirtualOracle<F>> = vec![&rescue_vo];
 
         let vk = PilInstance::index(
             &ck,
             &verifier_key,
-            &[dummy_rescue_vo_copy.clone()],
+            &vos,
             &mut witness_oracles,
             &mut instance_oracles,
             &mut fixed_oracles,
@@ -354,7 +348,7 @@ mod test {
             &pk,
             &mut witness_oracles,
             &mut instance_oracles,
-            vos.as_slice(),
+            &vos,
             domain_size,
             &domain.vanishing_polynomial().into(),
             &mut rng,
@@ -376,7 +370,7 @@ mod test {
         let mut vk = PilInstance::index(
             &ck,
             &verifier_key,
-            &[dummy_rescue_vo_copy],
+            &vos,
             &mut witness_ver_oracles,
             &mut instance_oracles,
             &mut fixed_oracles,
@@ -390,7 +384,7 @@ mod test {
             proof,
             &mut witness_ver_oracles,
             &mut [],
-            vos.as_slice(),
+            &vos,
             domain_size,
             &domain.vanishing_polynomial().into(),
             &mut rng,
@@ -561,14 +555,12 @@ mod test {
             GenericVO::<F>::init(PrecompiledPlonkArith::get_expr_and_queries());
         plonk_vo.configure(&witness_oracles, &instance_oracles, &fixed_oracles);
 
-        let plonk_vo_dummy_clone = plonk_vo.clone();
-
-        let vos: Vec<Box<&dyn VirtualOracle<F>>> = vec![Box::new(&plonk_vo)];
+        let vos: Vec<&dyn VirtualOracle<F>> = vec![&plonk_vo];
 
         let vk = PilInstance::index(
             &ck,
             &verifier_key,
-            &[plonk_vo_dummy_clone.clone()],
+            &vos,
             &mut witness_oracles,
             &mut instance_oracles,
             &mut fixed_oracles,
@@ -586,7 +578,7 @@ mod test {
             &pk,
             &mut witness_oracles,
             &mut instance_oracles,
-            vos.as_slice(),
+            &vos,
             domain_size,
             &domain.vanishing_polynomial().into(),
             &mut rng,
@@ -618,7 +610,7 @@ mod test {
         let mut vk = PilInstance::index(
             &ck,
             &verifier_key,
-            &[plonk_vo_dummy_clone],
+            &vos,
             &mut witness_ver_oracles,
             &mut instance_oracles,
             &mut fixed_oracles,
@@ -632,7 +624,7 @@ mod test {
             proof,
             &mut witness_ver_oracles,
             &mut instance_oracles,
-            vos.as_slice(),
+            &vos,
             domain_size,
             &domain.vanishing_polynomial().into(),
             &mut rng,
