@@ -27,7 +27,8 @@ mod test {
     use crate::rng::SimpleHashFiatShamirRng;
     use crate::vo::generic_vo::GenericVO;
     use crate::vo::precompiled_vos::{
-        PrecompiledMul, PrecompiledPlonkArith, PrecompiledRescue, PrecompiledVO,
+        DeltaXorAnd, PrecompiledMul, PrecompiledPlonkArith, PrecompiledRescue,
+        PrecompiledVO,
     };
     use crate::PIL;
     use blake2::Blake2s;
@@ -708,6 +709,231 @@ mod test {
             &mut witness_ver_oracles,
             &mut instance_oracles,
             &vos,
+            domain_size,
+            &domain.vanishing_polynomial().into(),
+            &mut rng,
+        )
+        .unwrap();
+
+        assert_eq!(res, ());
+    }
+
+    #[test]
+    fn test_delta_xor_and() {
+        let domain_size = 16;
+        let poly_degree = domain_size - 1;
+        let max_degree = poly_degree; // + max_blinding;
+
+        let mut rng = test_rng();
+        let srs = PilInstance::universal_setup(max_degree, &mut rng).unwrap();
+
+        let (ck, verifier_key) = PilInstance::prepare_keys(&srs).unwrap();
+
+        let domain = GeneralEvaluationDomain::<F>::new(domain_size).unwrap();
+
+        let (m_one, one) = (-F::one(), F::one());
+
+        let a_values_full = vec![
+            0u64, 0u64, 0u64, 0u64, 1u64, 1u64, 1u64, 1u64, 2u64, 2u64, 2u64,
+            2u64, 3u64, 3u64, 3u64, 3u64, 0u64, 0u64, 0u64, 0u64, 1u64, 1u64,
+            1u64, 1u64, 2u64, 2u64, 2u64, 2u64, 3u64, 3u64, 3u64, 3u64,
+        ];
+        let b_values_full = vec![
+            0u64, 1u64, 2u64, 3u64, 0u64, 1u64, 2u64, 3u64, 0u64, 1u64, 2u64,
+            3u64, 0u64, 1u64, 2u64, 3u64, 0u64, 1u64, 2u64, 3u64, 0u64, 1u64,
+            2u64, 3u64, 0u64, 1u64, 2u64, 3u64, 0u64, 1u64, 2u64, 3u64,
+        ];
+
+        let q_c_evals_full = vec![
+            one, one, one, one, one, one, one, one, one, one, one, one, one,
+            one, one, one, m_one, m_one, m_one, m_one, m_one, m_one, m_one,
+            m_one, m_one, m_one, m_one, m_one, m_one, m_one, m_one, m_one,
+        ];
+        let a_values = &a_values_full[..32];
+        let b_values = &b_values_full[..32];
+        let q_c_evals = &q_c_evals_full[..32];
+
+        let a_evals: Vec<_> = a_values.iter().map(|&v| F::from(v)).collect();
+        let b_evals: Vec<_> = b_values.iter().map(|&v| F::from(v)).collect();
+
+        let q_c_poly =
+            DensePolynomial::from_coefficients_slice(&domain.ifft(&q_c_evals));
+
+        let c_evals: Vec<_> = izip!(a_evals.clone(), b_evals.clone())
+            .map(|(a, b)| a * b)
+            .collect();
+        let d_evals: Vec<_> = izip!(a_values, b_values)
+            .enumerate()
+            .map(|(i, (a, b))| {
+                if i < 16 {
+                    F::from(a & b)
+                } else {
+                    F::from(a ^ b)
+                }
+            })
+            .collect();
+
+        let _check: Vec<_> = izip!(
+            a_evals.clone(),
+            b_evals.clone(),
+            c_evals.clone(),
+            d_evals.clone(),
+            q_c_evals
+        )
+        .map(|(a, b, c, d, qc)| {
+            // copied from zk-garage
+            let original_func = |(a, b, w, c, q_c): (F, F, F, F, F)| -> F {
+                let nine = F::from(9_u64);
+                let two = F::from(2_u64);
+                let three = F::from(3_u64);
+                let four = F::from(4_u64);
+                let eighteen = F::from(18_u64);
+                let eighty_one = F::from(81_u64);
+                let eighty_three = F::from(83_u64);
+                let var_f = w
+                    * (w * (four * w - eighteen * (a + b) + eighty_one)
+                        + eighteen * (a * a + b * b)
+                        - eighty_one * (a + b)
+                        + eighty_three);
+                let var_e = three * (a + b + c) - (two * var_f);
+                let var_b = q_c * ((nine * c) - three * (a + b));
+                var_b + var_e
+            };
+
+            let const_2 = F::from(2u32);
+            let const_3 = F::from(3u32);
+            let const_4 = F::from(4u32);
+            let const_9 = F::from(9u32);
+            let const_18 = F::from(18u32);
+            let const_81 = F::from(81u32);
+            let const_83 = F::from(83u32);
+            let f = c.clone()
+                * (c.clone()
+                    * (const_4 * c
+                        - const_18.clone() * (a.clone() + b.clone())
+                        + const_81.clone())
+                    + const_18
+                        * (a.clone() * a.clone() + b.clone() * b.clone())
+                    - const_81 * (a.clone() + b.clone())
+                    + const_83);
+            let e = const_3.clone() * (a.clone() + b.clone() + d.clone())
+                - const_2 * f;
+            let h = *qc * (const_9 * d - const_3 * (a + b));
+            let res = h + e;
+            assert_eq!(F::zero(), original_func((a, b, c, d, *qc)));
+            assert_eq!(F::zero(), res);
+        })
+        .collect();
+
+        let witness_polys: Vec<_> = [a_evals, b_evals, c_evals, d_evals]
+            .iter()
+            .map(|evals| {
+                DensePolynomial::from_coefficients_slice(&domain.ifft(evals))
+            })
+            .collect();
+
+        let mut and_xor_vo =
+            GenericVO::<F>::init(DeltaXorAnd::get_expr_and_queries());
+
+        let mut witness_oracles: Vec<_> = [
+            (witness_polys[0].clone(), "a"),
+            (witness_polys[1].clone(), "b"),
+            (witness_polys[2].clone(), "product"),
+            (witness_polys[3].clone(), "logic"),
+        ]
+        .into_iter()
+        .map(|(poly, label)| WitnessProverOracle::<F> {
+            label: label.to_string(),
+            poly,
+            evals_at_coset_of_extended_domain: None,
+            queried_rotations: BTreeSet::new(),
+            should_mask: false,
+        })
+        .collect();
+
+        let mut instance_oracles = vec![];
+
+        let mut fixed_oracles: Vec<_> = [(q_c_poly.clone(), "qc")]
+            .into_iter()
+            .map(|(poly, label)| FixedOracle::<F, PC> {
+                label: label.to_string(),
+                poly,
+                evals_at_coset_of_extended_domain: None,
+                queried_rotations: BTreeSet::new(),
+                evals_at_challenges: BTreeMap::default(),
+                commitment: None,
+            })
+            .collect();
+
+        and_xor_vo.configure(
+            &witness_oracles,
+            &instance_oracles,
+            &fixed_oracles,
+        );
+
+        //TODO: remove once we remove box from VOs
+        let dummy_vo_copy = and_xor_vo.clone();
+
+        let vos: Vec<Box<&dyn VirtualOracle<F>>> = vec![Box::new(&and_xor_vo)];
+
+        let vk = PilInstance::index(
+            &ck,
+            &verifier_key,
+            &[dummy_vo_copy.clone()],
+            &mut witness_oracles,
+            &mut instance_oracles,
+            &mut fixed_oracles,
+            domain,
+            domain.vanishing_polynomial().into(),
+        )
+        .unwrap();
+
+        let pk = ProverKey {
+            committer_key: ck.clone(),
+            vk: vk.clone(),
+        };
+
+        let proof = PilInstance::prove(
+            &pk,
+            &mut witness_oracles,
+            &mut instance_oracles,
+            vos.as_slice(),
+            domain_size,
+            &domain.vanishing_polynomial().into(),
+            &mut rng,
+        )
+        .unwrap();
+
+        let mut witness_ver_oracles: Vec<_> = ["a", "b", "product", "logic"]
+            .into_iter()
+            .map(|label| WitnessVerifierOracle {
+                label: label.to_string(),
+                queried_rotations: BTreeSet::new(),
+                should_mask: false,
+                evals_at_challenges: BTreeMap::default(),
+                commitment: None,
+            })
+            .collect();
+
+        // Repeat but this time provide verifier witness oracles
+        let mut vk = PilInstance::index(
+            &ck,
+            &verifier_key,
+            &[dummy_vo_copy],
+            &mut witness_ver_oracles,
+            &mut instance_oracles,
+            &mut fixed_oracles,
+            domain,
+            domain.vanishing_polynomial().into(),
+        )
+        .unwrap();
+
+        let res = PilInstance::verify(
+            &mut vk,
+            proof,
+            &mut witness_ver_oracles,
+            &mut instance_oracles,
+            vos.as_slice(),
             domain_size,
             &domain.vanishing_polynomial().into(),
             &mut rng,

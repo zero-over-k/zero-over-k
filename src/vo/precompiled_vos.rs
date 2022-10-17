@@ -157,6 +157,15 @@ impl<F: PrimeField> PrecompiledVO<F> for PlonkArith4 {
 
 // Precompiled VOs related to 4-wire LogicGate
 
+/// This VO is used to check the decomposition of a value in 2-bit increments.
+/// An n-bit value a: a_0, a_1, ..., a_n, where a_0 is the most significant bit
+/// will be split in 2-bit values and then stored as an accumulator.
+/// In this way, the first cell of the wire will store the value of the first
+/// (most significant) 2 bits, and the last cell will store the value a.
+/// The value of intermediate cells will be: the previous cell value * 4 + the
+/// value of the new 2-bit value.
+/// This accumulation relation is the one enforced by Delta:
+/// 0 <= (a_next - 4 * a) < 4
 pub struct Delta {}
 
 impl<F: PrimeField> PrecompiledVO<F> for Delta {
@@ -196,8 +205,8 @@ impl<F: PrimeField> PrecompiledVO<F> for DeltaXorAnd {
     /// ```text
     /// G = H + E
     /// H = q_c * [9c - 3(a+b)]
-    /// E = 3(a+b+c) - 2F
-    /// F = d[d(4d - 18(a+b) + 81) + 18(a^2 + b^2) - 81(a+b) + 83]
+    /// E = 3(a+b+d) - 2F
+    /// F = c[c(4c - 18(a+b) + 81) + 18(a^2 + b^2) - 81(a+b) + 83]
     /// ```
     fn get_expr_and_queries() -> (VirtualExpression<F>, Vec<VirtualQuery>) {
         // Witnesses
@@ -206,7 +215,7 @@ impl<F: PrimeField> PrecompiledVO<F> for DeltaXorAnd {
         let c = VirtualQuery::new(2, Rotation::curr(), OracleType::Witness);
         let d = VirtualQuery::new(2, Rotation::curr(), OracleType::Witness);
         // Selector
-        let qc = VirtualQuery::new(4, Rotation::curr(), OracleType::Fixed);
+        let qc = VirtualQuery::new(0, Rotation::curr(), OracleType::Fixed);
 
         let expr = {
             let qc: VirtualExpression<F> = qc.clone().into();
@@ -231,23 +240,23 @@ impl<F: PrimeField> PrecompiledVO<F> for DeltaXorAnd {
             let const_83: VirtualExpression<F> =
                 VirtualExpression::Constant(F::from(83u32));
 
-            let f = d.clone()
-                * (d.clone()
-                    * (const_4 * d
+            let f = c.clone()
+                * (c.clone()
+                    * (const_4 * c
                         - const_18.clone() * (a.clone() + b.clone())
                         + const_81.clone())
                     + const_18
                         * (a.clone() * a.clone() + b.clone() * b.clone())
                     - const_81 * (a.clone() + b.clone())
                     + const_83);
-            let e = const_3.clone() * (a.clone() + b.clone() + c.clone())
+            let e = const_3.clone() * (a.clone() + b.clone() + d.clone())
                 - const_2 * f;
-            let h = qc * (const_9 * c - const_3 * (a + b));
+            let h = qc * (const_9 * d - const_3 * (a + b));
             let a = h + e;
             a
         };
 
-        (expr, vec![qc, a, b, c, d])
+        (expr, vec![a, b, c, d, qc])
     }
 }
 
@@ -263,7 +272,9 @@ mod test {
         vo::generic_vo::GenericVO,
     };
 
-    use super::{PrecompiledMul, PrecompiledRescue, PrecompiledVO};
+    use super::{
+        DeltaXorAnd, PrecompiledMul, PrecompiledRescue, PrecompiledVO,
+    };
     use crate::commitment::KZG10;
     use ark_bls12_381::{Bls12_381, Fr as F};
     use ark_poly::univariate::DensePolynomial;
