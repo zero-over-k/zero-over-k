@@ -153,6 +153,19 @@ pub struct FixedVerifierOracle<F: PrimeField, PC: HomomorphicCommitment<F>> {
     pub(crate) commitment: Option<PC::Commitment>,
 }
 
+impl<F: PrimeField, PC: HomomorphicCommitment<F>> Clone
+    for FixedVerifierOracle<F, PC>
+{
+    fn clone(&self) -> Self {
+        Self {
+            label: self.label.clone(),
+            queried_rotations: self.queried_rotations.clone(),
+            evals_at_challenges: self.evals_at_challenges.clone(),
+            commitment: self.commitment.clone(),
+        }
+    }
+}
+
 impl<F: PrimeField, PC: HomomorphicCommitment<F>> FixedVerifierOracle<F, PC> {
     pub fn from_labeled_commitment(
         c: &LabeledCommitment<PC::Commitment>,

@@ -3,7 +3,8 @@ use ark_poly::{
     univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
 };
 use ark_poly_commit::{
-    LabeledPolynomial, PCCommitment, PCRandomness, PolynomialCommitment,
+    LabeledCommitment, LabeledPolynomial, PCCommitment, PCRandomness,
+    PolynomialCommitment,
 };
 
 use crate::{
@@ -84,6 +85,57 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>>
             permutation_oracles,
         }
     }
+
+    pub fn new(
+        fixed_oracles: &Vec<FixedProverOracle<F>>,
+        permutation_oracles: &Vec<FixedProverOracle<F>>,
+        index_info: &IndexInfo<F>
+    ) -> Self {
+        let mut fixed_oracles = fixed_oracles.clone(); 
+        let mut permutation_oracles = permutation_oracles.clone();
+
+        for oracle in fixed_oracles.iter_mut() {
+            oracle.compute_extended_evals(&index_info.extended_coset_domain);
+        }
+
+        for oracle in permutation_oracles.iter_mut() {
+            oracle.compute_extended_evals(&index_info.extended_coset_domain);
+        }
+        Self {
+            empty_rands_for_fixed: vec![
+                PC::Randomness::empty();
+                fixed_oracles.len()
+                    + permutation_oracles.len()
+            ],
+            fixed_oracles,
+            permutation_oracles,
+        }
+    }
+}
+
+pub struct PreprocessedCommitments<F: PrimeField, PC: HomomorphicCommitment<F>>
+{
+    pub(crate) fixed_commitments: Vec<LabeledCommitment<PC::Commitment>>,
+    pub(crate) permutation_commitments: Vec<LabeledCommitment<PC::Commitment>>,
+}
+
+impl<F: PrimeField, PC: HomomorphicCommitment<F>>
+    PreprocessedCommitments<F, PC>
+{
+    pub fn to_verifier_preprocessed(&self) -> VerifierPreprocessedInput<F, PC> {
+        VerifierPreprocessedInput {
+            fixed_oracles: self
+                .fixed_commitments
+                .iter()
+                .map(|c| FixedVerifierOracle::from_labeled_commitment(c))
+                .collect(),
+            permutation_oracles: self
+                .permutation_commitments
+                .iter()
+                .map(|c| FixedVerifierOracle::from_labeled_commitment(c))
+                .collect(),
+        }
+    }
 }
 
 pub struct VerifierPreprocessedInput<
@@ -92,6 +144,17 @@ pub struct VerifierPreprocessedInput<
 > {
     pub fixed_oracles: Vec<FixedVerifierOracle<F, PC>>,
     pub permutation_oracles: Vec<FixedVerifierOracle<F, PC>>,
+}
+
+impl<F: PrimeField, PC: HomomorphicCommitment<F>> Clone
+    for VerifierPreprocessedInput<F, PC>
+{
+    fn clone(&self) -> Self {
+        Self {
+            fixed_oracles: self.fixed_oracles.clone(),
+            permutation_oracles: self.permutation_oracles.clone(),
+        }
+    }
 }
 
 impl<F: PrimeField, PC: HomomorphicCommitment<F>>
@@ -173,7 +236,10 @@ pub struct ProverKey<F: PrimeField, PC: HomomorphicCommitment<F>> {
 }
 
 impl<F: PrimeField, PC: HomomorphicCommitment<F>> ProverKey<F, PC> {
-    pub fn from_vk(ck: &PC::CommitterKey, vk: &VerifierKey<F, PC>) -> Self {
+    pub fn from_ck_and_vk(
+        ck: &PC::CommitterKey,
+        vk: &VerifierKey<F, PC>,
+    ) -> Self {
         Self {
             vk: vk.clone(),
             committer_key: ck.clone(),
