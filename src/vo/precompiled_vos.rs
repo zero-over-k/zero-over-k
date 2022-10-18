@@ -26,12 +26,14 @@ impl<F: PrimeField> PrecompiledVO<F> for PrecompiledMul {
     }
 }
 
-/// Implements 4-width rescue:
+/// Rescue VO implements a 4 element vector multiplication and a exponentiation:
+/// (q1, q2, q3, q4) * (w1, w2, w3, w4)^5  = w5
+/// Constraint :
 /// q_1 * w_1^5 +
 /// q_2 * w_2^5 +
 /// q_3 * w_3^5 +
-/// q_4 * w_4^5 =
-/// w_5
+/// q_4 * w_4^5 -
+/// w_5 = 0
 pub struct PrecompiledRescue {}
 
 impl<F> PrecompiledVO<F> for PrecompiledRescue
@@ -67,6 +69,8 @@ where
     }
 }
 
+/// Plonk's original arithmetic constraint:
+/// q_m * a * b + q_L * a + q_R * b + q_o * c + q_c + PI = 0
 pub struct PrecompiledPlonkArith {}
 
 impl<F: PrimeField> PrecompiledVO<F> for PrecompiledPlonkArith {
@@ -106,6 +110,8 @@ impl<F: PrimeField> PrecompiledVO<F> for PrecompiledPlonkArith {
     }
 }
 
+/// Plonk's orginal arithmetic constraint with an extra addend using 4 wires.
+/// q_m * a * b + q_L * a + q_R * b + q_o * c + q_4 * d + q_c + PI = 0
 pub struct PlonkArith4 {}
 
 impl<F: PrimeField> PrecompiledVO<F> for PlonkArith4 {
@@ -157,7 +163,7 @@ impl<F: PrimeField> PrecompiledVO<F> for PlonkArith4 {
 
 // Precompiled VOs related to 4-wire LogicGate
 
-/// This VO is used to check the decomposition of a value in 2-bit increments.
+/// Delta VO is used to check the decomposition of a value in 2-bit increments.
 /// An n-bit value a: a_0, a_1, ..., a_n, where a_0 is the most significant bit
 /// will be split in 2-bit values and then stored as an accumulator.
 /// In this way, the first cell of the wire will store the value of the first
@@ -197,17 +203,30 @@ impl<F: PrimeField> PrecompiledVO<F> for Delta {
         (expr, vec![a])
     }
 }
+
+/// DeltaXorAnd VO is used to to perform a bitwise XOR or AND operation
+/// between 2 2-bit values. It uses a fixed selector (q_c) to select the
+/// operation:
+///    - XOR: q_c = -1
+///    - AND: q_c = 1
+/// It also uses an extra witness that must hold the product of the 2 inputs.
+/// The constraint is G = 0 where:
+/// ```text
+/// G = H + E
+/// H = qc * [9c - 3(a+b)]
+/// E = 3(a+b+d) - 2F
+/// F = c[c(4c - 18(a+b) + 81) + 18(a^2 + b^2) - 81(a+b) + 83]
+/// ```
+/// where a and b are the 2-bit inputs,
+/// c is their product a*b
+/// and d is the result of the logic operation: a (& or ^) b
 pub struct DeltaXorAnd {}
 
 impl<F: PrimeField> PrecompiledVO<F> for DeltaXorAnd {
-    /// The identity we want to check is `q_logic * A = 0` where:
-    ///
-    /// ```text
-    /// G = H + E
-    /// H = q_c * [9c - 3(a+b)]
-    /// E = 3(a+b+d) - 2F
-    /// F = c[c(4c - 18(a+b) + 81) + 18(a^2 + b^2) - 81(a+b) + 83]
-    /// ```
+    // TODO: When the full arbitrary number of bit implementation is done
+    // the inputs a, b and output d must be modified to work with the accumulated
+    // results. This involves an extra query at the next rotation and a sustitution:
+    // a => (a_next - 4 * a_curr) ... same for b and d.
     fn get_expr_and_queries() -> (VirtualExpression<F>, Vec<VirtualQuery>) {
         // Witnesses
         let a = VirtualQuery::new(0, Rotation::curr(), OracleType::Witness);
@@ -272,9 +291,7 @@ mod test {
         vo::generic_vo::GenericVO,
     };
 
-    use super::{
-        PrecompiledMul, PrecompiledRescue, PrecompiledVO,
-    };
+    use super::{PrecompiledMul, PrecompiledRescue, PrecompiledVO};
     use crate::commitment::KZG10;
     use ark_bls12_381::{Bls12_381, Fr as F};
     use ark_poly::univariate::DensePolynomial;
