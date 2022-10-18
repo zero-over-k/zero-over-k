@@ -1,5 +1,3 @@
-
-
 use ark_ff::Field;
 
 use crate::vo::error::Error;

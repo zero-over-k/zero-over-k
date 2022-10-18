@@ -2,7 +2,7 @@ use ark_ff::PrimeField;
 use ark_poly::{
     univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
 };
-use ark_poly_commit::{PCRandomness, PolynomialCommitment, PCCommitment};
+use ark_poly_commit::{PCCommitment, PCRandomness, PolynomialCommitment};
 
 use crate::{
     commitment::HomomorphicCommitment,
@@ -11,10 +11,10 @@ use crate::{
     oracles::{fixed::FixedOracle, traits::Instantiable},
 };
 
-use ark_serialize::{CanonicalSerialize, CanonicalDeserialize, SerializationError};
-use ark_std::{
-    io::{Read, Write},
+use ark_serialize::{
+    CanonicalDeserialize, CanonicalSerialize, SerializationError,
 };
+use ark_std::io::{Read, Write};
 
 pub type UniversalSRS<F, PC> =
     <PC as PolynomialCommitment<F, DensePolynomial<F>>>::UniversalParams;

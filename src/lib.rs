@@ -3,7 +3,6 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::iter::{self, successors};
 use std::marker::PhantomData;
 
-
 use ark_ff::{to_bytes, PrimeField};
 use ark_poly::univariate::DensePolynomial;
 use ark_poly::{EvaluationDomain, GeneralEvaluationDomain, Polynomial};
@@ -26,7 +25,6 @@ use oracles::traits::{ConcreteOracle, Instantiable};
 use oracles::witness::{WitnessProverOracle, WitnessVerifierOracle};
 use rng::FiatShamirRng;
 use vo::VirtualOracle;
-
 
 use crate::oracles::query::OracleType;
 use crate::oracles::rotation::Rotation;

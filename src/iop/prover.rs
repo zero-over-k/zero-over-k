@@ -1,4 +1,3 @@
-
 use std::{
     collections::{BTreeMap, BTreeSet},
     iter::successors,
@@ -6,8 +5,8 @@ use std::{
 
 use ark_ff::PrimeField;
 use ark_poly::{
-    univariate::DensePolynomial, EvaluationDomain,
-    GeneralEvaluationDomain, Polynomial, UVPolynomial,
+    univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
+    Polynomial, UVPolynomial,
 };
 use ark_std::rand::Rng;
 
