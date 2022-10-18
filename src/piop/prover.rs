@@ -16,7 +16,7 @@ use crate::{
         instance::InstanceProverOracle,
         query::{OracleType, QueryContext},
         rotation::Rotation,
-        traits::ConcreteOracle,
+        traits::{ConcreteOracle, Instantiable},
         witness::WitnessProverOracle,
     },
     piop::error::Error,

@@ -16,7 +16,6 @@ use crate::{
             ConcreteOracle, FixedOracle, InstanceOracle, Instantiable,
             WitnessOracle,
         },
-        traits::{ConcreteOracle, WitnessOracle},
         witness::WitnessProverOracle,
     },
     util::compute_vanishing_poly_over_coset,
