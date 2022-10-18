@@ -38,11 +38,7 @@ pub trait Instantiable<F: FftField>: ConcreteOracle<F> {
         eval
     }
 
-    fn query_in_coset(
-        &self,
-        omega_index: usize,
-        rotation: Rotation,
-    ) -> F {
+    fn query_in_coset(&self, omega_index: usize, rotation: Rotation) -> F {
         let extended_coset_evals = self.get_extended_coset_evals();
         if rotation.degree == 0 {
             return extended_coset_evals[omega_index];
@@ -52,7 +48,8 @@ pub trait Instantiable<F: FftField>: ConcreteOracle<F> {
         let scaling_ratio = extended_domain_size / original_domain_size;
         let eval = match &rotation.sign {
             Sign::Plus => {
-                extended_coset_evals[(omega_index + rotation.degree * scaling_ratio)
+                extended_coset_evals[(omega_index
+                    + rotation.degree * scaling_ratio)
                     % extended_domain_size]
             }
             // TODO: test negative rotations

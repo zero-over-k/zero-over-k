@@ -3,11 +3,10 @@ use std::marker::PhantomData;
 use ark_ff::PrimeField;
 
 use crate::{commitment::HomomorphicCommitment, rng::FiatShamirRng};
-use ark_serialize::{CanonicalSerialize, CanonicalDeserialize, SerializationError};
-use ark_std::{
-    io::{Read, Write},
+use ark_serialize::{
+    CanonicalDeserialize, CanonicalSerialize, SerializationError,
 };
-
+use ark_std::io::{Read, Write};
 
 pub mod piop;
 pub mod poly;

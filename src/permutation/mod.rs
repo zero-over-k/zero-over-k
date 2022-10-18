@@ -160,10 +160,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PermutationArgument<F, PC> {
         let mut permutation_eval = alpha_powers[0]
             * l_0_coset_evals[omega_index]
             * (F::one()
-                - agg_polys[0].query_in_coset(
-                    omega_index,
-                    Rotation::curr(),
-                ));
+                - agg_polys[0].query_in_coset(omega_index, Rotation::curr()));
         let mut alpha_shift = 1;
 
         for (i, ((ws, sigmas), ds)) in oracle_chunks
@@ -192,19 +189,18 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PermutationArgument<F, PC> {
         for i in 0..agg_polys.len() - 1 {
             permutation_eval += alpha_powers[i + alpha_shift]
                 * l_0_coset_evals[omega_index]
-                * (agg_polys[i + 1].query_in_coset(
-                    omega_index,
-                    Rotation::curr(),
-                ) - agg_polys[i].query_in_coset(
-                    omega_index,
-                    Rotation::new(self.u, Sign::Plus),
-                ));
+                * (agg_polys[i + 1]
+                    .query_in_coset(omega_index, Rotation::curr())
+                    - agg_polys[i].query_in_coset(
+                        omega_index,
+                        Rotation::new(self.u, Sign::Plus),
+                    ));
         }
 
-        let z_last_eval = agg_polys.last().unwrap().query_in_coset(
-            omega_index,
-            Rotation::curr(),
-        );
+        let z_last_eval = agg_polys
+            .last()
+            .unwrap()
+            .query_in_coset(omega_index, Rotation::curr());
         permutation_eval += alpha_powers.last().unwrap().clone()
             * q_last_coset_evals[omega_index]
             * (z_last_eval * z_last_eval - z_last_eval);

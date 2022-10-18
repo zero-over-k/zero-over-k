@@ -112,29 +112,19 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> GrandProductArgument<F, PC> {
     ) -> F {
         let zk_part = F::one()
             - (q_last_coset_evals[omega_index]
-                + q_blind.query_in_coset(
-                    omega_index,
-                    Rotation::curr(),
-                ));
+                + q_blind.query_in_coset(omega_index, Rotation::curr()));
 
-        let mut lhs =
-            z.query_in_coset(omega_index, Rotation::next());
-        let mut rhs =
-            z.query_in_coset(omega_index, Rotation::curr());
+        let mut lhs = z.query_in_coset(omega_index, Rotation::next());
+        let mut rhs = z.query_in_coset(omega_index, Rotation::curr());
 
         for ((w_i, sigma_i), &delta_i) in witness_oracles
             .iter()
             .zip(permutation_oracles.iter())
             .zip(deltas.iter())
         {
-            let w_res =
-                w_i.query_in_coset(omega_index, Rotation::curr());
+            let w_res = w_i.query_in_coset(omega_index, Rotation::curr());
             lhs *= w_res
-                + beta
-                    * sigma_i.query_in_coset(
-                        omega_index,
-                        Rotation::curr(),
-                    )
+                + beta * sigma_i.query_in_coset(omega_index, Rotation::curr())
                 + gamma;
             rhs *= w_res
                 + beta * delta_i * F::multiplicative_generator() * omega
@@ -194,7 +184,8 @@ mod test {
         oracles::{
             fixed::{FixedProverOracle, FixedVerifierOracle},
             rotation::Rotation,
-            witness::{WitnessProverOracle, WitnessVerifierOracle}, traits::Instantiable,
+            traits::Instantiable,
+            witness::{WitnessProverOracle, WitnessVerifierOracle},
         },
         permutation,
     };
@@ -553,10 +544,14 @@ mod test {
                 Rotation::next(),
             ]),
             evals_at_challenges: BTreeMap::from([
-                (evaluation_challenge, agg_poly.polynomial().evaluate(&evaluation_challenge)),
+                (
+                    evaluation_challenge,
+                    agg_poly.polynomial().evaluate(&evaluation_challenge),
+                ),
                 (
                     domain.element(1) * evaluation_challenge,
-                    agg_poly.polynomial()
+                    agg_poly
+                        .polynomial()
                         .evaluate(&(evaluation_challenge * domain.element(1))),
                 ),
             ]),
