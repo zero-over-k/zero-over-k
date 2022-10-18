@@ -1,28 +1,25 @@
-use core::num;
 use std::{
-    cmp::max,
     collections::{BTreeMap, BTreeSet},
     iter::successors,
 };
 
 use ark_ff::PrimeField;
 use ark_poly::{
-    domain, univariate::DensePolynomial, EvaluationDomain,
-    GeneralEvaluationDomain, Polynomial, UVPolynomial,
+    univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
+    Polynomial, UVPolynomial,
 };
-use ark_std::rand::Rng;
+
 
 use crate::{
     commitment::HomomorphicCommitment,
-    data_structures::{IndexInfo, VerifierKey},
+    data_structures::{VerifierKey},
     iop::error::Error,
     iop::{verifier::VerifierFirstMsg, PIOPforPolyIdentity},
     oracles::{
-        fixed::FixedOracle,
         instance::InstanceOracle,
         query::{OracleType, QueryContext},
         rotation::Rotation,
-        traits::{ConcreteOracle, Instantiable},
+        traits::{ConcreteOracle},
         witness::WitnessProverOracle,
     },
     vo::VirtualOracle,

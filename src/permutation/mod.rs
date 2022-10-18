@@ -2,8 +2,7 @@ use std::marker::PhantomData;
 
 use ark_ff::PrimeField;
 use ark_poly::{
-    univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
-    Polynomial,
+    EvaluationDomain, GeneralEvaluationDomain,
 };
 use ark_std::rand::RngCore;
 use itertools::Itertools;
@@ -306,13 +305,12 @@ mod test {
     use crate::{
         commitment::KZG10,
         oracles::{
-            fixed::FixedOracle, rotation::Rotation, traits::Instantiable,
+            fixed::FixedOracle, rotation::Rotation,
             witness::WitnessProverOracle,
         },
-        permutation,
         util::compute_vanishing_poly_over_coset,
     };
-    use ark_ff::{FftField, Field, One, UniformRand, Zero};
+    use ark_ff::{One, UniformRand, Zero};
     use ark_poly::{
         univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
         Polynomial, UVPolynomial,
@@ -444,7 +442,7 @@ mod test {
             &domain.ifft(&b_evals),
         );
 
-        let q_last = DensePolynomial::<F>::from_coefficients_slice(
+        let _q_last = DensePolynomial::<F>::from_coefficients_slice(
             &domain.ifft(&q_last_evals),
         );
         let q_blind = DensePolynomial::<F>::from_coefficients_slice(

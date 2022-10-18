@@ -6,9 +6,8 @@ use crate::{
     commitment::HomomorphicCommitment,
     oracles::{
         fixed::FixedOracle,
-        instance::{self, InstanceOracle},
+        instance::{InstanceOracle},
         query::{OracleQuery, OracleType},
-        rotation::Rotation,
         traits::{ConcreteOracle, WitnessOracle},
     },
 };

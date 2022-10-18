@@ -1,25 +1,24 @@
-use std::cmp::max;
+
 use std::collections::{BTreeMap, BTreeSet};
-use std::iter::{self, successors};
+use std::iter::{successors};
 use std::marker::PhantomData;
-use std::option::Iter;
 
 use ark_ff::{to_bytes, PrimeField};
 use ark_poly::univariate::DensePolynomial;
 use ark_poly::{EvaluationDomain, GeneralEvaluationDomain, Polynomial};
 use ark_poly_commit::{
-    LabeledPolynomial, PCCommitterKey, PCRandomness, PCUniversalParams,
+    LabeledPolynomial, PCCommitterKey, PCUniversalParams,
 };
-use digest::generic_array::typenum::Quot;
+
 use error::Error;
 
 use ark_poly_commit::evaluate_query_set;
 use ark_std::rand::{Rng, RngCore};
 use commitment::HomomorphicCommitment;
-use data_structures::{IndexInfo, Proof, ProverKey, UniversalSRS, VerifierKey};
+use data_structures::{Proof, ProverKey, UniversalSRS, VerifierKey};
 use iop::PIOPforPolyIdentity;
 use multiproof::piop::Multiopen;
-use oracles::fixed::FixedOracle;
+
 use oracles::instance::InstanceOracle;
 use oracles::query::QueryContext;
 use oracles::traits::{ConcreteOracle, Instantiable};
@@ -27,11 +26,10 @@ use oracles::witness::{WitnessProverOracle, WitnessVerifierOracle};
 use rng::FiatShamirRng;
 use vo::VirtualOracle;
 
-use crate::iop::prover;
 use crate::oracles::query::OracleType;
 use crate::oracles::rotation::Rotation;
 use crate::oracles::traits::CommittedOracle;
-use crate::util::compute_vanishing_poly_over_coset;
+
 
 pub mod commitment;
 mod data_structures;

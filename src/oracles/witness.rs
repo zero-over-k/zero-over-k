@@ -3,10 +3,10 @@ use std::collections::{BTreeMap, BTreeSet};
 use ark_ff::PrimeField;
 use ark_poly::{
     univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
-    Polynomial, UVPolynomial,
+    Polynomial,
 };
 use ark_poly_commit::{LabeledPolynomial, QuerySet};
-use ark_std::rand::Rng;
+
 
 use crate::commitment::HomomorphicCommitment;
 
