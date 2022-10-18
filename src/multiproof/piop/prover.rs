@@ -100,7 +100,7 @@ impl<F: PrimeField> PIOP<F> {
                 for (i, (oracle, _)) in oracles_rands.iter().enumerate() {
                     evaluation += x1_powers[i]
                         * oracle
-                            .query(&QueryContext::Challenge(evaluation_point));
+                            .query(&evaluation_point);
                 }
 
                 let prev = q_i_evals_set.insert(evaluation_point, evaluation);

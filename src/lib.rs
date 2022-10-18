@@ -38,12 +38,12 @@ pub mod data_structures;
 pub mod error;
 // pub mod iop;
 pub mod oracles;
-// pub mod rng;
+pub mod rng;
 mod util;
 pub mod vo;
 
 pub mod indexer;
-// pub mod multiproof;
+pub mod multiproof;
 pub mod permutation;
 
 // mod tests;
