@@ -15,7 +15,6 @@ use ark_std::rand::Rng;
 use crate::{
     commitment::HomomorphicCommitment,
     oracles::{
-        query::QueryContext,
         rotation::Rotation,
         traits::{CommittedOracle, Instantiable},
     },
@@ -199,7 +198,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng>
                 for (i, &oracle) in oracles.iter().enumerate() {
                     evaluation += x1_powers[i]
                         * oracle
-                            .query(&QueryContext::Challenge(evaluation_point));
+                            .query(&evaluation_point);
                 }
 
                 let prev = q_i_evals_set.insert(evaluation_point, evaluation);
@@ -346,7 +345,7 @@ mod test {
             evals_at_coset_of_extended_domain: None,
             queried_rotations: BTreeSet::from([Rotation::curr()]),
             should_permute: false,
-            evals: None,
+            evals: domain.fft(&a_poly),
         };
 
         let b = WitnessProverOracle {
@@ -355,7 +354,7 @@ mod test {
             evals_at_coset_of_extended_domain: None,
             queried_rotations: BTreeSet::from([Rotation::curr()]),
             should_permute: false,
-            evals: None,
+            evals: domain.fft(&b_poly),
         };
 
         let c = WitnessProverOracle {
@@ -367,7 +366,7 @@ mod test {
                 Rotation::next(),
             ]),
             should_permute: false,
-            evals: None,
+            evals: domain.fft(&c_poly),
         };
 
         let d = WitnessProverOracle {
@@ -379,7 +378,7 @@ mod test {
                 Rotation::next(),
             ]),
             should_permute: false,
-            evals: None,
+            evals: domain.fft(&d_poly),
         };
 
         // TODO: Can we remove this Box
@@ -421,7 +420,7 @@ mod test {
         let a_ver = WitnessVerifierOracle {
             label: "a".to_string(),
             queried_rotations: BTreeSet::from([Rotation::curr()]),
-            should_mask: false,
+            should_permute: false,
             evals_at_challenges: BTreeMap::from([(xi, a_at_xi)]),
             commitment: Some(oracles_commitments[0].commitment().clone()),
         };
@@ -429,7 +428,7 @@ mod test {
         let b_ver = WitnessVerifierOracle {
             label: "b".to_string(),
             queried_rotations: BTreeSet::from([Rotation::curr()]),
-            should_mask: false,
+            should_permute: false,
             evals_at_challenges: BTreeMap::from([(xi, b_at_xi)]),
             commitment: Some(oracles_commitments[1].commitment().clone()),
         };
@@ -440,7 +439,7 @@ mod test {
                 Rotation::curr(),
                 Rotation::next(),
             ]),
-            should_mask: false,
+            should_permute: false,
             evals_at_challenges: BTreeMap::from([
                 (xi, c_at_xi),
                 (omega_xi, c_at_omega_xi),
@@ -454,7 +453,7 @@ mod test {
                 Rotation::curr(),
                 Rotation::next(),
             ]),
-            should_mask: false,
+            should_permute: false,
             evals_at_challenges: BTreeMap::from([
                 (xi, d_at_xi),
                 (omega_xi, d_at_omega_xi),
