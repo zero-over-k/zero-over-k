@@ -8,18 +8,18 @@ use ark_poly::{
     univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
     Polynomial, UVPolynomial,
 };
-use ark_std::rand::Rng;
+
 
 use crate::{
     commitment::HomomorphicCommitment,
-    data_structures::{IndexInfo, VerifierKey},
+    data_structures::{VerifierKey},
     iop::error::Error,
     iop::{verifier::VerifierFirstMsg, PIOPforPolyIdentity},
     oracles::{
         instance::InstanceOracle,
         query::{OracleType, QueryContext},
         rotation::Rotation,
-        traits::{ConcreteOracle, Instantiable},
+        traits::{ConcreteOracle},
         witness::WitnessProverOracle,
     },
     vo::VirtualOracle,

@@ -273,7 +273,7 @@ mod test {
     };
 
     use super::{
-        DeltaXorAnd, PrecompiledMul, PrecompiledRescue, PrecompiledVO,
+        PrecompiledMul, PrecompiledRescue, PrecompiledVO,
     };
     use crate::commitment::KZG10;
     use ark_bls12_381::{Bls12_381, Fr as F};

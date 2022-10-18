@@ -17,8 +17,8 @@ mod test {
 
     use crate::data_structures::ProverKey;
     use crate::indexer::{Adversary, Indexer};
-    use crate::multiproof::poly;
-    use crate::oracles::fixed::{self, FixedOracle};
+    
+    use crate::oracles::fixed::{FixedOracle};
 
     use crate::oracles::instance::InstanceOracle;
 
@@ -608,7 +608,7 @@ mod test {
 
         let vos: Vec<&dyn VirtualOracle<F>> = vec![&plonk_vo];
 
-        let mut vk = Indexer::index(
+        let vk = Indexer::index(
             &ck,
             &verifier_key,
             &vos,

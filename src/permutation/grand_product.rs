@@ -11,10 +11,9 @@ use crate::{
     commitment::HomomorphicCommitment,
     oracles::{
         fixed::FixedOracle,
-        instance::InstanceOracle,
-        query::{OracleQuery, OracleType, QueryContext},
+        query::{QueryContext},
         rotation::Rotation,
-        traits::{ConcreteOracle, Instantiable, WitnessOracle},
+        traits::{ConcreteOracle, WitnessOracle},
         witness::WitnessProverOracle,
     },
 };
@@ -274,7 +273,6 @@ mod test {
             fixed::FixedOracle, rotation::Rotation,
             witness::WitnessProverOracle,
         },
-        permutation,
     };
 
     use ark_bls12_381::{Bls12_381, Fr as F};
@@ -480,7 +478,7 @@ mod test {
             &domain.ifft(&b_evals),
         );
 
-        let q_last = DensePolynomial::<F>::from_coefficients_slice(
+        let _q_last = DensePolynomial::<F>::from_coefficients_slice(
             &domain.ifft(&q_last_evals),
         );
 
