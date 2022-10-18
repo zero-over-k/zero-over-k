@@ -11,10 +11,11 @@ use crate::{
     data_structures::{IndexInfo, VerifierKey},
     error::Error,
     oracles::{
-        fixed::FixedOracle,
-        instance::InstanceOracle,
         query::OracleType,
-        traits::{ConcreteOracle, Instantiable, WitnessOracle},
+        traits::{
+            ConcreteOracle, FixedOracle, InstanceOracle, Instantiable,
+            WitnessOracle,
+        },
         witness::WitnessProverOracle,
     },
     util::compute_vanishing_poly_over_coset,
@@ -48,8 +49,8 @@ pub struct Indexer<F: PrimeField, PC: HomomorphicCommitment<F>> {
 impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
     fn compute_quotient_degree(
         witness_oracles: &[impl WitnessOracle<F>],
-        instance_oracles: &[InstanceOracle<F>],
-        selector_oracles: &[FixedOracle<F, PC>],
+        instance_oracles: &[impl InstanceOracle<F>],
+        selector_oracles: &[impl FixedOracle<F>],
         witness_oracles_mapping: &BTreeMap<String, usize>,
         instance_oracles_mapping: &BTreeMap<String, usize>,
         selector_oracles_mapping: &BTreeMap<String, usize>,
@@ -143,9 +144,9 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
         vk: &PC::VerifierKey,
         vos: &[&dyn VirtualOracle<F>],
         witness_oracles: &[impl WitnessOracle<F>],
-        instance_oracles: &[InstanceOracle<F>],
-        selector_oracles: &[FixedOracle<F, PC>],
-        permutation_oracles: &[FixedOracle<F, PC>],
+        instance_oracles: &[impl InstanceOracle<F>],
+        selector_oracles: &[impl FixedOracle<F>],
+        permutation_oracles: &[impl FixedOracle<F>],
         domain: GeneralEvaluationDomain<F>,
         zH: &DensePolynomial<F>,
         adversary: Adversary,
@@ -194,16 +195,16 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
 
         let mut vk = VerifierKey {
             verifier_key: vk.clone(),
-            selector_oracles: selector_oracles.to_vec(),
-            permutation_oracles: permutation_oracles.to_vec(),
+            // selector_oracles: selector_oracles.to_vec(),
+            // permutation_oracles: permutation_oracles.to_vec(),
             index_info,
             zh_inverses_over_coset,
         };
 
-        match adversary {
-            Adversary::Prover => vk.handle_fixed_prover(ck)?,
-            Adversary::Verifier => vk.handle_fixed_verifier(ck)?,
-        }
+        // match adversary {
+        //     Adversary::Prover => vk.handle_fixed_prover(ck)?,
+        //     Adversary::Verifier => vk.handle_fixed_verifier(ck)?,
+        // }
 
         Ok(vk)
     }

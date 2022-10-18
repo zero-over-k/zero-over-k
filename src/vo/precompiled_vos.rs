@@ -114,7 +114,7 @@ mod test {
 
     use crate::{
         oracles::{
-            fixed::FixedOracle, instance::InstanceOracle,
+            fixed::FixedProverOracle, instance::InstanceProverOracle,
             witness::WitnessProverOracle,
         },
         vo::generic_vo::GenericVO,
@@ -123,6 +123,7 @@ mod test {
     use super::{PrecompiledMul, PrecompiledRescue, PrecompiledVO};
     use crate::commitment::KZG10;
     use ark_bls12_381::{Bls12_381, Fr as F};
+    use ark_ff::Zero;
     use ark_poly::univariate::DensePolynomial;
 
     type PC = KZG10<Bls12_381>;
@@ -138,7 +139,7 @@ mod test {
             evals_at_coset_of_extended_domain: None,
             queried_rotations: BTreeSet::new(),
             should_permute: false,
-            evals: None,
+            evals: vec![F::zero(); 1],
         };
 
         let b = WitnessProverOracle::<F> {
@@ -147,19 +148,20 @@ mod test {
             evals_at_coset_of_extended_domain: None,
             queried_rotations: BTreeSet::new(),
             should_permute: false,
-            evals: None,
+            evals: vec![F::zero(); 1],
         };
 
-        let c = InstanceOracle::<F> {
+        let c = InstanceProverOracle::<F> {
             label: "c".to_string(),
             poly: DensePolynomial::default(),
             evals_at_coset_of_extended_domain: None,
             queried_rotations: BTreeSet::new(),
+            evals: vec![F::zero(); 1],
         };
 
         let mut witness_oracles = vec![a, b];
         let mut instance_oracles = vec![c];
-        let mut fixed_oracles: Vec<FixedOracle<F, PC>> = vec![];
+        let mut fixed_oracles: Vec<FixedProverOracle<F>> = vec![];
 
         mul_vo.configure(
             &mut witness_oracles,
@@ -181,22 +183,20 @@ mod test {
                 evals_at_coset_of_extended_domain: None,
                 queried_rotations: BTreeSet::new(),
                 should_permute: false,
-                evals: None,
+                evals: vec![F::zero(); 0],
             })
             .collect();
 
-        let mut instance_oracles = vec![];
+        let mut instance_oracles: Vec<InstanceProverOracle<F>> = vec![];
 
         let mut fixed_oracles: Vec<_> = ["q1", "q2", "q3", "q4"]
             .into_iter()
-            .map(|label| FixedOracle::<F, PC> {
+            .map(|label| FixedProverOracle::<F> {
                 label: label.to_string(),
                 poly: DensePolynomial::default(),
                 evals_at_coset_of_extended_domain: None,
-                evals: None,
+                evals: vec![F::zero(); 0],
                 queried_rotations: BTreeSet::default(),
-                evals_at_challenges: BTreeMap::default(),
-                commitment: None,
             })
             .collect();
 

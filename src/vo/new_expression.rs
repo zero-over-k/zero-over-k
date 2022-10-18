@@ -151,9 +151,3 @@ impl<F: PrimeField> From<OracleQuery> for NewExpression<F> {
         Self::Oracle(query)
     }
 }
-
-#[cfg(test)]
-mod test {
-    #[test]
-    fn test_new_expression() {}
-}
