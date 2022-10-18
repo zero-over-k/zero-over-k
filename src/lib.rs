@@ -336,7 +336,7 @@ where
     }
 
     pub fn verify<R: Rng>(
-        vk: &mut VerifierKey<F, PC>,
+        vk: &VerifierKey<F, PC>,
         preprocessed: &mut VerifierPreprocessedInput<F, PC>,
         proof: Proof<F, PC>,
         witness_oracles: &mut [WitnessVerifierOracle<F, PC>],
