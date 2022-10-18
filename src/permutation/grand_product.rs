@@ -11,9 +11,8 @@ use crate::{
     commitment::HomomorphicCommitment,
     oracles::{
         fixed::{FixedProverOracle, FixedVerifierOracle},
-        query::{OracleQuery, OracleType, QueryContext},
         rotation::Rotation,
-        traits::{ConcreteOracle, Instantiable, WitnessOracle},
+        traits::{ConcreteOracle, Instantiable},
         witness::{WitnessProverOracle, WitnessVerifierOracle},
     },
 };
@@ -106,7 +105,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> GrandProductArgument<F, PC> {
         deltas: &[F],
         beta: F,
         gamma: F,
-        domain_size: usize,
+        _domain_size: usize,
         omega: F,
         omega_index: usize,
     ) -> F {

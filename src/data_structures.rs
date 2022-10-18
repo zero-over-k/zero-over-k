@@ -1,15 +1,9 @@
 use ark_ff::PrimeField;
-use ark_poly::{
-    univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
-};
-use ark_poly_commit::{
-    LabeledCommitment, LabeledPolynomial, PCCommitment, PCRandomness,
-    PolynomialCommitment,
-};
+use ark_poly::{univariate::DensePolynomial, GeneralEvaluationDomain};
+use ark_poly_commit::{PCCommitment, PCRandomness, PolynomialCommitment};
 
 use crate::{
     commitment::HomomorphicCommitment,
-    error::Error,
     // error::Error,
     multiproof::Proof as MultiOpenProof,
     oracles::{
@@ -45,9 +39,9 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>>
     pub fn new(
         fixed_oracles: &Vec<FixedProverOracle<F>>,
         permutation_oracles: &Vec<FixedProverOracle<F>>,
-        index_info: &IndexInfo<F>
+        index_info: &IndexInfo<F>,
     ) -> Self {
-        let mut fixed_oracles = fixed_oracles.clone(); 
+        let mut fixed_oracles = fixed_oracles.clone();
         let mut permutation_oracles = permutation_oracles.clone();
 
         for oracle in fixed_oracles.iter_mut() {

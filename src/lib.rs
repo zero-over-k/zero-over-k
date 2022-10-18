@@ -6,19 +6,19 @@ use ark_ff::{to_bytes, PrimeField};
 use ark_poly::univariate::DensePolynomial;
 use ark_poly::{EvaluationDomain, GeneralEvaluationDomain, Polynomial};
 use ark_poly_commit::{LabeledPolynomial, PCCommitterKey, PCUniversalParams};
-use digest::generic_array::typenum::Quot;
+
 use error::Error;
 
 use ark_poly_commit::evaluate_query_set;
 use ark_std::rand::{Rng, RngCore};
 use commitment::HomomorphicCommitment;
 use data_structures::{
-    IndexInfo, Proof, ProverKey, ProverPreprocessedInput, UniversalSRS,
-    VerifierKey, VerifierPreprocessedInput,
+    Proof, ProverKey, ProverPreprocessedInput, UniversalSRS, VerifierKey,
+    VerifierPreprocessedInput,
 };
 use multiproof::piop::Multiopen;
 use oracles::instance::{InstanceProverOracle, InstanceVerifierOracle};
-use oracles::query::QueryContext;
+
 use oracles::traits::{ConcreteOracle, Instantiable};
 use oracles::witness::{WitnessProverOracle, WitnessVerifierOracle};
 use piop::PIOPforPolyIdentity;
@@ -28,8 +28,6 @@ use vo::VirtualOracle;
 use crate::oracles::query::OracleType;
 use crate::oracles::rotation::Rotation;
 use crate::oracles::traits::CommittedOracle;
-use crate::piop::prover;
-use crate::util::compute_vanishing_poly_over_coset;
 
 pub mod commitment;
 pub mod data_structures;

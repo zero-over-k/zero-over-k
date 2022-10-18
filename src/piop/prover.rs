@@ -11,10 +11,10 @@ use ark_poly::{
 
 use crate::{
     commitment::HomomorphicCommitment,
-    data_structures::{IndexInfo, ProverPreprocessedInput, VerifierKey},
+    data_structures::{ProverPreprocessedInput, VerifierKey},
     oracles::{
         instance::InstanceProverOracle,
-        query::{OracleType, QueryContext},
+        query::OracleType,
         rotation::Rotation,
         traits::{ConcreteOracle, Instantiable},
         witness::WitnessProverOracle,

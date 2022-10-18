@@ -5,13 +5,12 @@ use ark_poly::{
     univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
     Polynomial, UVPolynomial,
 };
-use ark_poly_commit::{LabeledCommitment, LabeledPolynomial, QuerySet};
+use ark_poly_commit::{LabeledCommitment, LabeledPolynomial};
 
 use crate::commitment::HomomorphicCommitment;
 
 use super::{
-    query::QueryContext,
-    rotation::{Rotation, Sign},
+    rotation::Rotation,
     traits::{
         CommittedOracle, ConcreteOracle, FixedOracle, Instantiable,
         QuerySetProvider,

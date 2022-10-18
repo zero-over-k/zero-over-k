@@ -12,11 +12,7 @@ use crate::{
     error::Error,
     oracles::{
         query::OracleType,
-        traits::{
-            ConcreteOracle, FixedOracle, InstanceOracle, Instantiable,
-            WitnessOracle,
-        },
-        witness::WitnessProverOracle,
+        traits::{ConcreteOracle, FixedOracle, InstanceOracle, WitnessOracle},
     },
     util::compute_vanishing_poly_over_coset,
     vo::VirtualOracle,

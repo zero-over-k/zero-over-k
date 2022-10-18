@@ -8,8 +8,7 @@ use ark_poly::{
 use ark_poly_commit::LabeledPolynomial;
 
 use super::{
-    query::QueryContext,
-    rotation::{Rotation, Sign},
+    rotation::Rotation,
     traits::{ConcreteOracle, InstanceOracle, Instantiable},
 };
 
