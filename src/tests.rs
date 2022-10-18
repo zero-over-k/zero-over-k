@@ -833,7 +833,7 @@ mod test {
             .collect();
 
         let mut and_xor_vo =
-            GenericVO::<F>::init(DeltaXorAnd::get_expr_and_queries());
+            GenericVO::<F, PC>::init(DeltaXorAnd::get_expr_and_queries());
 
         let mut witness_oracles: Vec<_> = [
             (witness_polys[0].clone(), "a"),
@@ -847,7 +847,8 @@ mod test {
             poly,
             evals_at_coset_of_extended_domain: None,
             queried_rotations: BTreeSet::new(),
-            should_mask: false,
+            should_permute: false,
+            evals: None,
         })
         .collect();
 
@@ -859,6 +860,7 @@ mod test {
                 label: label.to_string(),
                 poly,
                 evals_at_coset_of_extended_domain: None,
+                evals: None,
                 queried_rotations: BTreeSet::new(),
                 evals_at_challenges: BTreeMap::default(),
                 commitment: None,
@@ -866,32 +868,28 @@ mod test {
             .collect();
 
         and_xor_vo.configure(
-            &witness_oracles,
-            &instance_oracles,
-            &fixed_oracles,
-        );
-
-        //TODO: remove once we remove box from VOs
-        let dummy_vo_copy = and_xor_vo.clone();
-
-        let vos: Vec<Box<&dyn VirtualOracle<F>>> = vec![Box::new(&and_xor_vo)];
-
-        let vk = PilInstance::index(
-            &ck,
-            &verifier_key,
-            &[dummy_vo_copy.clone()],
             &mut witness_oracles,
             &mut instance_oracles,
             &mut fixed_oracles,
+        );
+
+        let vos: Vec<&dyn VirtualOracle<F>> = vec![&and_xor_vo];
+
+        let vk = Indexer::index(
+            &ck,
+            &verifier_key,
+            &vos,
+            &witness_oracles,
+            &instance_oracles,
+            &fixed_oracles,
+            &[],
             domain,
-            domain.vanishing_polynomial().into(),
+            &domain.vanishing_polynomial().into(),
+            Adversary::Prover,
         )
         .unwrap();
 
-        let pk = ProverKey {
-            committer_key: ck.clone(),
-            vk: vk.clone(),
-        };
+        let pk = ProverKey::from_ck_and_vk(&ck, &vk);
 
         let proof = PilInstance::prove(
             &pk,
@@ -904,6 +902,13 @@ mod test {
         )
         .unwrap();
 
+        println!("{}", proof.info());
+        println!("{}", proof.cumulative_info());
+        println!("in bytes: {}", proof.serialized_size());
+
+        // Verifier
+        // Repeat everything to make sure that we are not implicitly using something from prover
+
         let mut witness_ver_oracles: Vec<_> = ["a", "b", "product", "logic"]
             .into_iter()
             .map(|label| WitnessVerifierOracle {
@@ -915,16 +920,17 @@ mod test {
             })
             .collect();
 
-        // Repeat but this time provide verifier witness oracles
-        let mut vk = PilInstance::index(
+        let mut vk = Indexer::index(
             &ck,
             &verifier_key,
-            &[dummy_vo_copy],
-            &mut witness_ver_oracles,
-            &mut instance_oracles,
-            &mut fixed_oracles,
+            &vos,
+            &witness_ver_oracles,
+            &instance_oracles,
+            &fixed_oracles,
+            &[],
             domain,
-            domain.vanishing_polynomial().into(),
+            &domain.vanishing_polynomial().into(),
+            Adversary::Verifier,
         )
         .unwrap();
 
