@@ -17,8 +17,8 @@ mod test {
 
     use crate::data_structures::ProverKey;
     use crate::indexer::{Adversary, Indexer};
-    
-    use crate::oracles::fixed::{FixedOracle};
+
+    use crate::oracles::fixed::FixedOracle;
 
     use crate::oracles::instance::InstanceOracle;
 
@@ -919,6 +919,32 @@ mod test {
                 commitment: None,
             })
             .collect();
+
+        let mut instance_oracles = vec![];
+
+        let mut fixed_oracles: Vec<_> = [(q_c_poly.clone(), "qc")]
+            .into_iter()
+            .map(|(poly, label)| FixedOracle::<F, PC> {
+                label: label.to_string(),
+                poly,
+                evals_at_coset_of_extended_domain: None,
+                evals: None,
+                queried_rotations: BTreeSet::new(),
+                evals_at_challenges: BTreeMap::default(),
+                commitment: None,
+            })
+            .collect();
+
+        let mut and_xor_vo =
+            GenericVO::<F, PC>::init(DeltaXorAnd::get_expr_and_queries());
+
+        and_xor_vo.configure(
+            &mut witness_ver_oracles,
+            &mut instance_oracles,
+            &mut fixed_oracles,
+        );
+
+        let vos: Vec<&dyn VirtualOracle<F>> = vec![&and_xor_vo];
 
         let mut vk = Indexer::index(
             &ck,
