@@ -82,7 +82,8 @@ impl<F: PrimeField> Instantiable<F> for InstanceProverOracle<F> {
 
 pub struct InstanceVerifierOracle<F: PrimeField> {
     pub(crate) label: String,
-    pub(crate) evals: Vec<F>,
+    pub(crate) poly: DensePolynomial<F>,
+    pub(crate) evals: Vec<F>, // TODO enable evals with lagrange
     pub(crate) queried_rotations: BTreeSet<Rotation>,
 }
 
@@ -98,7 +99,7 @@ impl<F: PrimeField> ConcreteOracle<F> for InstanceVerifierOracle<F> {
     }
 
     fn query(&self, challenge: &F) -> F {
-        panic!("Instance verifier oracle should be queried only from lagrange evaluations")
+        self.poly.evaluate(challenge)
     }
 
     fn get_label(&self) -> String {

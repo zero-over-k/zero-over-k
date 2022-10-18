@@ -48,7 +48,7 @@ pub mod indexer;
 pub mod multiproof;
 pub mod permutation;
 
-// mod tests;
+mod tests;
 
 pub struct PIL<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng> {
     _field: PhantomData<F>,
