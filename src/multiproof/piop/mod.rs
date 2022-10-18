@@ -196,9 +196,8 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng>
                     .compute_evaluation_point(evaluation_challenge, &omegas);
                 let mut evaluation = F::zero();
                 for (i, &oracle) in oracles.iter().enumerate() {
-                    evaluation += x1_powers[i]
-                        * oracle
-                            .query(&evaluation_point);
+                    evaluation +=
+                        x1_powers[i] * oracle.query(&evaluation_point);
                 }
 
                 let prev = q_i_evals_set.insert(evaluation_point, evaluation);
