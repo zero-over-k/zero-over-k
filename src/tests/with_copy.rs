@@ -68,19 +68,6 @@ mod copy_constraint_tests {
                 (a0, b0, b1, a3) (a1, c0) (b2, b3) (a4, c1) (b4, c3) (a6, c4) (b5, b6) (c6, c7)
 
 
-            row    0     1    2    3    4    5    6    7
-            ------------------------------------------
-            qm:   [1,    1,   0,   1,   0,   0,   0,   0]
-
-            ql:   [0,    0,   0,   0,   1,   0,   1,   0]
-
-            qr:   [0,    0,   0,   0,   1,   0,   1,   0]
-
-            qo:   [-1,  -1,   0,  -1,  -1,   0,  -1,   1]
-
-            q_pi: [0,    0,   1,   0,   0,   1,   0,   0]
-
-
             Begin NOTE:
             When we use permutation we need one more element to encode full accumulation in z(X)
             consider simple example without rotations:
