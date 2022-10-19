@@ -40,10 +40,12 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PermutationArgument<F, PC> {
         So, minimal domain to use when permutation is enabled will be 2n
     */
 
+    pub const MINIMAL_SCALING_FACTOR: usize = 2;
+
     pub fn new(scaling_factor: usize, u: usize) -> Self {
         // extended coset domain is defined as Domain of size original_domain_size * scaling_factor, where minimal scaling factor,
         // as noted above, is 2
-        let m = scaling_factor - 1;
+        let m = scaling_factor - 1; // smallest scaling factor is 2, so 2 - 1 will give us one permutation per chunk
         Self {
             m,
             u,
@@ -54,7 +56,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PermutationArgument<F, PC> {
 
     pub fn construct_agg_polys<R: RngCore>(
         &self,
-        witness_oracles: &[WitnessProverOracle<F>], // Only oracles that are included in permutation
+        witness_oracles: &[&WitnessProverOracle<F>], // Only oracles that are included in permutation
         permutation_oracles: &[FixedProverOracle<F>],
         deltas: &[F],
         beta: F,
@@ -70,8 +72,10 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PermutationArgument<F, PC> {
         let sigma_chunks = permutation_oracles.chunks(self.m);
         let delta_chunks = deltas.chunks(self.m);
 
+        let num_of_chunks = oracle_chunks.len();
+
         let mut agg_polys =
-            Vec::<WitnessProverOracle<F>>::with_capacity(oracle_chunks.len());
+            Vec::<WitnessProverOracle<F>>::with_capacity(num_of_chunks);
 
         for (i, ((ws, sigmas), ds)) in oracle_chunks
             .zip(sigma_chunks)
@@ -84,8 +88,15 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PermutationArgument<F, PC> {
                 agg_polys[i - 1].evals()[self.u]
             };
 
+            let is_last = if i == num_of_chunks - 1 {
+                true
+            } else {
+                false
+            };
+
             let agg_i = GrandProductArgument::<F, PC>::construct_agg_poly(
                 i,
+                is_last,
                 init_value,
                 sigmas,
                 ws,
@@ -119,7 +130,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PermutationArgument<F, PC> {
         l_0_coset_evals: &Vec<F>, // lagrange poly should not be fixed column, it's not committed since it can be evaluated in O(log(N))
         q_last_coset_evals: &Vec<F>, // q_last is 1 only at index u, so it can also be treated as Lu(X)
         q_blind: &FixedProverOracle<F>,
-        witness_oracles: &[WitnessProverOracle<F>], // Only oracles that are included in permutation
+        witness_oracles: &[&WitnessProverOracle<F>], // Only oracles that are included in permutation
         permutation_oracles: &[FixedProverOracle<F>],
         agg_polys: &[WitnessProverOracle<F>],
         omega_index: usize,
@@ -508,7 +519,7 @@ mod test {
             queried_rotations: BTreeSet::from([Rotation::curr()]),
         };
 
-        let witness_oracles = [a, b];
+        let witness_oracles = [&a, &b];
         let permutation_oracles = [sigma_1, sigma_2];
 
         let deltas = [F::one(), F::from(13u64)];

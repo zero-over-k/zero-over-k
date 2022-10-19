@@ -12,7 +12,7 @@ use crate::{
     oracles::{
         fixed::{FixedProverOracle, FixedVerifierOracle},
         query::{OracleQuery, OracleType, QueryContext},
-        rotation::Rotation,
+        rotation::{Rotation, Sign},
         traits::{ConcreteOracle, Instantiable, WitnessOracle},
         witness::{WitnessProverOracle, WitnessVerifierOracle},
     },
@@ -30,9 +30,10 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> GrandProductArgument<F, PC> {
     /// Given oracles constructs Z(X) polynomial that prover commits to
     pub fn construct_agg_poly<R: RngCore>(
         chunk_index: usize,
+        is_last: bool,
         init_value: F, // this is F::one() for Z_0 and Z_[i-1][u] for Z[i], i>0
         permutation_oracles: &[FixedProverOracle<F>],
-        witness_oracles: &[WitnessProverOracle<F>],
+        witness_oracles: &[&WitnessProverOracle<F>],
         deltas: &[F],
         beta: F,
         gamma: F,
@@ -83,15 +84,22 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> GrandProductArgument<F, PC> {
         let evals_at_coset_of_extended_domain =
             Some(extended_coset_domain.coset_fft(&z_poly));
 
+
+        let mut queried_rotations = BTreeSet::from([
+            Rotation::curr(),
+            Rotation::next(),
+        ]);
+
+        if !is_last {
+            queried_rotations.insert(Rotation::new(u, Sign::Plus));
+        }
+
         // NOTE: Maybe consider another type for Z polys which will always have evals and should_permute field will be removed
         WitnessProverOracle {
             label: format!("agg_permutation_{}", chunk_index).to_string(),
             poly: z_poly,
             evals_at_coset_of_extended_domain,
-            queried_rotations: BTreeSet::from([
-                Rotation::curr(),
-                Rotation::next(),
-            ]),
+            queried_rotations,
             should_permute: false,
             evals: z_evals,
         }
@@ -104,7 +112,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> GrandProductArgument<F, PC> {
         q_blind: &FixedProverOracle<F>,
         z: &WitnessProverOracle<F>,
         permutation_oracles: &[FixedProverOracle<F>],
-        witness_oracles: &[WitnessProverOracle<F>],
+        witness_oracles: &[&WitnessProverOracle<F>],
         deltas: &[F],
         beta: F,
         gamma: F,
@@ -475,13 +483,14 @@ mod test {
         );
         let l_u_coset_evals = extended_coset_domain.coset_fft(&lu);
 
-        let witness_oracles = [a, b];
+        let witness_oracles = [&a, &b];
         let permutation_oracles = [sigma_1, sigma_2];
 
         let deltas = [F::one(), F::from(13u64)];
 
         let agg_poly = GrandProductArgument::<F, PC>::construct_agg_poly(
             0,
+            true,
             F::one(),
             &permutation_oracles,
             &witness_oracles,

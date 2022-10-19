@@ -27,9 +27,16 @@ pub type UniversalSRS<F, PC> =
     <PC as PolynomialCommitment<F, DensePolynomial<F>>>::UniversalParams;
 
 #[derive(Clone)]
+pub struct PermutationInfo<F: PrimeField> {
+    pub u: usize,       // usable rows
+    pub deltas: Vec<F>, // separators for different wires
+}
+
+#[derive(Clone)]
 pub struct IndexInfo<F: PrimeField> {
     pub quotient_degree: usize,
     pub extended_coset_domain: GeneralEvaluationDomain<F>,
+    pub permutation_info: Option<PermutationInfo<F>>,
 }
 
 pub struct ProverPreprocessedInput<F: PrimeField, PC: HomomorphicCommitment<F>>
@@ -127,6 +134,9 @@ pub struct Proof<F: PrimeField, PC: HomomorphicCommitment<F>> {
     pub quotient_chunk_commitments: Vec<PC::Commitment>,
     pub quotient_chunks_evals: Vec<F>,
     pub fixed_oracle_evals: Vec<F>,
+    pub z_commitments: Vec<PC::Commitment>,
+    pub z_evals: Vec<F>,
+    pub permutation_oracle_evals: Vec<F>,
     pub multiopen_proof: MultiOpenProof<F, PC>,
 }
 
@@ -138,7 +148,10 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Proof<F, PC> {
             witness evals: {}
             quotient chunk commitments: {}
             quotient chunks evals: {}
-            selector oracle evals: {}
+            fixed oracle evals: {}
+            z commitments: {}
+            z evals {}
+            permutation oracle evals: {}
             MultiOpenProof:
                 q_evals: {}
                 f_commit: 1
@@ -149,6 +162,9 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Proof<F, PC> {
             self.quotient_chunk_commitments.len(),
             self.quotient_chunks_evals.len(),
             self.fixed_oracle_evals.len(),
+            self.z_commitments.len(), 
+            self.z_evals.len(),
+            self.permutation_oracle_evals.len(),
             self.multiopen_proof.q_evals.len()
         )
         .to_string()
@@ -157,10 +173,13 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Proof<F, PC> {
     pub fn cumulative_info(&self) -> String {
         let num_of_commitments = self.witness_commitments.len()
             + self.quotient_chunk_commitments.len()
+            + self.z_commitments.len()
             + 1; // + 1 for f commitment in multiopen
         let num_of_field_elements = self.witness_evals.len()
             + self.quotient_chunks_evals.len()
             + self.fixed_oracle_evals.len()
+            + self.z_evals.len()
+            + self.permutation_oracle_evals.len()
             + self.multiopen_proof.q_evals.len();
 
         format!(

@@ -137,6 +137,7 @@ mod test {
             &fixed_oracles,
             domain,
             &domain.vanishing_polynomial().into(),
+            None,
         )
         .unwrap();
 
@@ -212,6 +213,7 @@ mod test {
             &fixed_oracles,
             domain,
             &domain.vanishing_polynomial().into(),
+            None,
         )
         .unwrap();
 
@@ -370,6 +372,7 @@ mod test {
             &selector_oracles,
             domain,
             &domain.vanishing_polynomial().into(),
+            None,
         )
         .unwrap();
 
@@ -461,6 +464,7 @@ mod test {
             &selector_oracles,
             domain,
             &domain.vanishing_polynomial().into(),
+            None,
         )
         .unwrap();
 
@@ -668,6 +672,7 @@ mod test {
             &selector_oracles,
             domain,
             &domain.vanishing_polynomial().into(),
+            None,
         )
         .unwrap();
 
@@ -798,6 +803,7 @@ mod test {
             &selector_oracles,
             domain,
             &domain.vanishing_polynomial().into(),
+            None,
         )
         .unwrap();
 
@@ -998,6 +1004,7 @@ mod test {
             &fixed_oracles,
             domain,
             &domain.vanishing_polynomial().into(),
+            None,
         )
         .unwrap();
 
@@ -1084,6 +1091,7 @@ mod test {
             &fixed_oracles,
             domain,
             &domain.vanishing_polynomial().into(),
+            None,
         )
         .unwrap();
 

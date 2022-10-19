@@ -15,8 +15,16 @@ pub struct VerifierState<'a, F: PrimeField> {
     pub(crate) domain: GeneralEvaluationDomain<F>,
     pub(crate) vanishing_polynomial: &'a DensePolynomial<F>,
 
+    pub(crate) permutation_msg: Option<VerifierPermutationMsg<F>>,
     pub(crate) first_round_msg: Option<VerifierFirstMsg<F>>,
     pub(crate) second_round_msg: Option<VerifierSecondMsg<F>>,
+}
+
+/// First message of the verifier.
+#[derive(Copy, Clone)]
+pub struct VerifierPermutationMsg<F: PrimeField> {
+    pub(crate) beta: F,
+    pub(crate) gamma: F,
 }
 
 /// First message of the verifier.
@@ -40,10 +48,26 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
         VerifierState {
             domain: GeneralEvaluationDomain::new(domain_size).unwrap(),
             vanishing_polynomial,
+            permutation_msg: None,
             first_round_msg: None,
             second_round_msg: None,
         }
     }
+
+    /// Output permutation challenges.
+    pub fn verifier_permutation_round<'a, R: RngCore>(
+        mut state: VerifierState<'a, F>,
+        rng: &mut R,
+    ) -> (VerifierPermutationMsg<F>, VerifierState<'a, F>) {
+        let beta = F::rand(rng);
+        let gamma = F::rand(rng);
+
+        let msg = VerifierPermutationMsg { beta, gamma };
+
+        state.permutation_msg = Some(msg);
+        (msg, state)
+    }
+
     /// Output the first message.
     pub fn verifier_first_round<'a, R: RngCore>(
         mut state: VerifierState<'a, F>,

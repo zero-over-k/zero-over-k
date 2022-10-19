@@ -8,7 +8,7 @@ use ark_poly::{
 
 use crate::{
     commitment::HomomorphicCommitment,
-    data_structures::{IndexInfo, VerifierKey},
+    data_structures::{IndexInfo, PermutationInfo, VerifierKey},
     error::Error,
     oracles::{
         query::OracleType,
@@ -142,6 +142,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
         fixed_oracles: &[impl FixedOracle<F>],
         domain: GeneralEvaluationDomain<F>,
         zH: &DensePolynomial<F>,
+        permutation_info: Option<PermutationInfo<F>>,
     ) -> Result<VerifierKey<F, PC>, Error<PC::Error>> {
         let witness_oracles_mapping: BTreeMap<String, usize> = witness_oracles
             .iter()
@@ -182,6 +183,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
         let index_info = IndexInfo {
             quotient_degree,
             extended_coset_domain,
+            permutation_info,
         };
 
         let vk = VerifierKey {

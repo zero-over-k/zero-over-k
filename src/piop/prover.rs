@@ -8,6 +8,7 @@ use ark_poly::{
     univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
     Polynomial, UVPolynomial,
 };
+use ark_std::rand::Rng;
 
 use crate::{
     commitment::HomomorphicCommitment,
@@ -19,10 +20,13 @@ use crate::{
         traits::{ConcreteOracle, Instantiable},
         witness::WitnessProverOracle,
     },
+    permutation::PermutationArgument,
     piop::error::Error,
     piop::{verifier::VerifierFirstMsg, PIOPforPolyIdentity},
     vo::VirtualOracle,
 };
+
+use super::verifier::VerifierPermutationMsg;
 
 // Note: To keep flexible vanishing polynomial should not be strictly domain.vanishing_polynomial
 // For example consider https://hackmd.io/1DaroFVfQwySwZPHMoMdBg?view where we remove some roots from Zh
@@ -35,6 +39,7 @@ pub struct ProverState<'a, F: PrimeField> {
     pub(crate) fixed_oracles_mapping: BTreeMap<String, usize>,
     pub(crate) witness_oracles: &'a [WitnessProverOracle<F>],
     pub(crate) instance_oracles: &'a [InstanceProverOracle<F>],
+    pub(crate) z_polys: Option<Vec<WitnessProverOracle<F>>>, 
     vos: &'a [&'a dyn VirtualOracle<F>],
     pub(crate) domain: GeneralEvaluationDomain<F>,
     pub(crate) vanishing_polynomial: DensePolynomial<F>,
@@ -76,11 +81,48 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
             fixed_oracles_mapping,
             witness_oracles,
             instance_oracles,
+            z_polys: None,
             vos,
             domain,
             vanishing_polynomial: vanishing_polynomial.clone(),
             quotient_chunks: None,
         }
+    }
+
+    pub fn prover_permutation_round<'a, R: Rng>(
+        permutation_msg: &VerifierPermutationMsg<F>,
+        state: &mut ProverState<F>,
+        permutation_argument: Option<PermutationArgument<F, PC>>,
+        preprocessed: &ProverPreprocessedInput<F, PC>,
+        index_info: &IndexInfo<F>,
+        zk_rng: &mut R,
+    ) -> Vec<WitnessProverOracle<F>> {
+        if permutation_argument.is_none() {
+            return vec![]
+        }
+
+        let oracles_to_copy: Vec<&WitnessProverOracle<F>> = state
+            .witness_oracles
+            .iter()
+            .filter(|&oracle| oracle.should_permute)
+            .collect();
+        let permutation_info = index_info
+            .permutation_info
+            .as_ref()
+            .expect("Permutation Info not defined");
+        let z_polys = permutation_argument.unwrap().construct_agg_polys(
+            &oracles_to_copy,
+            &preprocessed.permutation_oracles,
+            &permutation_info.deltas,
+            permutation_msg.beta,
+            permutation_msg.gamma,
+            &state.domain,
+            &index_info.extended_coset_domain,
+            zk_rng,
+        );
+
+        state.z_polys = Some(z_polys.clone());
+        z_polys
     }
 
     pub fn prover_first_round(

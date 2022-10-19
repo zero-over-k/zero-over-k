@@ -1,15 +1,26 @@
 #[cfg(test)]
 mod copy_constraint_tests {
-    use std::{collections::{BTreeSet, BTreeMap}, iter::successors};
+    use std::{
+        collections::{BTreeMap, BTreeSet},
+        iter::successors,
+    };
 
     use ark_ff::{Field, One, UniformRand, Zero};
     use ark_poly::{
         univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
-        UVPolynomial, Polynomial,
+        Polynomial, UVPolynomial,
     };
     use ark_std::test_rng;
 
-    use crate::{commitment::KZG10, permutation, util::compute_vanishing_poly_over_coset, oracles::{fixed::FixedVerifierOracle, witness::WitnessVerifierOracle, rotation::Sign, traits::Instantiable}};
+    use crate::{
+        commitment::KZG10,
+        oracles::{
+            fixed::FixedVerifierOracle, rotation::Sign, traits::Instantiable,
+            witness::WitnessVerifierOracle,
+        },
+        permutation,
+        util::compute_vanishing_poly_over_coset,
+    };
     use ark_bls12_381::{Bls12_381, Fr as F};
 
     type PC = KZG10<Bls12_381>;
@@ -409,7 +420,7 @@ mod copy_constraint_tests {
         let permutation_argument =
             PermutationArgument::<F, PC>::new(scaling_factor, u);
 
-        let witness_oracles = [a, b, c];
+        let witness_oracles = [&a, &b, &c];
         let permutation_oracles = [sigma1, sigma2, sigma3];
 
         let agg_polys = permutation_argument.construct_agg_polys(
@@ -669,7 +680,6 @@ mod copy_constraint_tests {
             should_permute: false,
         };
 
-
         let witness_oracles = [a, b, c];
         let permutation_oracles = [sigma_1, sigma_2, sigma_3];
         let z_polys = [z_poly_0, z_poly_1, z_poly_2];
@@ -690,6 +700,5 @@ mod copy_constraint_tests {
         );
 
         assert_eq!(permutation_eval, q_eval * zh_eval);
-
     }
 }
