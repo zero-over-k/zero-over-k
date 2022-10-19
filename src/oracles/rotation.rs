@@ -1,6 +1,6 @@
 use ark_ff::Field;
 
-use crate::vo::error::Error;
+// use crate::vo::error::Error;
 #[derive(PartialEq, PartialOrd, Eq, Ord, Clone, Copy, Debug)]
 pub enum Sign {
     Plus,
@@ -88,47 +88,6 @@ impl Rotation {
 
             let point = omega * opening_challenge;
             (point_label, point)
-        }
-    }
-
-    pub fn from_point_label(
-        point_label: &String,
-        opening_challenge_label: &String,
-    ) -> Result<Self, Error> {
-        let tokens = point_label.split("_").collect::<Vec<&str>>();
-
-        if tokens.len() == 1 {
-            if tokens[0] == opening_challenge_label {
-                return Ok(Rotation::curr());
-            } else {
-                return Err(Error::PointLabelError(point_label.clone()));
-            }
-        } else if tokens.len() == 3 {
-            if tokens[0] != String::from("omega") {
-                return Err(Error::PointLabelError(point_label.clone()));
-            }
-            if tokens[2] != opening_challenge_label {
-                return Err(Error::PointLabelError(point_label.clone()));
-            }
-
-            let degree = i32::from_str_radix(tokens[1], 10)
-                .map_err(Error::from_parse_int_error)?;
-
-            let rotation = if degree > 0 {
-                Rotation {
-                    degree: degree as usize,
-                    sign: Sign::Plus,
-                }
-            } else {
-                Rotation {
-                    degree: (-1 * degree) as usize,
-                    sign: Sign::Minus,
-                }
-            };
-
-            return Ok(rotation);
-        } else {
-            return Err(Error::PointLabelError(point_label.clone()));
         }
     }
 }

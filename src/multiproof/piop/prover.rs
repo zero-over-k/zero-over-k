@@ -10,7 +10,7 @@ use super::verifier::{VerifierFirstMsg, VerifierSecondMsg, VerifierThirdMsg};
 use super::{PIOPError, PIOP};
 use crate::commitment::HomomorphicCommitment;
 use crate::multiproof::poly::construct_vanishing;
-use crate::oracles::query::QueryContext;
+
 use crate::oracles::rotation::Rotation;
 use crate::oracles::traits::Instantiable;
 
@@ -98,9 +98,8 @@ impl<F: PrimeField> PIOP<F> {
                     .compute_evaluation_point(evaluation_challenge, &omegas);
                 let mut evaluation = F::zero();
                 for (i, (oracle, _)) in oracles_rands.iter().enumerate() {
-                    evaluation += x1_powers[i]
-                        * oracle
-                            .query(&QueryContext::Challenge(evaluation_point));
+                    evaluation +=
+                        x1_powers[i] * oracle.query(&evaluation_point);
                 }
 
                 let prev = q_i_evals_set.insert(evaluation_point, evaluation);

@@ -10,11 +10,11 @@ use ark_std::rand::RngCore;
 use crate::{
     commitment::HomomorphicCommitment,
     oracles::{
-        fixed::FixedOracle,
-        query::{QueryContext},
+        fixed::{FixedProverOracle, FixedVerifierOracle},
+        query::{OracleQuery, OracleType, QueryContext},
         rotation::Rotation,
-        traits::{ConcreteOracle, WitnessOracle},
-        witness::WitnessProverOracle,
+        traits::{ConcreteOracle, Instantiable, WitnessOracle},
+        witness::{WitnessProverOracle, WitnessVerifierOracle},
     },
 };
 
@@ -31,7 +31,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> GrandProductArgument<F, PC> {
     pub fn construct_agg_poly<R: RngCore>(
         chunk_index: usize,
         init_value: F, // this is F::one() for Z_0 and Z_[i-1][u] for Z[i], i>0
-        permutation_oracles: &[FixedOracle<F, PC>],
+        permutation_oracles: &[FixedProverOracle<F>],
         witness_oracles: &[WitnessProverOracle<F>],
         deltas: &[F],
         beta: F,
@@ -43,11 +43,11 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> GrandProductArgument<F, PC> {
     ) -> WitnessProverOracle<F> {
         let wi_evals: Vec<&Vec<F>> = witness_oracles
             .iter()
-            .map(|oracle| oracle.get_evals())
+            .map(|oracle| oracle.evals())
             .collect();
         let sigma_evals: Vec<&Vec<F>> = permutation_oracles
             .iter()
-            .map(|oracle| oracle.get_evals())
+            .map(|oracle| oracle.evals())
             .collect();
 
         let mut z_evals = Vec::<F>::with_capacity(domain.size());
@@ -91,7 +91,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> GrandProductArgument<F, PC> {
                 Rotation::next(),
             ]),
             should_permute: false,
-            evals: Some(z_evals),
+            evals: z_evals,
         }
     }
 
@@ -99,53 +99,33 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> GrandProductArgument<F, PC> {
     pub fn instantiate_argument_at_omega_i(
         // q_last is 1 in u and everywhere else it's 0, so it can be treated as Lu(X)
         q_last_coset_evals: &Vec<F>,
-        q_blind: &FixedOracle<F, PC>,
+        q_blind: &FixedProverOracle<F>,
         z: &WitnessProverOracle<F>,
-        permutation_oracles: &[FixedOracle<F, PC>],
-        witness_oracles: &[impl WitnessOracle<F>],
+        permutation_oracles: &[FixedProverOracle<F>],
+        witness_oracles: &[WitnessProverOracle<F>],
         deltas: &[F],
         beta: F,
         gamma: F,
-        domain_size: usize,
+        _domain_size: usize,
         omega: F,
         omega_index: usize,
     ) -> F {
-        let zk_ctx = QueryContext::<F>::ExtendedCoset(
-            domain_size,
-            Rotation::curr(),
-            omega_index,
-        );
         let zk_part = F::one()
-            - (q_last_coset_evals[omega_index] + q_blind.query(&zk_ctx));
+            - (q_last_coset_evals[omega_index]
+                + q_blind.query_in_coset(omega_index, Rotation::curr()));
 
-        let z_wx_ctx = QueryContext::<F>::ExtendedCoset(
-            domain_size,
-            Rotation::next(),
-            omega_index,
-        );
-
-        let mut lhs = z.query(&z_wx_ctx);
-
-        let z_x_ctx = QueryContext::<F>::ExtendedCoset(
-            domain_size,
-            Rotation::curr(),
-            omega_index,
-        );
-        let mut rhs = z.query(&z_x_ctx);
-
-        let oracle_ctx = QueryContext::<F>::ExtendedCoset(
-            domain_size,
-            Rotation::curr(),
-            omega_index,
-        );
+        let mut lhs = z.query_in_coset(omega_index, Rotation::next());
+        let mut rhs = z.query_in_coset(omega_index, Rotation::curr());
 
         for ((w_i, sigma_i), &delta_i) in witness_oracles
             .iter()
             .zip(permutation_oracles.iter())
             .zip(deltas.iter())
         {
-            let w_res = w_i.query(&oracle_ctx);
-            lhs *= w_res + beta * sigma_i.query(&oracle_ctx) + gamma;
+            let w_res = w_i.query_in_coset(omega_index, Rotation::curr());
+            lhs *= w_res
+                + beta * sigma_i.query_in_coset(omega_index, Rotation::curr())
+                + gamma;
             rhs *= w_res
                 + beta * delta_i * F::multiplicative_generator() * omega
                 + gamma;
@@ -154,101 +134,33 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> GrandProductArgument<F, PC> {
         zk_part * (lhs - rhs)
     }
 
-    // TODO: this function will probably be removed
-    pub fn instantiate_argument(
-        q_last: &FixedOracle<F, PC>,
-        q_blind: &FixedOracle<F, PC>,
-        z: &WitnessProverOracle<F>,
-        permutation_oracles: &[FixedOracle<F, PC>],
-        witness_oracles: &[WitnessProverOracle<F>],
-        deltas: &[F],
-        beta: F,
-        gamma: F,
-        domain: &GeneralEvaluationDomain<F>,
-        extended_coset_domain: &GeneralEvaluationDomain<F>,
-    ) -> Vec<F> {
-        let mut grand_product_evals =
-            Vec::with_capacity(extended_coset_domain.size());
-        let domain_size = domain.size();
-        for i in 0..extended_coset_domain.size() {
-            let zk_ctx = QueryContext::<F>::ExtendedCoset(
-                domain_size,
-                Rotation::curr(),
-                i,
-            );
-            let zk_part =
-                F::one() - (q_last.query(&zk_ctx) + q_blind.query(&zk_ctx));
-
-            let z_wx_ctx = QueryContext::<F>::ExtendedCoset(
-                domain_size,
-                Rotation::next(),
-                i,
-            );
-
-            let mut lhs = z.query(&z_wx_ctx);
-
-            let z_x_ctx = QueryContext::<F>::ExtendedCoset(
-                domain_size,
-                Rotation::curr(),
-                i,
-            );
-            let mut rhs = z.query(&z_x_ctx);
-
-            let oracle_ctx = QueryContext::<F>::ExtendedCoset(
-                domain_size,
-                Rotation::curr(),
-                i,
-            );
-            for ((w_i, sigma_i), &delta_i) in witness_oracles
-                .iter()
-                .zip(permutation_oracles.iter())
-                .zip(deltas.iter())
-            {
-                let w_res = w_i.query(&oracle_ctx);
-                lhs *= w_res + beta * sigma_i.query(&oracle_ctx) + gamma;
-                rhs *= w_res
-                    + beta
-                        * delta_i
-                        * F::multiplicative_generator()
-                        * extended_coset_domain.element(i)
-                    + gamma;
-            }
-
-            grand_product_evals.push(zk_part * (lhs - rhs));
-        }
-
-        grand_product_evals
-    }
-
     pub fn open_argument(
         q_last_eval: F,
-        q_blind: &FixedOracle<F, PC>,
-        z: &impl WitnessOracle<F>, //TODO: make this verifier witness oracle
-        permutation_oracles: &[FixedOracle<F, PC>], //TODO: make this verifier witness oracle
-        witness_oracles: &[impl WitnessOracle<F>],
+        q_blind: &FixedVerifierOracle<F, PC>,
+        z: &WitnessVerifierOracle<F, PC>,
+        permutation_oracles: &[FixedVerifierOracle<F, PC>],
+        witness_oracles: &[WitnessVerifierOracle<F, PC>],
         deltas: &[F],
         beta: F,
         gamma: F,
         domain: &GeneralEvaluationDomain<F>,
         evaluation_challenge: F,
     ) -> F {
-        let opening_ctx = QueryContext::Challenge(evaluation_challenge);
         let shifted_evaluation_challenge =
             domain.element(1) * evaluation_challenge;
-        let shifted_opening_ctx =
-            QueryContext::Challenge(shifted_evaluation_challenge);
-        let zk_part = F::one() - (q_last_eval + q_blind.query(&opening_ctx));
+        let zk_part =
+            F::one() - (q_last_eval + q_blind.query(&evaluation_challenge));
 
-        let mut lhs = z.query(&shifted_opening_ctx);
-        let mut rhs = z.query(&opening_ctx);
+        let mut lhs = z.query(&shifted_evaluation_challenge);
+        let mut rhs = z.query(&evaluation_challenge);
 
         for ((w_i, sigma_i), &delta_i) in witness_oracles
             .iter()
             .zip(permutation_oracles.iter())
             .zip(deltas.iter())
         {
-            let w_res = w_i.query(&opening_ctx);
-            lhs *= w_res + beta * sigma_i.query(&opening_ctx) + gamma;
+            let w_res = w_i.query(&evaluation_challenge);
+            lhs *= w_res + beta * sigma_i.query(&evaluation_challenge) + gamma;
             rhs *= w_res + beta * delta_i * evaluation_challenge + gamma;
         }
 
@@ -270,8 +182,10 @@ mod test {
     use crate::{
         commitment::KZG10,
         oracles::{
-            fixed::FixedOracle, rotation::Rotation,
-            witness::WitnessProverOracle,
+            fixed::{FixedProverOracle, FixedVerifierOracle},
+            rotation::Rotation,
+            traits::Instantiable,
+            witness::{WitnessProverOracle, WitnessVerifierOracle},
         },
     };
 
@@ -470,27 +384,27 @@ mod test {
             assert_eq!(zk_part * (lhs - rhs), F::zero());
         }
 
-        let a = DensePolynomial::<F>::from_coefficients_slice(
+        let a_poly = DensePolynomial::<F>::from_coefficients_slice(
             &domain.ifft(&a_evals),
         );
 
-        let b = DensePolynomial::<F>::from_coefficients_slice(
+        let b_poly = DensePolynomial::<F>::from_coefficients_slice(
             &domain.ifft(&b_evals),
         );
 
-        let _q_last = DensePolynomial::<F>::from_coefficients_slice(
-            &domain.ifft(&q_last_evals),
-        );
+        // let q_last_poly = DensePolynomial::<F>::from_coefficients_slice(
+        //     &domain.ifft(&q_last_evals),
+        // );
 
-        let q_blind = DensePolynomial::<F>::from_coefficients_slice(
+        let q_blind_poly = DensePolynomial::<F>::from_coefficients_slice(
             &domain.ifft(&q_blind_evals),
         );
 
-        let sigma_1 = DensePolynomial::<F>::from_coefficients_slice(
+        let sigma_1_poly = DensePolynomial::<F>::from_coefficients_slice(
             &domain.ifft(&sigma_1_evals),
         );
 
-        let sigma_2 = DensePolynomial::<F>::from_coefficients_slice(
+        let sigma_2_poly = DensePolynomial::<F>::from_coefficients_slice(
             &domain.ifft(&sigma_2_evals),
         );
 
@@ -504,60 +418,54 @@ mod test {
 
         let a = WitnessProverOracle {
             label: "a".to_string(),
-            poly: a.clone(),
+            poly: a_poly.clone(),
             evals_at_coset_of_extended_domain: Some(
-                extended_coset_domain.coset_fft(&a),
+                extended_coset_domain.coset_fft(&a_poly),
             ),
             queried_rotations: BTreeSet::from([Rotation::curr()]),
             should_permute: true,
-            evals: Some(a_evals),
+            evals: a_evals,
         };
 
         let b = WitnessProverOracle {
             label: "b".to_string(),
-            poly: b.clone(),
+            poly: b_poly.clone(),
             evals_at_coset_of_extended_domain: Some(
-                extended_coset_domain.coset_fft(&b),
+                extended_coset_domain.coset_fft(&b_poly),
             ),
             queried_rotations: BTreeSet::from([Rotation::curr()]),
             should_permute: true,
-            evals: Some(b_evals),
+            evals: b_evals,
         };
 
-        let sigma_1 = FixedOracle::<F, PC> {
+        let sigma_1 = FixedProverOracle {
             label: "sigma_1".to_string(),
-            poly: sigma_1.clone(),
+            poly: sigma_1_poly.clone(),
             evals_at_coset_of_extended_domain: Some(
-                extended_coset_domain.coset_fft(&sigma_1),
+                extended_coset_domain.coset_fft(&sigma_1_poly),
             ),
-            evals: Some(sigma_1_evals),
+            evals: sigma_1_evals,
             queried_rotations: BTreeSet::from([Rotation::curr()]),
-            evals_at_challenges: BTreeMap::default(),
-            commitment: None,
         };
 
-        let sigma_2 = FixedOracle::<F, PC> {
+        let sigma_2 = FixedProverOracle {
             label: "sigma_2".to_string(),
-            poly: sigma_2.clone(),
+            poly: sigma_2_poly.clone(),
             evals_at_coset_of_extended_domain: Some(
-                extended_coset_domain.coset_fft(&sigma_2),
+                extended_coset_domain.coset_fft(&sigma_2_poly),
             ),
-            evals: Some(sigma_2_evals),
+            evals: sigma_2_evals,
             queried_rotations: BTreeSet::from([Rotation::curr()]),
-            evals_at_challenges: BTreeMap::default(),
-            commitment: None,
         };
 
-        let q_blind = FixedOracle::<F, PC> {
+        let q_blind = FixedProverOracle {
             label: "q_blind".to_string(),
-            poly: q_blind.clone(),
+            poly: q_blind_poly.clone(),
             evals_at_coset_of_extended_domain: Some(
-                extended_coset_domain.coset_fft(&q_blind),
+                extended_coset_domain.coset_fft(&q_blind_poly),
             ),
-            evals: None,
+            evals: q_blind_evals.to_vec(),
             queried_rotations: BTreeSet::from([Rotation::curr()]),
-            evals_at_challenges: BTreeMap::default(),
-            commitment: None,
         };
 
         let lu = DensePolynomial::from_coefficients_slice(
@@ -595,19 +503,20 @@ mod test {
         let mut grand_product_evals =
             Vec::<F>::with_capacity(extended_coset_domain.size());
         for i in 0..extended_coset_domain.size() {
-            let gp_i = GrandProductArgument::instantiate_argument_at_omega_i(
-                &l_u_coset_evals,
-                &q_blind,
-                &agg_poly,
-                &permutation_oracles,
-                &witness_oracles,
-                &deltas,
-                beta,
-                gamma,
-                domain_size,
-                extended_coset_domain.element(i),
-                i,
-            );
+            let gp_i =
+                GrandProductArgument::<F, PC>::instantiate_argument_at_omega_i(
+                    &l_u_coset_evals,
+                    &q_blind,
+                    &agg_poly,
+                    &permutation_oracles,
+                    &witness_oracles,
+                    &deltas,
+                    beta,
+                    gamma,
+                    domain_size,
+                    extended_coset_domain.element(i),
+                    i,
+                );
 
             grand_product_evals.push(gp_i);
         }
@@ -626,6 +535,83 @@ mod test {
         let q_eval = q.evaluate(&evaluation_challenge);
 
         let l_u_eval = lu.evaluate(&evaluation_challenge);
+
+        let agg_poly = WitnessVerifierOracle::<F, PC> {
+            label: "agg_permutation_0".into(),
+            queried_rotations: BTreeSet::from([
+                Rotation::curr(),
+                Rotation::next(),
+            ]),
+            evals_at_challenges: BTreeMap::from([
+                (
+                    evaluation_challenge,
+                    agg_poly.polynomial().evaluate(&evaluation_challenge),
+                ),
+                (
+                    domain.element(1) * evaluation_challenge,
+                    agg_poly
+                        .polynomial()
+                        .evaluate(&(evaluation_challenge * domain.element(1))),
+                ),
+            ]),
+            commitment: None,
+            should_permute: false,
+        };
+
+        let q_blind = FixedVerifierOracle {
+            label: "q_blind".into(),
+            queried_rotations: BTreeSet::from([Rotation::curr()]),
+            evals_at_challenges: BTreeMap::from([(
+                evaluation_challenge,
+                q_blind_poly.evaluate(&evaluation_challenge),
+            )]),
+            commitment: None,
+        };
+
+        let a = WitnessVerifierOracle {
+            label: "a".to_string(),
+            queried_rotations: BTreeSet::from([Rotation::curr()]),
+            evals_at_challenges: BTreeMap::from([(
+                evaluation_challenge,
+                a_poly.evaluate(&evaluation_challenge),
+            )]),
+            commitment: None,
+            should_permute: true,
+        };
+
+        let b = WitnessVerifierOracle {
+            label: "b".to_string(),
+            queried_rotations: BTreeSet::from([Rotation::curr()]),
+            evals_at_challenges: BTreeMap::from([(
+                evaluation_challenge,
+                b_poly.evaluate(&evaluation_challenge),
+            )]),
+            commitment: None,
+            should_permute: true,
+        };
+
+        let sigma_1 = FixedVerifierOracle {
+            label: "sigma_1".into(),
+            queried_rotations: BTreeSet::from([Rotation::curr()]),
+            evals_at_challenges: BTreeMap::from([(
+                evaluation_challenge,
+                sigma_1_poly.evaluate(&evaluation_challenge),
+            )]),
+            commitment: None,
+        };
+
+        let sigma_2 = FixedVerifierOracle {
+            label: "sigma_2".into(),
+            queried_rotations: BTreeSet::from([Rotation::curr()]),
+            evals_at_challenges: BTreeMap::from([(
+                evaluation_challenge,
+                sigma_2_poly.evaluate(&evaluation_challenge),
+            )]),
+            commitment: None,
+        };
+
+        let witness_oracles = [a, b];
+        let permutation_oracles = [sigma_1, sigma_2];
 
         let opening = GrandProductArgument::open_argument(
             l_u_eval,

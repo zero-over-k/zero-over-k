@@ -1,4 +1,5 @@
-7. remove coset evals and poly from fixed when stored on verifier side
-
-========
-2. design circuit with copy constraints
+1. design circuit with copy constraints
+2. finalize permutation integration 
+3. add lookups
+4. design circuit with lookups
+5. extract halo2 assignment then prove&verify it

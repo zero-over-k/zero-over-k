@@ -11,19 +11,16 @@ use crate::{
     data_structures::{IndexInfo, VerifierKey},
     error::Error,
     oracles::{
-        fixed::FixedOracle,
-        instance::InstanceOracle,
         query::OracleType,
-        traits::{ConcreteOracle, WitnessOracle},
+        traits::{
+            ConcreteOracle, FixedOracle, InstanceOracle, Instantiable,
+            WitnessOracle,
+        },
+        witness::WitnessProverOracle,
     },
     util::compute_vanishing_poly_over_coset,
     vo::VirtualOracle,
 };
-
-pub enum Adversary {
-    Prover,
-    Verifier,
-}
 
 /*
     We want to support both Plonkish like zero over K checks, where each gate is separated with selector, ex: (q_1, gate_1), (q_2, gate_2),
@@ -47,8 +44,8 @@ pub struct Indexer<F: PrimeField, PC: HomomorphicCommitment<F>> {
 impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
     fn compute_quotient_degree(
         witness_oracles: &[impl WitnessOracle<F>],
-        instance_oracles: &[InstanceOracle<F>],
-        selector_oracles: &[FixedOracle<F, PC>],
+        instance_oracles: &[impl InstanceOracle<F>],
+        selector_oracles: &[impl FixedOracle<F>],
         witness_oracles_mapping: &BTreeMap<String, usize>,
         instance_oracles_mapping: &BTreeMap<String, usize>,
         selector_oracles_mapping: &BTreeMap<String, usize>,
@@ -138,16 +135,13 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
     }
 
     pub fn index(
-        ck: &PC::CommitterKey,
         vk: &PC::VerifierKey,
         vos: &[&dyn VirtualOracle<F>],
         witness_oracles: &[impl WitnessOracle<F>],
-        instance_oracles: &[InstanceOracle<F>],
-        selector_oracles: &[FixedOracle<F, PC>],
-        permutation_oracles: &[FixedOracle<F, PC>],
+        instance_oracles: &[impl InstanceOracle<F>],
+        fixed_oracles: &[impl FixedOracle<F>],
         domain: GeneralEvaluationDomain<F>,
         zH: &DensePolynomial<F>,
-        adversary: Adversary,
     ) -> Result<VerifierKey<F, PC>, Error<PC::Error>> {
         let witness_oracles_mapping: BTreeMap<String, usize> = witness_oracles
             .iter()
@@ -161,20 +155,19 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
                 .map(|(i, oracle)| (oracle.get_label(), i))
                 .collect();
 
-        let selector_oracles_mapping: BTreeMap<String, usize> =
-            selector_oracles
-                .iter()
-                .enumerate()
-                .map(|(i, oracle)| (oracle.get_label(), i))
-                .collect();
+        let fixed_oracles_mapping: BTreeMap<String, usize> = fixed_oracles
+            .iter()
+            .enumerate()
+            .map(|(i, oracle)| (oracle.get_label(), i))
+            .collect();
 
         let quotient_degree: usize = Self::compute_quotient_degree(
             witness_oracles,
             instance_oracles,
-            &selector_oracles,
+            &fixed_oracles,
             &witness_oracles_mapping,
             &instance_oracles_mapping,
-            &selector_oracles_mapping,
+            &fixed_oracles_mapping,
             vos,
             domain.size(),
             zH.degree(),
@@ -191,18 +184,11 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
             extended_coset_domain,
         };
 
-        let mut vk = VerifierKey {
+        let vk = VerifierKey {
             verifier_key: vk.clone(),
-            selector_oracles: selector_oracles.to_vec(),
-            permutation_oracles: permutation_oracles.to_vec(),
             index_info,
             zh_inverses_over_coset,
         };
-
-        match adversary {
-            Adversary::Prover => vk.handle_fixed_prover(ck)?,
-            Adversary::Verifier => vk.handle_fixed_verifier(ck)?,
-        }
 
         Ok(vk)
     }

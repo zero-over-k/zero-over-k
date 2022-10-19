@@ -2,13 +2,20 @@ use ark_ff::PrimeField;
 use ark_poly::{
     univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
 };
-use ark_poly_commit::{PCCommitment, PCRandomness, PolynomialCommitment};
+use ark_poly_commit::{
+    LabeledCommitment, LabeledPolynomial, PCCommitment, PCRandomness,
+    PolynomialCommitment,
+};
 
 use crate::{
     commitment::HomomorphicCommitment,
     error::Error,
+    // error::Error,
     multiproof::Proof as MultiOpenProof,
-    oracles::{fixed::FixedOracle, traits::Instantiable},
+    oracles::{
+        fixed::{FixedProverOracle, FixedVerifierOracle},
+        traits::Instantiable,
+    },
 };
 
 use ark_serialize::{
@@ -25,113 +32,71 @@ pub struct IndexInfo<F: PrimeField> {
     pub extended_coset_domain: GeneralEvaluationDomain<F>,
 }
 
-pub struct VerifierKey<F: PrimeField, PC: HomomorphicCommitment<F>> {
-    pub verifier_key: PC::VerifierKey,
-    pub selector_oracles: Vec<FixedOracle<F, PC>>,
-    pub permutation_oracles: Vec<FixedOracle<F, PC>>,
-    pub index_info: IndexInfo<F>,
-
-    pub zh_inverses_over_coset: Vec<F>,
+pub struct ProverPreprocessedInput<F: PrimeField, PC: HomomorphicCommitment<F>>
+{
+    pub fixed_oracles: Vec<FixedProverOracle<F>>,
+    pub permutation_oracles: Vec<FixedProverOracle<F>>,
+    pub empty_rands_for_fixed: Vec<PC::Randomness>,
 }
 
-impl<F: PrimeField, PC: HomomorphicCommitment<F>> VerifierKey<F, PC> {
-    pub fn handle_fixed_verifier(
-        &mut self,
-        ck: &PC::CommitterKey,
-    ) -> Result<(), Error<PC::Error>> {
-        let selector_labeled: Vec<_> = self
-            .selector_oracles
-            .iter()
-            .map(|o| o.to_labeled())
-            .collect();
-        let (selector_commitments, _) =
-            PC::commit(ck, selector_labeled.iter(), None)
-                .map_err(Error::from_pc_err)?;
+impl<F: PrimeField, PC: HomomorphicCommitment<F>>
+    ProverPreprocessedInput<F, PC>
+{
+    pub fn new(
+        fixed_oracles: &Vec<FixedProverOracle<F>>,
+        permutation_oracles: &Vec<FixedProverOracle<F>>,
+        index_info: &IndexInfo<F>
+    ) -> Self {
+        let mut fixed_oracles = fixed_oracles.clone();
+        let mut permutation_oracles = permutation_oracles.clone();
 
-        for (selector, commitment) in
-            self.selector_oracles.iter_mut().zip(selector_commitments)
-        {
-            selector.commitment = Some(commitment.commitment().clone());
-            selector.evals_at_coset_of_extended_domain = None
+        for oracle in fixed_oracles.iter_mut() {
+            oracle.compute_extended_evals(&index_info.extended_coset_domain);
         }
 
-        let permutation_labeled: Vec<_> = self
-            .permutation_oracles
-            .iter()
-            .map(|o| o.to_labeled())
-            .collect();
-        let (permutation_commitments, _) =
-            PC::commit(ck, permutation_labeled.iter(), None)
-                .map_err(Error::from_pc_err)?;
-
-        for (sigma, commitment) in self
-            .permutation_oracles
-            .iter_mut()
-            .zip(permutation_commitments)
-        {
-            sigma.commitment = Some(commitment.commitment().clone());
-            sigma.evals_at_coset_of_extended_domain = None
+        for oracle in permutation_oracles.iter_mut() {
+            oracle.compute_extended_evals(&index_info.extended_coset_domain);
         }
-
-        Ok(())
+        Self {
+            empty_rands_for_fixed: vec![
+                PC::Randomness::empty();
+                fixed_oracles.len()
+                    + permutation_oracles.len()
+            ],
+            fixed_oracles,
+            permutation_oracles,
+        }
     }
+}
 
-    pub fn handle_fixed_prover(
-        &mut self,
-        ck: &PC::CommitterKey,
-    ) -> Result<(), Error<PC::Error>> {
-        let selector_labeled: Vec<_> = self
-            .selector_oracles
-            .iter()
-            .map(|o| o.to_labeled())
-            .collect();
-        let (selector_commitments, _) =
-            PC::commit(ck, selector_labeled.iter(), None)
-                .map_err(Error::from_pc_err)?;
+pub struct VerifierPreprocessedInput<
+    F: PrimeField,
+    PC: HomomorphicCommitment<F>,
+> {
+    pub fixed_oracles: Vec<FixedVerifierOracle<F, PC>>,
+    pub permutation_oracles: Vec<FixedVerifierOracle<F, PC>>,
+}
 
-        for (selector, commitment) in
-            self.selector_oracles.iter_mut().zip(selector_commitments)
-        {
-            selector.commitment = Some(commitment.commitment().clone());
-            selector.evals_at_coset_of_extended_domain = Some(
-                self.index_info
-                    .extended_coset_domain
-                    .coset_fft(&selector.polynomial()),
-            )
+impl<F: PrimeField, PC: HomomorphicCommitment<F>> Clone
+    for VerifierPreprocessedInput<F, PC>
+{
+    fn clone(&self) -> Self {
+        Self {
+            fixed_oracles: self.fixed_oracles.clone(),
+            permutation_oracles: self.permutation_oracles.clone(),
         }
-
-        let permutation_labeled: Vec<_> = self
-            .permutation_oracles
-            .iter()
-            .map(|o| o.to_labeled())
-            .collect();
-        let (permutation_commitments, _) =
-            PC::commit(ck, permutation_labeled.iter(), None)
-                .map_err(Error::from_pc_err)?;
-
-        for (sigma, commitment) in self
-            .permutation_oracles
-            .iter_mut()
-            .zip(permutation_commitments)
-        {
-            sigma.commitment = Some(commitment.commitment().clone());
-            sigma.evals_at_coset_of_extended_domain = Some(
-                self.index_info
-                    .extended_coset_domain
-                    .coset_fft(&sigma.polynomial()),
-            )
-        }
-
-        Ok(())
     }
+}
+pub struct VerifierKey<F: PrimeField, PC: HomomorphicCommitment<F>> {
+    pub verifier_key: PC::VerifierKey,
+    pub index_info: IndexInfo<F>,
+    pub zh_inverses_over_coset: Vec<F>,
 }
 
 impl<F: PrimeField, PC: HomomorphicCommitment<F>> Clone for VerifierKey<F, PC> {
     fn clone(&self) -> Self {
         Self {
             verifier_key: self.verifier_key.clone(),
-            selector_oracles: self.selector_oracles.clone(),
-            permutation_oracles: self.permutation_oracles.clone(),
             index_info: self.index_info.clone(),
             zh_inverses_over_coset: self.zh_inverses_over_coset.clone(),
         }
@@ -141,7 +106,6 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Clone for VerifierKey<F, PC> {
 pub struct ProverKey<F: PrimeField, PC: HomomorphicCommitment<F>> {
     pub vk: VerifierKey<F, PC>,
     pub committer_key: PC::CommitterKey,
-    pub empty_rands_for_fixed: Vec<PC::Randomness>,
 }
 
 impl<F: PrimeField, PC: HomomorphicCommitment<F>> ProverKey<F, PC> {
@@ -152,11 +116,6 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> ProverKey<F, PC> {
         Self {
             vk: vk.clone(),
             committer_key: ck.clone(),
-            empty_rands_for_fixed: vec![
-                PC::Randomness::empty();
-                vk.selector_oracles.len()
-                    + vk.permutation_oracles.len()
-            ],
         }
     }
 }
@@ -167,7 +126,7 @@ pub struct Proof<F: PrimeField, PC: HomomorphicCommitment<F>> {
     pub witness_evals: Vec<F>,
     pub quotient_chunk_commitments: Vec<PC::Commitment>,
     pub quotient_chunks_evals: Vec<F>,
-    pub selector_oracle_evals: Vec<F>,
+    pub fixed_oracle_evals: Vec<F>,
     pub multiopen_proof: MultiOpenProof<F, PC>,
 }
 
@@ -189,7 +148,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Proof<F, PC> {
             self.witness_evals.len(),
             self.quotient_chunk_commitments.len(),
             self.quotient_chunks_evals.len(),
-            self.selector_oracle_evals.len(),
+            self.fixed_oracle_evals.len(),
             self.multiopen_proof.q_evals.len()
         )
         .to_string()
@@ -201,11 +160,11 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Proof<F, PC> {
             + 1; // + 1 for f commitment in multiopen
         let num_of_field_elements = self.witness_evals.len()
             + self.quotient_chunks_evals.len()
-            + self.selector_oracle_evals.len()
+            + self.fixed_oracle_evals.len()
             + self.multiopen_proof.q_evals.len();
 
         format!(
-            " 
+            "
             Proof is consisted of: \n
             {} commitments
             {} field elements

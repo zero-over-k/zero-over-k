@@ -1,41 +1,41 @@
-
 use std::collections::{BTreeMap, BTreeSet};
-use std::iter::{successors};
+use std::iter::successors;
 use std::marker::PhantomData;
 
 use ark_ff::{to_bytes, PrimeField};
 use ark_poly::univariate::DensePolynomial;
 use ark_poly::{EvaluationDomain, GeneralEvaluationDomain, Polynomial};
-use ark_poly_commit::{
-    LabeledPolynomial, PCCommitterKey, PCUniversalParams,
-};
+use ark_poly_commit::{LabeledPolynomial, PCCommitterKey, PCUniversalParams};
 
 use error::Error;
 
 use ark_poly_commit::evaluate_query_set;
 use ark_std::rand::{Rng, RngCore};
 use commitment::HomomorphicCommitment;
-use data_structures::{Proof, ProverKey, UniversalSRS, VerifierKey};
-use iop::PIOPforPolyIdentity;
+use data_structures::{
+    IndexInfo, Proof, ProverKey, ProverPreprocessedInput, UniversalSRS,
+    VerifierKey, VerifierPreprocessedInput,
+};
 use multiproof::piop::Multiopen;
-
-use oracles::instance::InstanceOracle;
+use oracles::instance::{InstanceProverOracle, InstanceVerifierOracle};
 use oracles::query::QueryContext;
 use oracles::traits::{ConcreteOracle, Instantiable};
 use oracles::witness::{WitnessProverOracle, WitnessVerifierOracle};
+use piop::PIOPforPolyIdentity;
 use rng::FiatShamirRng;
 use vo::VirtualOracle;
 
 use crate::oracles::query::OracleType;
 use crate::oracles::rotation::Rotation;
 use crate::oracles::traits::CommittedOracle;
-
+use crate::piop::prover;
+use crate::util::compute_vanishing_poly_over_coset;
 
 pub mod commitment;
-mod data_structures;
+pub mod data_structures;
 pub mod error;
-pub mod iop;
 pub mod oracles;
+pub mod piop;
 pub mod rng;
 mod util;
 pub mod vo;
@@ -81,8 +81,9 @@ where
 
     pub fn prove<'a, R: Rng>(
         pk: &ProverKey<F, PC>,
+        preprocessed: &ProverPreprocessedInput<F, PC>,
         witness_oracles: &'a mut [WitnessProverOracle<F>],
-        instance_oracles: &'a mut [InstanceOracle<F>],
+        instance_oracles: &'a mut [InstanceProverOracle<F>],
         vos: &[&'a dyn VirtualOracle<F>],
         domain_size: usize,
         vanishing_polynomial: &DensePolynomial<F>,
@@ -129,7 +130,7 @@ where
             vos,
             domain_size,
             vanishing_polynomial,
-            &pk.vk,
+            preprocessed,
         );
 
         let verifier_init_state = PIOPforPolyIdentity::<F, PC>::init_verifier(
@@ -150,6 +151,7 @@ where
             &verifier_first_msg,
             &mut prover_state,
             &pk.vk,
+            &preprocessed,
         )?;
 
         let quotient_chunks_labeled: Vec<
@@ -183,8 +185,8 @@ where
             verifier_second_msg.xi,
             &omegas,
         );
-        let selector_query_set = PIOPforPolyIdentity::<F, PC>::get_query_set(
-            &pk.vk.selector_oracles,
+        let fixed_query_set = PIOPforPolyIdentity::<F, PC>::get_query_set(
+            &preprocessed.fixed_oracles,
             verifier_second_msg.label,
             verifier_second_msg.xi,
             &omegas,
@@ -198,30 +200,22 @@ where
         .map(|(_, eval)| *eval)
         .collect();
 
-        let selector_oracles_labeled: Vec<_> = pk
-            .vk
-            .selector_oracles
+        let fixed_oracles_labeled: Vec<_> = preprocessed
+            .fixed_oracles
             .iter()
             .map(|o| o.to_labeled())
             .collect();
 
-        let selector_oracle_evals: Vec<F> =
-            evaluate_query_set(&selector_oracles_labeled, &selector_query_set)
+        let fixed_oracle_evals: Vec<F> =
+            evaluate_query_set(&fixed_oracles_labeled, &fixed_query_set)
                 .iter()
                 .map(|(_, eval)| *eval)
                 .collect();
 
         let quotient_chunks_evals: Vec<F> = quotient_chunk_oracles
             .iter()
-            .map(|q_i| {
-                q_i.query(&QueryContext::Challenge(verifier_second_msg.xi))
-            })
+            .map(|q_i| q_i.query(&verifier_second_msg.xi))
             .collect();
-
-        // let mut evaluations = vec![];
-        // evaluations.extend_from_slice(&witness_evaluations);
-        // evaluations.extend_from_slice(&quotient_chunks_evaluations);
-        // evaluations.extend_from_slice(&selector_oracle_evals);
 
         // Multiopen
         let mut oracles: Vec<&dyn Instantiable<F>> = witness_oracles
@@ -229,18 +223,17 @@ where
             .chain(quotient_chunk_oracles.iter())
             .map(|o| o as &dyn Instantiable<F>)
             .collect();
-        let selector_oracles: Vec<&dyn Instantiable<F>> = pk
-            .vk
-            .selector_oracles
+        let fixed_oracles: Vec<&dyn Instantiable<F>> = preprocessed
+            .fixed_oracles
             .iter()
             .map(|o| o as &dyn Instantiable<F>)
             .collect();
-        oracles.extend_from_slice(&selector_oracles.as_slice());
+        oracles.extend_from_slice(&fixed_oracles.as_slice());
 
         let oracle_rands: Vec<PC::Randomness> = wtns_rands
             .iter()
             .chain(quotient_rands.iter())
-            .chain(pk.empty_rands_for_fixed.iter())
+            .chain(preprocessed.empty_rands_for_fixed.iter())
             .map(|rand| rand.clone())
             .collect();
 
@@ -266,84 +259,84 @@ where
                 .map(|c| c.commitment().clone())
                 .collect(),
             quotient_chunks_evals,
-            selector_oracle_evals,
+            fixed_oracle_evals,
             multiopen_proof,
         };
 
         /* BEGIN SANITY CHECK BEFORE INVOKING VERIFIER */
-        // let powers_of_alpha: Vec<F> = successors(Some(F::one()), |alpha_i| {
-        //     Some(*alpha_i * verifier_first_msg.alpha)
-        // })
-        // .take(vos.len())
-        // .collect();
+        let powers_of_alpha: Vec<F> = successors(Some(F::one()), |alpha_i| {
+            Some(*alpha_i * verifier_first_msg.alpha)
+        })
+        .take(vos.len())
+        .collect();
 
-        // let mut quotient_eval = F::zero();
-        // for (vo_index, vo) in vos.iter().enumerate() {
-        //     let vo_evaluation = vo.get_expression().evaluate(
-        //         &|x: F| x,
-        //         &|query| {
-        //             let challenge = query.rotation.compute_evaluation_point(
-        //                 verifier_second_msg.xi,
-        //                 &omegas,
-        //             );
-        //             match query.oracle_type {
-        //                 OracleType::Witness => {
-        //                     match prover_state.witness_oracles_mapping.get(&query.label) {
-        //                         Some(index) => prover_state.witness_oracles[*index].query(&QueryContext::Challenge(challenge)),
-        //                         None => panic!("Witness oracle with label add_label not found") //TODO: Introduce new Error here,
-        //                     }
-        //                 },
-        //                 OracleType::Instance => {
-        //                     match prover_state.instance_oracles_mapping.get(&query.label) {
-        //                         Some(index) => prover_state.instance_oracles[*index].query(&QueryContext::Challenge(challenge)),
-        //                         None => panic!("Instance oracle with label {} not found", query.label) //TODO: Introduce new Error here,
-        //                     }
-        //                 },
-        //                 OracleType::Fixed => {
-        //                     match prover_state.fixed_oracles_mapping.get(&query.label) {
-        //                         Some(index) => pk.vk.fixed_oracles[*index].query(&QueryContext::Challenge(challenge)),
-        //                         None => panic!("Fixed oracle with label add_label not found") //TODO: Introduce new Error here,
-        //                     }
-        //                 },
-        //             }
-        //         },
-        //         &|x: F| -x,
-        //         &|x: F, y: F| x + y,
-        //         &|x: F, y: F| x * y,
-        //         &|x: F, y: F| x * y,
-        //     );
+        let mut quotient_eval = F::zero();
+        for (vo_index, vo) in vos.iter().enumerate() {
+            let vo_evaluation = vo.get_expression().evaluate(
+            &|x: F| x,
+            &|query| {
+                let challenge = query.rotation.compute_evaluation_point(
+                    verifier_second_msg.xi,
+                    &omegas,
+                );
+                match query.oracle_type {
+                    OracleType::Witness => {
+                        match prover_state.witness_oracles_mapping.get(&query.label) {
+                            Some(index) => prover_state.witness_oracles[*index].query(&challenge),
+                            None => panic!("Witness oracle with label add_label not found") //TODO: Introduce new Error here,
+                        }
+                    },
+                    OracleType::Instance => {
+                        match prover_state.instance_oracles_mapping.get(&query.label) {
+                            Some(index) => prover_state.instance_oracles[*index].query(&challenge),
+                            None => panic!("Instance oracle with label {} not found", query.label) //TODO: Introduce new Error here,
+                        }
+                    },
+                    OracleType::Fixed => {
+                        match prover_state.fixed_oracles_mapping.get(&query.label) {
+                            Some(index) => preprocessed.fixed_oracles[*index].query(&challenge),
+                            None => panic!("Fixed oracle with label add_label not found") //TODO: Introduce new Error here,
+                        }
+                    },
+                }
+            },
+            &|x: F| -x,
+            &|x: F, y: F| x + y,
+            &|x: F, y: F| x * y,
+            &|x: F, y: F| x * y,
+        );
 
-        //     quotient_eval += powers_of_alpha[vo_index] * vo_evaluation;
-        // }
+            quotient_eval += powers_of_alpha[vo_index] * vo_evaluation;
+        }
 
-        // let x_n = verifier_second_msg.xi.pow([domain_size as u64, 0, 0, 0]);
-        // let powers_of_x: Vec<F> =
-        //     successors(Some(F::one()), |x_i| Some(*x_i * x_n))
-        //         .take(quotient_chunk_oracles.len())
-        //         .collect();
+        let x_n = verifier_second_msg.xi.pow([domain_size as u64, 0, 0, 0]);
+        let powers_of_x: Vec<F> =
+            successors(Some(F::one()), |x_i| Some(*x_i * x_n))
+                .take(quotient_chunk_oracles.len())
+                .collect();
 
-        // let mut t_part = F::zero();
-        // for (&x_i, t_i) in
-        //     powers_of_x.iter().zip(quotient_chunk_oracles.clone())
-        // {
-        //     t_part += x_i
-        //         * t_i.query(&QueryContext::Challenge(verifier_second_msg.xi));
-        // }
+        let mut t_part = F::zero();
+        for (&x_i, t_i) in
+            powers_of_x.iter().zip(quotient_chunk_oracles.clone())
+        {
+            t_part += x_i * t_i.query(&verifier_second_msg.xi);
+        }
 
-        // t_part *= vanishing_polynomial.evaluate(&verifier_second_msg.xi);
+        t_part *= vanishing_polynomial.evaluate(&verifier_second_msg.xi);
 
-        // quotient_eval -= t_part;
-        // assert_eq!(quotient_eval, F::zero());
+        quotient_eval -= t_part;
+        assert_eq!(quotient_eval, F::zero());
         /* END SANITY CHECK BEFORE INVOKING VERIFIER */
 
         Ok(proof)
     }
 
     pub fn verify<R: Rng>(
-        vk: &mut VerifierKey<F, PC>,
+        vk: &VerifierKey<F, PC>,
+        preprocessed: &mut VerifierPreprocessedInput<F, PC>,
         proof: Proof<F, PC>,
         witness_oracles: &mut [WitnessVerifierOracle<F, PC>],
-        instance_oracles: &mut [InstanceOracle<F>],
+        instance_oracles: &mut [InstanceVerifierOracle<F>],
         vos: &[&dyn VirtualOracle<F>],
         domain_size: usize,
         vanishing_polynomial: &DensePolynomial<F>,
@@ -368,8 +361,8 @@ where
                 .enumerate()
                 .map(|(i, oracle)| (oracle.get_label(), i))
                 .collect();
-        let selector_oracles_mapping: BTreeMap<String, usize> = vk
-            .selector_oracles
+        let fixed_oracles_mapping: BTreeMap<String, usize> = preprocessed
+            .fixed_oracles
             .iter()
             .enumerate()
             .map(|(i, oracle)| (oracle.get_label(), i))
@@ -429,7 +422,7 @@ where
             .map(|i| WitnessVerifierOracle {
                 label: format!("quotient_chunk_{}", i).to_string(),
                 queried_rotations: BTreeSet::from([Rotation::curr()]),
-                should_mask: false,
+                should_permute: false,
                 evals_at_challenges: BTreeMap::from([(
                     verifier_second_msg.xi,
                     proof.quotient_chunks_evals[i],
@@ -449,21 +442,21 @@ where
 
         assert_eq!(query_set.len(), proof.witness_evals.len());
 
-        let selector_query_set = PIOPforPolyIdentity::<F, PC>::get_query_set(
-            &vk.selector_oracles,
+        let fixed_query_set = PIOPforPolyIdentity::<F, PC>::get_query_set(
+            &preprocessed.fixed_oracles,
             verifier_second_msg.label,
             verifier_second_msg.xi,
             &omegas,
         );
 
-        assert_eq!(selector_query_set.len(), proof.selector_oracle_evals.len());
+        assert_eq!(fixed_query_set.len(), proof.fixed_oracle_evals.len());
 
-        for ((poly_label, (_, point)), &evaluation) in selector_query_set
+        for ((poly_label, (_, point)), &evaluation) in fixed_query_set
             .iter()
-            .zip(proof.selector_oracle_evals.iter())
+            .zip(proof.fixed_oracle_evals.iter())
         {
-            match selector_oracles_mapping.get(poly_label) {
-                Some(index) => vk.selector_oracles[*index]
+            match fixed_oracles_mapping.get(poly_label) {
+                Some(index) => preprocessed.fixed_oracles[*index]
                     .register_eval_at_challenge(*point, evaluation),
                 None => panic!("Missing poly: {}", poly_label),
             };
@@ -498,19 +491,19 @@ where
                     match query.oracle_type {
                         OracleType::Witness => {
                             match witness_oracles_mapping.get(&query.label) {
-                                Some(index) => witness_oracles[*index].query(&QueryContext::Challenge(challenge)),
+                                Some(index) => witness_oracles[*index].query(&challenge),
                                 None => panic!("Witness oracle with label add_label not found") //TODO: Introduce new Error here,
                             }
                         },
                         OracleType::Instance => {
                             match instance_oracles_mapping.get(&query.label) {
-                                Some(index) => instance_oracles[*index].query(&QueryContext::Challenge(challenge)),
+                                Some(index) => instance_oracles[*index].query(&challenge),
                                 None => panic!("Instance oracle with label {} not found", query.label) //TODO: Introduce new Error here,
                             }
                         },
                         OracleType::Fixed => {
-                            match selector_oracles_mapping.get(&query.label) {
-                                Some(index) => vk.selector_oracles[*index].query(&QueryContext::Challenge(challenge)),
+                            match fixed_oracles_mapping.get(&query.label) {
+                                Some(index) => preprocessed.fixed_oracles[*index].query(&challenge),
                                 None => panic!("Fixed oracle with label add_label not found") //TODO: Introduce new Error here,
                             }
                         },
@@ -535,8 +528,7 @@ where
         for (&x_i, t_i) in
             powers_of_x.iter().zip(quotient_chunk_oracles.clone())
         {
-            t_part += x_i
-                * t_i.query(&QueryContext::Challenge(verifier_second_msg.xi));
+            t_part += x_i * t_i.query(&verifier_second_msg.xi);
         }
 
         t_part *= vanishing_polynomial.evaluate(&verifier_second_msg.xi);
@@ -552,12 +544,12 @@ where
             .chain(quotient_chunk_oracles.iter())
             .map(|a| a as &dyn CommittedOracle<F, PC>)
             .collect();
-        let selector_oracles: Vec<&dyn CommittedOracle<F, PC>> = vk
-            .selector_oracles
+        let fixed_oracles: Vec<&dyn CommittedOracle<F, PC>> = preprocessed
+            .fixed_oracles
             .iter()
             .map(|o| o as &dyn CommittedOracle<F, PC>)
             .collect();
-        oracles.extend_from_slice(&selector_oracles.as_slice());
+        oracles.extend_from_slice(&fixed_oracles.as_slice());
 
         let res = Multiopen::<F, PC, FS>::verify(
             &vk.verifier_key,

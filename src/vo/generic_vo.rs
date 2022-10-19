@@ -5,10 +5,9 @@ use ark_ff::PrimeField;
 use crate::{
     commitment::HomomorphicCommitment,
     oracles::{
-        fixed::FixedOracle,
-        instance::{InstanceOracle},
         query::{OracleQuery, OracleType},
-        traits::{ConcreteOracle, WitnessOracle},
+        rotation::Rotation,
+        traits::{ConcreteOracle, FixedOracle, InstanceOracle, WitnessOracle},
     },
 };
 
@@ -40,8 +39,8 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> GenericVO<F, PC> {
     pub fn configure(
         &mut self,
         witness_oracles: &mut [impl WitnessOracle<F>],
-        instance_oracles: &mut [InstanceOracle<F>],
-        fixed_oracles: &mut [FixedOracle<F, PC>],
+        instance_oracles: &mut [impl InstanceOracle<F>],
+        fixed_oracles: &mut [impl FixedOracle<F>],
     ) {
         let mut queries = Vec::with_capacity(self.virtual_queries.len());
         for query in &self.virtual_queries {

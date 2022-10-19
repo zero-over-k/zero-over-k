@@ -1,5 +1,5 @@
-use crate::iop::error::Error as IOPError;
 use crate::multiproof::error::Error as MultiproofError;
+use crate::piop::error::Error as IOPError;
 /// A `enum` specifying the possible failure modes of the `SNARK`.
 #[derive(Debug)]
 pub enum Error<E> {
@@ -13,7 +13,6 @@ pub enum Error<E> {
     WrongNumberOfChunks,
     /// Non zero over K indentity does not hold
     QuotientNotZero,
-
     MultiproofError(MultiproofError<E>),
 }
 

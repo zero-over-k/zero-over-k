@@ -131,9 +131,3 @@ impl<F: PrimeField> Mul<F> for VirtualExpression<F> {
         VirtualExpression::Scaled(Box::new(self), rhs)
     }
 }
-
-#[cfg(test)]
-mod test {
-    #[test]
-    fn test_new_expression() {}
-}

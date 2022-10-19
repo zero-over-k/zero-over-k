@@ -9,19 +9,18 @@ use ark_poly::{
     Polynomial, UVPolynomial,
 };
 
-
 use crate::{
     commitment::HomomorphicCommitment,
-    data_structures::{VerifierKey},
-    iop::error::Error,
-    iop::{verifier::VerifierFirstMsg, PIOPforPolyIdentity},
+    data_structures::{IndexInfo, ProverPreprocessedInput, VerifierKey},
     oracles::{
-        instance::InstanceOracle,
+        instance::InstanceProverOracle,
         query::{OracleType, QueryContext},
         rotation::Rotation,
-        traits::{ConcreteOracle},
+        traits::{ConcreteOracle, Instantiable},
         witness::WitnessProverOracle,
     },
+    piop::error::Error,
+    piop::{verifier::VerifierFirstMsg, PIOPforPolyIdentity},
     vo::VirtualOracle,
 };
 
@@ -33,9 +32,9 @@ use crate::{
 pub struct ProverState<'a, F: PrimeField> {
     pub(crate) witness_oracles_mapping: BTreeMap<String, usize>, // TODO: introduce &str here maybe
     pub(crate) instance_oracles_mapping: BTreeMap<String, usize>,
-    pub(crate) selector_oracles_mapping: BTreeMap<String, usize>,
+    pub(crate) fixed_oracles_mapping: BTreeMap<String, usize>,
     pub(crate) witness_oracles: &'a [WitnessProverOracle<F>],
-    pub(crate) instance_oracles: &'a [InstanceOracle<F>],
+    pub(crate) instance_oracles: &'a [InstanceProverOracle<F>],
     vos: &'a [&'a dyn VirtualOracle<F>],
     pub(crate) domain: GeneralEvaluationDomain<F>,
     pub(crate) vanishing_polynomial: DensePolynomial<F>,
@@ -46,11 +45,11 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
     // NOTE: consider having indexed concrete oracles by initializing evals_at_coset_of_extended_domain (ex. selector polynomials)
     pub fn init_prover<'a>(
         witness_oracles: &'a [WitnessProverOracle<F>],
-        instance_oracles: &'a [InstanceOracle<F>],
+        instance_oracles: &'a [InstanceProverOracle<F>],
         vos: &'a [&'a dyn VirtualOracle<F>],
         domain_size: usize,
         vanishing_polynomial: &DensePolynomial<F>,
-        vk: &VerifierKey<F, PC>,
+        preprocessed: &ProverPreprocessedInput<F, PC>,
     ) -> ProverState<'a, F> {
         let domain = GeneralEvaluationDomain::new(domain_size).unwrap();
 
@@ -64,8 +63,8 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
             .enumerate()
             .map(|(i, oracle)| (oracle.get_label(), i))
             .collect();
-        let selector_oracles_mapping = vk
-            .selector_oracles
+        let fixed_oracles_mapping = preprocessed
+            .fixed_oracles
             .iter()
             .enumerate()
             .map(|(i, oracle)| (oracle.get_label(), i))
@@ -74,7 +73,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
         ProverState {
             witness_oracles_mapping,
             instance_oracles_mapping,
-            selector_oracles_mapping,
+            fixed_oracles_mapping,
             witness_oracles,
             instance_oracles,
             vos,
@@ -88,6 +87,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
         verifier_msg: &VerifierFirstMsg<F>,
         state: &mut ProverState<F>,
         vk: &VerifierKey<F, PC>,
+        preprocessed: &ProverPreprocessedInput<F, PC>,
     ) -> Result<Vec<WitnessProverOracle<F>>, Error> {
         let powers_of_alpha: Vec<F> = successors(Some(F::one()), |alpha_i| {
             Some(*alpha_i * verifier_msg.alpha)
@@ -104,23 +104,22 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
                     &|x: F| x,
                     &|query| {
                         // ctx.replace_rotation(query.rotation);
-                        let ctx = QueryContext::<F>::ExtendedCoset(state.domain.size(), query.rotation, i); //Maybe we can handle this in a more elegant way
                         match query.oracle_type {
                             OracleType::Witness => {
                                 match state.witness_oracles_mapping.get(&query.label) {
-                                    Some(index) => state.witness_oracles[*index].query(&ctx),
+                                    Some(index) => state.witness_oracles[*index].query_in_coset(i, query.rotation),
                                     None => panic!("Witness oracle with label add_label not found") //TODO: Introduce new Error here,
                                 }
                             },
                             OracleType::Instance => {
                                 match state.instance_oracles_mapping.get(&query.label) {
-                                    Some(index) => state.instance_oracles[*index].query(&ctx),
+                                    Some(index) => state.instance_oracles[*index].query_in_coset(i, query.rotation),
                                     None => panic!("Instance oracle with label add_label not found") //TODO: Introduce new Error here,
                                 }
                             },
                             OracleType::Fixed => {
-                                match state.selector_oracles_mapping.get(&query.label) {
-                                    Some(index) => vk.selector_oracles[*index].query(&ctx),
+                                match state.fixed_oracles_mapping.get(&query.label) {
+                                    Some(index) => preprocessed.fixed_oracles[*index].query_in_coset(i, query.rotation),
                                     None => panic!("Fixed oracle with label add_label not found") //TODO: Introduce new Error here,
                                 }
                             },
@@ -162,11 +161,11 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
                 let poly = DensePolynomial::from_coefficients_slice(chunk);
                 WitnessProverOracle {
                     label: format!("quotient_chunk_{}", i).to_string(),
+                    evals: state.domain.fft(&poly),
                     poly,
                     evals_at_coset_of_extended_domain: None,
                     queried_rotations: BTreeSet::from([Rotation::curr()]),
                     should_permute: false,
-                    evals: None,
                 }
             })
             .collect();
