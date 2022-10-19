@@ -293,7 +293,7 @@ where
                         }
                     },
                     OracleType::Fixed => {
-                        match prover_state.selector_oracles_mapping.get(&query.label) {
+                        match prover_state.fixed_oracles_mapping.get(&query.label) {
                             Some(index) => preprocessed.fixed_oracles[*index].query(&challenge),
                             None => panic!("Fixed oracle with label add_label not found") //TODO: Introduce new Error here,
                         }
@@ -361,7 +361,7 @@ where
                 .enumerate()
                 .map(|(i, oracle)| (oracle.get_label(), i))
                 .collect();
-        let selector_oracles_mapping: BTreeMap<String, usize> = preprocessed
+        let fixed_oracles_mapping: BTreeMap<String, usize> = preprocessed
             .fixed_oracles
             .iter()
             .enumerate()
@@ -455,7 +455,7 @@ where
             .iter()
             .zip(proof.fixed_oracle_evals.iter())
         {
-            match selector_oracles_mapping.get(poly_label) {
+            match fixed_oracles_mapping.get(poly_label) {
                 Some(index) => preprocessed.fixed_oracles[*index]
                     .register_eval_at_challenge(*point, evaluation),
                 None => panic!("Missing poly: {}", poly_label),
@@ -502,7 +502,7 @@ where
                             }
                         },
                         OracleType::Fixed => {
-                            match selector_oracles_mapping.get(&query.label) {
+                            match fixed_oracles_mapping.get(&query.label) {
                                 Some(index) => preprocessed.fixed_oracles[*index].query(&challenge),
                                 None => panic!("Fixed oracle with label add_label not found") //TODO: Introduce new Error here,
                             }
@@ -544,12 +544,12 @@ where
             .chain(quotient_chunk_oracles.iter())
             .map(|a| a as &dyn CommittedOracle<F, PC>)
             .collect();
-        let selector_oracles: Vec<&dyn CommittedOracle<F, PC>> = preprocessed
+        let fixed_oracles: Vec<&dyn CommittedOracle<F, PC>> = preprocessed
             .fixed_oracles
             .iter()
             .map(|o| o as &dyn CommittedOracle<F, PC>)
             .collect();
-        oracles.extend_from_slice(&selector_oracles.as_slice());
+        oracles.extend_from_slice(&fixed_oracles.as_slice());
 
         let res = Multiopen::<F, PC, FS>::verify(
             &vk.verifier_key,

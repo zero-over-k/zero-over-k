@@ -32,7 +32,7 @@ use crate::{
 pub struct ProverState<'a, F: PrimeField> {
     pub(crate) witness_oracles_mapping: BTreeMap<String, usize>, // TODO: introduce &str here maybe
     pub(crate) instance_oracles_mapping: BTreeMap<String, usize>,
-    pub(crate) selector_oracles_mapping: BTreeMap<String, usize>,
+    pub(crate) fixed_oracles_mapping: BTreeMap<String, usize>,
     pub(crate) witness_oracles: &'a [WitnessProverOracle<F>],
     pub(crate) instance_oracles: &'a [InstanceProverOracle<F>],
     vos: &'a [&'a dyn VirtualOracle<F>],
@@ -63,7 +63,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
             .enumerate()
             .map(|(i, oracle)| (oracle.get_label(), i))
             .collect();
-        let selector_oracles_mapping = preprocessed
+        let fixed_oracles_mapping = preprocessed
             .fixed_oracles
             .iter()
             .enumerate()
@@ -73,7 +73,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
         ProverState {
             witness_oracles_mapping,
             instance_oracles_mapping,
-            selector_oracles_mapping,
+            fixed_oracles_mapping,
             witness_oracles,
             instance_oracles,
             vos,
@@ -118,7 +118,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
                                 }
                             },
                             OracleType::Fixed => {
-                                match state.selector_oracles_mapping.get(&query.label) {
+                                match state.fixed_oracles_mapping.get(&query.label) {
                                     Some(index) => preprocessed.fixed_oracles[*index].query_in_coset(i, query.rotation),
                                     None => panic!("Fixed oracle with label add_label not found") //TODO: Introduce new Error here,
                                 }
