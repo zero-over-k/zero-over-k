@@ -45,7 +45,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>>
     pub fn new(
         fixed_oracles: &Vec<FixedProverOracle<F>>,
         permutation_oracles: &Vec<FixedProverOracle<F>>,
-        index_info: &IndexInfo<F>
+        index_info: &IndexInfo<F>,
     ) -> Self {
         let mut fixed_oracles = fixed_oracles.clone();
         let mut permutation_oracles = permutation_oracles.clone();

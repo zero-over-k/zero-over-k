@@ -1,3 +1,6 @@
+mod simple;
+mod with_copy;
+
 #[cfg(test)]
 mod test {
 
@@ -372,8 +375,11 @@ mod test {
 
         let pk = ProverKey::from_ck_and_vk(&ck, &vk);
 
-        let preprocessed =
-            ProverPreprocessedInput::new(&selector_oracles, &vec![], &vk.index_info);
+        let preprocessed = ProverPreprocessedInput::new(
+            &selector_oracles,
+            &vec![],
+            &vk.index_info,
+        );
 
         let proof = PilInstance::prove(
             &pk,
@@ -407,28 +413,39 @@ mod test {
 
         let mut instance_oracles: [InstanceVerifierOracle<F>; 0] = [];
 
-        let labeled_selectors: Vec<LabeledPolynomial<F, DensePolynomial<F>>> = [
-            (selector_polys[0].clone(), "q1"),
-            (selector_polys[1].clone(), "q2"),
-            (selector_polys[2].clone(), "q3"),
-            (selector_polys[3].clone(), "q4"),
-        ].iter().map(|(poly, label)| {
-            LabeledPolynomial::new(label.to_string(), poly.clone(), None, None)
-        }).collect();
+        let labeled_selectors: Vec<LabeledPolynomial<F, DensePolynomial<F>>> =
+            [
+                (selector_polys[0].clone(), "q1"),
+                (selector_polys[1].clone(), "q2"),
+                (selector_polys[2].clone(), "q3"),
+                (selector_polys[3].clone(), "q4"),
+            ]
+            .iter()
+            .map(|(poly, label)| {
+                LabeledPolynomial::new(
+                    label.to_string(),
+                    poly.clone(),
+                    None,
+                    None,
+                )
+            })
+            .collect();
 
-        let (selector_commitments, _) = PC::commit(&ck, labeled_selectors.iter(), None).unwrap();
+        let (selector_commitments, _) =
+            PC::commit(&ck, labeled_selectors.iter(), None).unwrap();
 
-        let mut selector_oracles: Vec<_> = selector_commitments.iter().map(|cmt| {
-            FixedVerifierOracle::<F, PC> {
+        let mut selector_oracles: Vec<_> = selector_commitments
+            .iter()
+            .map(|cmt| FixedVerifierOracle::<F, PC> {
                 label: cmt.label().clone(),
                 queried_rotations: BTreeSet::default(),
                 evals_at_challenges: BTreeMap::default(),
                 commitment: Some(cmt.commitment().clone()),
-            }
-        }).collect();
+            })
+            .collect();
 
         let mut rescue_vo =
-        GenericVO::<F, PC>::init(PrecompiledRescue::get_expr_and_queries());
+            GenericVO::<F, PC>::init(PrecompiledRescue::get_expr_and_queries());
 
         rescue_vo.configure(
             &mut witness_ver_oracles,
@@ -447,7 +464,6 @@ mod test {
         )
         .unwrap();
 
-
         let verifier_pp = VerifierPreprocessedInput {
             fixed_oracles: selector_oracles.clone(),
             permutation_oracles: vec![],
@@ -456,7 +472,7 @@ mod test {
         // We clone because fixed oracles must be mutable in order to add evals at challenge
         // Another option is to create reset method which will just reset challenge to eval mapping
         // This is anyway just mockup of frontend
-        let mut pp_clone = verifier_pp.clone(); 
+        let mut pp_clone = verifier_pp.clone();
 
         let vos: Vec<&dyn VirtualOracle<F>> = vec![&rescue_vo];
 
@@ -657,7 +673,11 @@ mod test {
 
         let pk = ProverKey::from_ck_and_vk(&ck, &vk);
 
-        let preprocessed = ProverPreprocessedInput::new(&selector_oracles, &vec![], &vk.index_info);
+        let preprocessed = ProverPreprocessedInput::new(
+            &selector_oracles,
+            &vec![],
+            &vk.index_info,
+        );
 
         let proof = PilInstance::prove(
             &pk,
@@ -693,26 +713,37 @@ mod test {
 
         let mut instance_oracles = [pi];
 
-        let labeled_selectors: Vec<LabeledPolynomial<F, DensePolynomial<F>>> = [
-            (qm_poly.clone(), "qm"),
-            (ql_poly.clone(), "ql"),
-            (qr_poly.clone(), "qr"),
-            (qo_poly.clone(), "qo"),
-            (qpi_poly.clone(), "qpi"),
-        ].iter().map(|(poly, label)| {
-            LabeledPolynomial::new(label.to_string(), poly.clone(), None, None)
-        }).collect();
+        let labeled_selectors: Vec<LabeledPolynomial<F, DensePolynomial<F>>> =
+            [
+                (qm_poly.clone(), "qm"),
+                (ql_poly.clone(), "ql"),
+                (qr_poly.clone(), "qr"),
+                (qo_poly.clone(), "qo"),
+                (qpi_poly.clone(), "qpi"),
+            ]
+            .iter()
+            .map(|(poly, label)| {
+                LabeledPolynomial::new(
+                    label.to_string(),
+                    poly.clone(),
+                    None,
+                    None,
+                )
+            })
+            .collect();
 
-        let (selector_commitments, _) = PC::commit(&ck, labeled_selectors.iter(), None).unwrap();
+        let (selector_commitments, _) =
+            PC::commit(&ck, labeled_selectors.iter(), None).unwrap();
 
-        let mut selector_oracles: Vec<_> = selector_commitments.iter().map(|cmt| {
-            FixedVerifierOracle::<F, PC> {
+        let mut selector_oracles: Vec<_> = selector_commitments
+            .iter()
+            .map(|cmt| FixedVerifierOracle::<F, PC> {
                 label: cmt.label().clone(),
                 queried_rotations: BTreeSet::default(),
                 evals_at_challenges: BTreeMap::default(),
                 commitment: Some(cmt.commitment().clone()),
-            }
-        }).collect();
+            })
+            .collect();
 
         let labeled_selectors: Vec<LabeledPolynomial<F, DensePolynomial<F>>> =
             [
@@ -796,6 +827,7 @@ mod test {
         assert_eq!(res, ());
     }
 
+    #[should_panic]
     #[test]
     fn test_delta_xor_and() {
         let domain_size = 16;
@@ -1063,7 +1095,7 @@ mod test {
         // Another option is to create reset method which will just reset challenge to eval mapping
         // This is anyway just mockup of frontend
         let mut pp_clone = verifier_pp.clone();
-        
+
         let res = PilInstance::verify(
             &mut vk,
             &mut pp_clone,

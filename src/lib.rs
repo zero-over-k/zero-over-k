@@ -451,9 +451,8 @@ where
 
         assert_eq!(fixed_query_set.len(), proof.fixed_oracle_evals.len());
 
-        for ((poly_label, (_, point)), &evaluation) in fixed_query_set
-            .iter()
-            .zip(proof.fixed_oracle_evals.iter())
+        for ((poly_label, (_, point)), &evaluation) in
+            fixed_query_set.iter().zip(proof.fixed_oracle_evals.iter())
         {
             match fixed_oracles_mapping.get(poly_label) {
                 Some(index) => preprocessed.fixed_oracles[*index]

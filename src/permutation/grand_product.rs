@@ -76,6 +76,8 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> GrandProductArgument<F, PC> {
             z_evals.push(F::rand(zk_rng));
         }
 
+        assert_eq!(z_evals.len(), domain.size());
+
         let z_poly =
             DensePolynomial::from_coefficients_slice(&domain.ifft(&z_evals));
         let evals_at_coset_of_extended_domain =

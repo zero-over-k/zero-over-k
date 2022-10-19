@@ -102,8 +102,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PermutationArgument<F, PC> {
         }
 
         // sanity
-        let z_last_evals = domain.fft(agg_polys.last().unwrap().polynomial());
-        assert_eq!(z_last_evals[self.u], F::one());
+        assert_eq!(agg_polys.last().unwrap().evals[self.u], F::one());
 
         agg_polys
     }
