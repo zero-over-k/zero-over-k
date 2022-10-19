@@ -1,16 +1,13 @@
-use core::num;
 use std::{
-    cmp::max,
     collections::{BTreeMap, BTreeSet},
     iter::successors,
 };
 
 use ark_ff::PrimeField;
 use ark_poly::{
-    domain, univariate::DensePolynomial, EvaluationDomain,
-    GeneralEvaluationDomain, Polynomial, UVPolynomial,
+    univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
+    Polynomial, UVPolynomial,
 };
-use ark_std::rand::Rng;
 
 use crate::{
     commitment::HomomorphicCommitment,

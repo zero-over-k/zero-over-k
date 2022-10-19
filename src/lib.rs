@@ -1,16 +1,12 @@
-use std::cmp::max;
 use std::collections::{BTreeMap, BTreeSet};
-use std::iter::{self, successors};
+use std::iter::successors;
 use std::marker::PhantomData;
-use std::option::Iter;
 
 use ark_ff::{to_bytes, PrimeField};
 use ark_poly::univariate::DensePolynomial;
 use ark_poly::{EvaluationDomain, GeneralEvaluationDomain, Polynomial};
-use ark_poly_commit::{
-    LabeledPolynomial, PCCommitterKey, PCRandomness, PCUniversalParams,
-};
-use digest::generic_array::typenum::Quot;
+use ark_poly_commit::{LabeledPolynomial, PCCommitterKey, PCUniversalParams};
+
 use error::Error;
 
 use ark_poly_commit::evaluate_query_set;
@@ -189,7 +185,7 @@ where
             verifier_second_msg.xi,
             &omegas,
         );
-        let selector_query_set = PIOPforPolyIdentity::<F, PC>::get_query_set(
+        let fixed_query_set = PIOPforPolyIdentity::<F, PC>::get_query_set(
             &preprocessed.fixed_oracles,
             verifier_second_msg.label,
             verifier_second_msg.xi,
@@ -204,14 +200,14 @@ where
         .map(|(_, eval)| *eval)
         .collect();
 
-        let selector_oracles_labeled: Vec<_> = preprocessed
+        let fixed_oracles_labeled: Vec<_> = preprocessed
             .fixed_oracles
             .iter()
             .map(|o| o.to_labeled())
             .collect();
 
-        let selector_oracle_evals: Vec<F> =
-            evaluate_query_set(&selector_oracles_labeled, &selector_query_set)
+        let fixed_oracle_evals: Vec<F> =
+            evaluate_query_set(&fixed_oracles_labeled, &fixed_query_set)
                 .iter()
                 .map(|(_, eval)| *eval)
                 .collect();
@@ -227,12 +223,12 @@ where
             .chain(quotient_chunk_oracles.iter())
             .map(|o| o as &dyn Instantiable<F>)
             .collect();
-        let selector_oracles: Vec<&dyn Instantiable<F>> = preprocessed
+        let fixed_oracles: Vec<&dyn Instantiable<F>> = preprocessed
             .fixed_oracles
             .iter()
             .map(|o| o as &dyn Instantiable<F>)
             .collect();
-        oracles.extend_from_slice(&selector_oracles.as_slice());
+        oracles.extend_from_slice(&fixed_oracles.as_slice());
 
         let oracle_rands: Vec<PC::Randomness> = wtns_rands
             .iter()
@@ -263,7 +259,7 @@ where
                 .map(|c| c.commitment().clone())
                 .collect(),
             quotient_chunks_evals,
-            selector_oracle_evals,
+            fixed_oracle_evals,
             multiopen_proof,
         };
 
@@ -446,18 +442,18 @@ where
 
         assert_eq!(query_set.len(), proof.witness_evals.len());
 
-        let selector_query_set = PIOPforPolyIdentity::<F, PC>::get_query_set(
+        let fixed_query_set = PIOPforPolyIdentity::<F, PC>::get_query_set(
             &preprocessed.fixed_oracles,
             verifier_second_msg.label,
             verifier_second_msg.xi,
             &omegas,
         );
 
-        assert_eq!(selector_query_set.len(), proof.selector_oracle_evals.len());
+        assert_eq!(fixed_query_set.len(), proof.fixed_oracle_evals.len());
 
-        for ((poly_label, (_, point)), &evaluation) in selector_query_set
+        for ((poly_label, (_, point)), &evaluation) in fixed_query_set
             .iter()
-            .zip(proof.selector_oracle_evals.iter())
+            .zip(proof.fixed_oracle_evals.iter())
         {
             match selector_oracles_mapping.get(poly_label) {
                 Some(index) => preprocessed.fixed_oracles[*index]

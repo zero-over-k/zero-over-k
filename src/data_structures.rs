@@ -47,7 +47,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>>
         permutation_oracles: &Vec<FixedProverOracle<F>>,
         index_info: &IndexInfo<F>
     ) -> Self {
-        let mut fixed_oracles = fixed_oracles.clone(); 
+        let mut fixed_oracles = fixed_oracles.clone();
         let mut permutation_oracles = permutation_oracles.clone();
 
         for oracle in fixed_oracles.iter_mut() {
@@ -126,7 +126,7 @@ pub struct Proof<F: PrimeField, PC: HomomorphicCommitment<F>> {
     pub witness_evals: Vec<F>,
     pub quotient_chunk_commitments: Vec<PC::Commitment>,
     pub quotient_chunks_evals: Vec<F>,
-    pub selector_oracle_evals: Vec<F>,
+    pub fixed_oracle_evals: Vec<F>,
     pub multiopen_proof: MultiOpenProof<F, PC>,
 }
 
@@ -148,7 +148,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Proof<F, PC> {
             self.witness_evals.len(),
             self.quotient_chunk_commitments.len(),
             self.quotient_chunks_evals.len(),
-            self.selector_oracle_evals.len(),
+            self.fixed_oracle_evals.len(),
             self.multiopen_proof.q_evals.len()
         )
         .to_string()
@@ -160,7 +160,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Proof<F, PC> {
             + 1; // + 1 for f commitment in multiopen
         let num_of_field_elements = self.witness_evals.len()
             + self.quotient_chunks_evals.len()
-            + self.selector_oracle_evals.len()
+            + self.fixed_oracle_evals.len()
             + self.multiopen_proof.q_evals.len();
 
         format!(

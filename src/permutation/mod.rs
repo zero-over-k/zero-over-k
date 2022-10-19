@@ -1,10 +1,7 @@
 use std::marker::PhantomData;
 
 use ark_ff::PrimeField;
-use ark_poly::{
-    univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
-    Polynomial,
-};
+use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
 use ark_std::rand::RngCore;
 use itertools::Itertools;
 
@@ -308,10 +305,9 @@ mod test {
             traits::Instantiable,
             witness::{WitnessProverOracle, WitnessVerifierOracle},
         },
-        permutation,
         util::compute_vanishing_poly_over_coset,
     };
-    use ark_ff::{FftField, Field, One, UniformRand, Zero};
+    use ark_ff::{One, UniformRand, Zero};
     use ark_poly::{
         univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
         Polynomial, UVPolynomial,

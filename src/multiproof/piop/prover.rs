@@ -10,7 +10,7 @@ use super::verifier::{VerifierFirstMsg, VerifierSecondMsg, VerifierThirdMsg};
 use super::{PIOPError, PIOP};
 use crate::commitment::HomomorphicCommitment;
 use crate::multiproof::poly::construct_vanishing;
-use crate::oracles::query::QueryContext;
+
 use crate::oracles::rotation::Rotation;
 use crate::oracles::traits::Instantiable;
 

@@ -3,16 +3,14 @@ use std::collections::{BTreeMap, BTreeSet};
 use ark_ff::PrimeField;
 use ark_poly::{
     univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
-    Polynomial, UVPolynomial,
+    Polynomial,
 };
-use ark_poly_commit::{LabeledPolynomial, QuerySet};
-use ark_std::rand::Rng;
+use ark_poly_commit::LabeledPolynomial;
 
 use crate::commitment::HomomorphicCommitment;
 
 use super::{
-    query::QueryContext,
-    rotation::{Rotation, Sign},
+    rotation::Rotation,
     traits::{
         CommittedOracle, ConcreteOracle, Instantiable, QuerySetProvider,
         WitnessOracle,

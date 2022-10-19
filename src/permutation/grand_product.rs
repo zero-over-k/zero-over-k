@@ -106,7 +106,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> GrandProductArgument<F, PC> {
         deltas: &[F],
         beta: F,
         gamma: F,
-        domain_size: usize,
+        _domain_size: usize,
         omega: F,
         omega_index: usize,
     ) -> F {
@@ -187,7 +187,6 @@ mod test {
             traits::Instantiable,
             witness::{WitnessProverOracle, WitnessVerifierOracle},
         },
-        permutation,
     };
 
     use ark_bls12_381::{Bls12_381, Fr as F};
