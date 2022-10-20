@@ -128,9 +128,10 @@ mod test {
     use super::*;
 
     use std::collections::{BTreeMap, BTreeSet};
+    use std::iter::successors;
 
     use ark_bls12_381::{Bls12_381, Fr};
-    use ark_ff::{One, Zero};
+    use ark_ff::{One, UniformRand, Zero};
 
     use ark_poly::{
         univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
@@ -139,6 +140,7 @@ mod test {
 
     use ark_poly_commit::{LabeledPolynomial, PolynomialCommitment};
     use ark_serialize::CanonicalSerialize;
+    use ark_std::rand::RngCore;
     use ark_std::test_rng;
     use rand_chacha::ChaChaRng;
 
@@ -168,6 +170,177 @@ mod test {
     type PC = KZG10<Bls12_381>;
 
     type PilInstance = PIL<F, PC, FS>;
+
+    // TODO Delta needs selector to avoid challenging the row beyound the last one
+    #[test]
+    fn test_delta() {
+        let domain_size = 16;
+        let poly_degree = domain_size - 1;
+        let max_degree = poly_degree; // + max_blinding;
+
+        let mut rng = test_rng();
+        let srs = PilInstance::universal_setup(max_degree, &mut rng).unwrap();
+
+        let (ck, verifier_key) = PilInstance::prepare_keys(&srs).unwrap();
+
+        let domain = GeneralEvaluationDomain::<F>::new(domain_size).unwrap();
+
+        let vals = &[F::zero(), F::one(), F::from(2u32), F::from(3u32)];
+        let mut rand_4 = || {
+            let u = rng.next_u32() % 4;
+            vals[u as usize].clone()
+        };
+
+        let initial_val = rand_4();
+        let a_evals: Vec<F> = successors(Some(initial_val), |v| {
+            Some(rand_4() + F::from(4u32) * v)
+        })
+        .take(domain_size)
+        .collect();
+
+        dbg!(a_evals.clone());
+        let a_poly =
+            DensePolynomial::from_coefficients_slice(&domain.ifft(&a_evals));
+
+        let a = WitnessProverOracle {
+            label: "a".to_string(),
+            poly: a_poly,
+            evals_at_coset_of_extended_domain: None,
+            queried_rotations: BTreeSet::new(),
+            should_permute: false,
+            evals: a_evals.clone(),
+        };
+
+        let mut witness_oracles = [a];
+        let mut instance_oracles: Vec<InstanceProverOracle<F>> = vec![];
+        let mut fixed_oracles: Vec<FixedProverOracle<F>> = vec![];
+
+        let mut delta_vo =
+            GenericVO::<F, PC>::init(Delta::get_expr_and_queries());
+
+        delta_vo.configure(
+            &mut witness_oracles,
+            &mut instance_oracles,
+            &mut fixed_oracles,
+        );
+
+        let vos: Vec<&dyn VirtualOracle<F>> = vec![&delta_vo];
+
+        let vk = Indexer::index(
+            &verifier_key,
+            &vos,
+            &witness_oracles,
+            &instance_oracles,
+            &fixed_oracles,
+            domain,
+            &domain.vanishing_polynomial().into(),
+            None,
+        )
+        .unwrap();
+
+        let pk = ProverKey::from_ck_and_vk(&ck, &vk);
+
+        let preprocessed = ProverPreprocessedInput::new(
+            &fixed_oracles,
+            &vec![],
+            None,
+            &vk.index_info,
+        );
+        let proof = PilInstance::prove(
+            &pk,
+            &preprocessed,
+            &mut witness_oracles,
+            &mut instance_oracles,
+            &vos,
+            domain_size,
+            &domain.vanishing_polynomial().into(),
+            &mut rng,
+        )
+        .unwrap();
+
+        println!("{}", proof.info());
+        println!("{}", proof.cumulative_info());
+        println!("in bytes: {}", proof.serialized_size());
+
+        // Verifier
+        // Repeat everything to make sure that we are not implicitly using something from prover
+
+        let mut witness_ver_oracles: Vec<_> = ["a"]
+            .into_iter()
+            .map(|label| WitnessVerifierOracle {
+                label: label.to_string(),
+                queried_rotations: BTreeSet::new(),
+                should_permute: false,
+                evals_at_challenges: BTreeMap::default(),
+                commitment: None,
+            })
+            .collect();
+
+        let mut instance_oracles: Vec<InstanceVerifierOracle<F>> = vec![];
+        let labeled_fixed: Vec<LabeledPolynomial<F, DensePolynomial<F>>> =
+            vec![];
+
+        let (fixed_comm, _) =
+            PC::commit(&ck, labeled_fixed.iter(), None).unwrap();
+
+        let mut fixed_oracles: Vec<_> = fixed_comm
+            .into_iter()
+            .map(|comm| FixedVerifierOracle::<F, PC> {
+                label: comm.label().to_string(),
+                queried_rotations: BTreeSet::default(),
+                evals_at_challenges: BTreeMap::default(),
+                commitment: Some(comm.commitment().clone()),
+            })
+            .collect();
+
+        let mut delta_vo =
+            GenericVO::<F, PC>::init(Delta::get_expr_and_queries());
+
+        delta_vo.configure(
+            &mut witness_ver_oracles,
+            &mut instance_oracles,
+            &mut fixed_oracles,
+        );
+
+        let vos: Vec<&dyn VirtualOracle<F>> = vec![&delta_vo];
+
+        let mut vk = Indexer::index(
+            &verifier_key,
+            &vos,
+            &witness_ver_oracles,
+            &instance_oracles,
+            &fixed_oracles,
+            domain,
+            &domain.vanishing_polynomial().into(),
+            None,
+        )
+        .unwrap();
+
+        let verifier_pp = VerifierPreprocessedInput {
+            fixed_oracles: fixed_oracles.clone(),
+            permutation_oracles: vec![],
+            q_blind: None,
+        };
+        // We clone because fixed oracles must be mutable in order to add evals at challenge
+        // Another option is to create reset method which will just reset challenge to eval mapping
+        // This is anyway just mockup of frontend
+        let mut pp_clone = verifier_pp.clone();
+
+        let res = PilInstance::verify(
+            &mut vk,
+            &mut pp_clone,
+            proof,
+            &mut witness_ver_oracles,
+            &mut instance_oracles,
+            vos.as_slice(),
+            domain_size,
+            &domain.vanishing_polynomial().into(),
+            &mut rng,
+        )
+        .unwrap();
+
+        assert_eq!(res, ());
+    }
 
     #[should_panic]
     #[test]
