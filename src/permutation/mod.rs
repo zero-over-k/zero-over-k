@@ -153,18 +153,17 @@ impl<F: PrimeField> PermutationArgument<F> {
         agg_polys: &[WitnessProverOracle<F>],
         omega_index: usize,
         omega: F,
-        deltas: &[F],
         beta: F,
         gamma: F,
         domain: &GeneralEvaluationDomain<F>,
         alpha_powers: &[F], // quotient separation challenges
     ) -> F {
         assert_eq!(witness_oracles.len(), permutation_oracles.len());
-        assert_eq!(witness_oracles.len(), deltas.len());
+        assert_eq!(witness_oracles.len(), self.deltas.len());
 
         let oracle_chunks = witness_oracles.chunks(self.m);
         let sigma_chunks = permutation_oracles.chunks(self.m);
-        let delta_chunks = deltas.chunks(self.m);
+        let delta_chunks = self.deltas.chunks(self.m);
 
         assert_eq!(oracle_chunks.len(), sigma_chunks.len());
         assert_eq!(oracle_chunks.len(), delta_chunks.len());
@@ -588,7 +587,6 @@ mod test {
                 &z_polys,
                 i,
                 extended_coset_domain.element(i),
-                &deltas,
                 beta,
                 gamma,
                 &domain,

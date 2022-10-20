@@ -515,7 +515,6 @@ mod copy_constraint_tests {
                 &agg_polys,
                 i,
                 extended_coset_domain.element(i),
-                &deltas,
                 beta,
                 gamma,
                 &domain,
@@ -1203,6 +1202,7 @@ mod copy_constraint_tests {
         let preprocessed = ProverPreprocessedInput::new(
             &fixed_oracles.to_vec(),
             &permutation_oracles.to_vec(),
+            Some(q_blind.clone()),
             &vk.index_info,
         );
 
@@ -1294,6 +1294,18 @@ mod copy_constraint_tests {
             })
             .collect();
 
+          
+        let q_blind_labeled = q_blind.to_labeled();
+        let (q_blind_commitment, _)  = 
+            PC::commit(&ck, &[q_blind_labeled], None).unwrap();
+
+        let q_blind = FixedVerifierOracle::<F, PC> {
+            label: "q_blind".into(),
+            queried_rotations: BTreeSet::from([Rotation::curr()]),
+            evals_at_challenges: BTreeMap::default(),
+            commitment: Some(q_blind_commitment[0].commitment().clone()),
+        };
+
         let mut plonk_vo = GenericVO::<F, PC>::init(
             PrecompiledPlonkArith::get_expr_and_queries(),
         );
@@ -1322,6 +1334,7 @@ mod copy_constraint_tests {
         let verifier_pp = VerifierPreprocessedInput {
             fixed_oracles: selector_oracles.clone(),
             permutation_oracles: sigma_oracles.clone(),
+            q_blind: Some(q_blind)
         };
 
         // We clone because fixed oracles must be mutable in order to add evals at challenge

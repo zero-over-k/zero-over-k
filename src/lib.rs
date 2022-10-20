@@ -1,5 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet};
-use std::iter::successors;
+use std::iter::{successors, self};
 use std::marker::PhantomData;
 
 use ark_ff::{to_bytes, PrimeField};
@@ -23,6 +23,7 @@ use piop::PIOPforPolyIdentity;
 use rng::FiatShamirRng;
 use vo::VirtualOracle;
 
+use crate::oracles::fixed::FixedVerifierOracle;
 use crate::oracles::query::OracleType;
 use crate::oracles::rotation::{Rotation, Sign};
 use crate::oracles::traits::CommittedOracle;
@@ -272,12 +273,20 @@ where
             .chain(z_polys.iter())
             .map(|o| o as &dyn Instantiable<F>)
             .collect();
-        let preprocessed_oracles: Vec<&dyn Instantiable<F>> = preprocessed
+        let mut preprocessed_oracles: Vec<&dyn Instantiable<F>> = preprocessed
             .fixed_oracles
             .iter()
             .chain(preprocessed.permutation_oracles.iter())
             .map(|o| o as &dyn Instantiable<F>)
             .collect();
+
+        let q_blind_eval = if let Some(q_blind) = &preprocessed.q_blind {
+            preprocessed_oracles.push(q_blind as &dyn Instantiable<F>);
+            Some(q_blind.polynomial().evaluate(&verifier_second_msg.xi))
+        } else {
+            None
+        };
+
         oracles.extend_from_slice(&preprocessed_oracles.as_slice());
 
         let oracle_rands: Vec<PC::Randomness> = wtns_rands
@@ -319,72 +328,74 @@ where
                 .collect(),
             z_evals,
             permutation_oracle_evals,
+            q_blind_eval,
             multiopen_proof,
         };
 
+        // TODO: include permutation checks
         /* BEGIN SANITY CHECK BEFORE INVOKING VERIFIER */
-        let powers_of_alpha: Vec<F> = successors(Some(F::one()), |alpha_i| {
-            Some(*alpha_i * verifier_first_msg.alpha)
-        })
-        .take(vos.len())
-        .collect();
+        // let powers_of_alpha: Vec<F> = successors(Some(F::one()), |alpha_i| {
+        //     Some(*alpha_i * verifier_first_msg.alpha)
+        // })
+        // .take(vos.len())
+        // .collect();
 
-        let mut quotient_eval = F::zero();
-        for (vo_index, vo) in vos.iter().enumerate() {
-            let vo_evaluation = vo.get_expression().evaluate(
-            &|x: F| x,
-            &|query| {
-                let challenge = query.rotation.compute_evaluation_point(
-                    verifier_second_msg.xi,
-                    &omegas,
-                );
-                match query.oracle_type {
-                    OracleType::Witness => {
-                        match prover_state.witness_oracles_mapping.get(&query.label) {
-                            Some(index) => prover_state.witness_oracles[*index].query(&challenge),
-                            None => panic!("Witness oracle with label add_label not found") //TODO: Introduce new Error here,
-                        }
-                    },
-                    OracleType::Instance => {
-                        match prover_state.instance_oracles_mapping.get(&query.label) {
-                            Some(index) => prover_state.instance_oracles[*index].query(&challenge),
-                            None => panic!("Instance oracle with label {} not found", query.label) //TODO: Introduce new Error here,
-                        }
-                    },
-                    OracleType::Fixed => {
-                        match prover_state.fixed_oracles_mapping.get(&query.label) {
-                            Some(index) => preprocessed.fixed_oracles[*index].query(&challenge),
-                            None => panic!("Fixed oracle with label add_label not found") //TODO: Introduce new Error here,
-                        }
-                    },
-                }
-            },
-            &|x: F| -x,
-            &|x: F, y: F| x + y,
-            &|x: F, y: F| x * y,
-            &|x: F, y: F| x * y,
-        );
+        // let mut quotient_eval = F::zero();
+        // for (vo_index, vo) in vos.iter().enumerate() {
+        //     let vo_evaluation = vo.get_expression().evaluate(
+        //     &|x: F| x,
+        //     &|query| {
+        //         let challenge = query.rotation.compute_evaluation_point(
+        //             verifier_second_msg.xi,
+        //             &omegas,
+        //         );
+        //         match query.oracle_type {
+        //             OracleType::Witness => {
+        //                 match prover_state.witness_oracles_mapping.get(&query.label) {
+        //                     Some(index) => prover_state.witness_oracles[*index].query(&challenge),
+        //                     None => panic!("Witness oracle with label add_label not found") //TODO: Introduce new Error here,
+        //                 }
+        //             },
+        //             OracleType::Instance => {
+        //                 match prover_state.instance_oracles_mapping.get(&query.label) {
+        //                     Some(index) => prover_state.instance_oracles[*index].query(&challenge),
+        //                     None => panic!("Instance oracle with label {} not found", query.label) //TODO: Introduce new Error here,
+        //                 }
+        //             },
+        //             OracleType::Fixed => {
+        //                 match prover_state.fixed_oracles_mapping.get(&query.label) {
+        //                     Some(index) => preprocessed.fixed_oracles[*index].query(&challenge),
+        //                     None => panic!("Fixed oracle with label add_label not found") //TODO: Introduce new Error here,
+        //                 }
+        //             },
+        //         }
+        //     },
+        //     &|x: F| -x,
+        //     &|x: F, y: F| x + y,
+        //     &|x: F, y: F| x * y,
+        //     &|x: F, y: F| x * y,
+        // );
 
-            quotient_eval += powers_of_alpha[vo_index] * vo_evaluation;
-        }
+        //     quotient_eval += powers_of_alpha[vo_index] * vo_evaluation;
+        // }
 
-        let x_n = verifier_second_msg.xi.pow([domain_size as u64, 0, 0, 0]);
-        let powers_of_x: Vec<F> =
-            successors(Some(F::one()), |x_i| Some(*x_i * x_n))
-                .take(quotient_chunk_oracles.len())
-                .collect();
+        // let x_n = verifier_second_msg.xi.pow([domain_size as u64, 0, 0, 0]);
+        // let powers_of_x: Vec<F> =
+        //     successors(Some(F::one()), |x_i| Some(*x_i * x_n))
+        //         .take(quotient_chunk_oracles.len())
+        //         .collect();
 
-        let mut t_part = F::zero();
-        for (&x_i, t_i) in
-            powers_of_x.iter().zip(quotient_chunk_oracles.clone())
-        {
-            t_part += x_i * t_i.query(&verifier_second_msg.xi);
-        }
+        // let mut t_part = F::zero();
+        // for (&x_i, t_i) in
+        //     powers_of_x.iter().zip(quotient_chunk_oracles.clone())
+        // {
+        //     t_part += x_i * t_i.query(&verifier_second_msg.xi);
+        // }
 
-        t_part *= vanishing_polynomial.evaluate(&verifier_second_msg.xi);
+        // t_part *= vanishing_polynomial.evaluate(&verifier_second_msg.xi);
 
-        quotient_eval -= t_part;
-        assert_eq!(quotient_eval, F::zero());
+        // quotient_eval -= t_part;
+        // assert_eq!(quotient_eval, F::zero());
         /* END SANITY CHECK BEFORE INVOKING VERIFIER */
 
         Ok(proof)
@@ -618,6 +629,11 @@ where
             };
         }
 
+        if let Some(q_blind) = &mut preprocessed.q_blind {
+            let q_blind_eval = proof.q_blind_eval.as_ref().expect("q_blind eval missing");
+            q_blind.register_eval_at_challenge(verifier_second_msg.xi, q_blind_eval.clone());
+        }
+
         // END CHALLENGE => EVALS MAPPING
 
         let powers_of_alpha: Vec<F> = successors(Some(F::one()), |alpha_i| {
@@ -626,7 +642,14 @@ where
         .take(vos.len())
         .collect();
 
-        let (permutation_alphas, l0_eval, lu_eval) = if let Some(permutation_argument) =
+        let dummy_fixed = FixedVerifierOracle::<F, PC> {
+            label: "".to_string(),
+            queried_rotations: BTreeSet::default(),
+            commitment: None,
+            evals_at_challenges: BTreeMap::default(),
+        };
+
+        let (permutation_alphas, l0_eval, lu_eval, q_blind) = if let Some(permutation_argument) =
             &vk.index_info.permutation_argument
         {
             // let z_polys = state.z_polys.as_ref().expect("z polys must be in state");
@@ -657,10 +680,12 @@ where
             let l0_eval = l0.evaluate(&verifier_second_msg.xi);
             let lu_eval = lu.evaluate(&verifier_second_msg.xi);
 
+            let q_blind = preprocessed.q_blind.as_ref().expect("Q blind must be initialized when permutation is used");
 
-            (powers_of_alpha, l0_eval, lu_eval)
+
+            (powers_of_alpha, l0_eval, lu_eval, q_blind)
         } else {
-            (vec![], F::zero(), F::zero())
+            (vec![], F::zero(), F::zero(), &dummy_fixed)
         };
 
         let mut quotient_eval = F::zero();
@@ -701,24 +726,24 @@ where
 
             quotient_eval += powers_of_alpha[vo_index] * vo_evaluation;
 
-            // if let Some(permutation_argument) =
-            //     &vk.index_info.permutation_argument
-            // {
-                // let x = permutation_argument.open_argument(
-                //     l_0_eval, //TODO
-                //     q_last_eval, //TODO
-                //     q_blind, //TODO
-                //     &z_polys,
-                //     &preprocessed.permutation_oracles,
-                //     witness_oracles,
-                //     &permutation_argument.deltas,
-                //     verifier_permutation_msg.beta,
-                //     verifier_permutation_msg.gamma,
-                //     &domain,
-                //     verifier_second_msg.xi,
-                //     &permutation_alphas,
-                // );
-            // }
+            if let Some(permutation_argument) =
+                &vk.index_info.permutation_argument
+            {
+                quotient_eval += permutation_argument.open_argument(
+                    l0_eval,
+                    lu_eval,
+                    q_blind,
+                    &z_polys,
+                    &preprocessed.permutation_oracles,
+                    witness_oracles,
+                    &permutation_argument.deltas,
+                    verifier_permutation_msg.beta,
+                    verifier_permutation_msg.gamma,
+                    &domain,
+                    verifier_second_msg.xi,
+                    &permutation_alphas,
+                );
+            }
         }
 
         let x_n = verifier_second_msg.xi.pow([domain_size as u64, 0, 0, 0]);
@@ -748,13 +773,18 @@ where
             .chain(z_polys.iter())
             .map(|a| a as &dyn CommittedOracle<F, PC>)
             .collect();
-        let preprocessed_oracles: Vec<&dyn CommittedOracle<F, PC>> =
+        let mut preprocessed_oracles: Vec<&dyn CommittedOracle<F, PC>> =
             preprocessed
                 .fixed_oracles
                 .iter()
                 .chain(preprocessed.permutation_oracles.iter())
                 .map(|o| o as &dyn CommittedOracle<F, PC>)
                 .collect();
+
+        if let Some(q_blind) = &preprocessed.q_blind {
+            preprocessed_oracles.push(q_blind as &dyn CommittedOracle<F, PC>);
+        }
+
         oracles.extend_from_slice(&preprocessed_oracles.as_slice());
 
         let res = Multiopen::<F, PC, FS>::verify(

@@ -18,7 +18,7 @@ use crate::{
         query::{OracleType, QueryContext},
         rotation::Rotation,
         traits::{ConcreteOracle, Instantiable},
-        witness::WitnessProverOracle,
+        witness::WitnessProverOracle, fixed::FixedProverOracle,
     },
     permutation::PermutationArgument,
     piop::error::Error,
@@ -133,7 +133,15 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
             vec![F::zero(); vk.index_info.extended_coset_domain.size()];
 
         let empty = vec![];
-        let (permutation_alphas, z_polys, l0_coset_evals, lu_coset_evals) = if let Some(permutation_argument) =
+        let dummy_fixed = FixedProverOracle {
+            label: "".to_string(),
+            poly: DensePolynomial::default(),
+            evals: vec![F::zero(); 1],
+            evals_at_coset_of_extended_domain: None,
+            queried_rotations: BTreeSet::default(),
+        };
+
+        let (permutation_alphas, z_polys, l0_coset_evals, lu_coset_evals, q_blind) = if let Some(permutation_argument) =
             &vk.index_info.permutation_argument
         {
             let z_polys =
@@ -164,10 +172,18 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
                 DensePolynomial::from_coefficients_slice(&state.domain.ifft(&lu_evals));
             let lu_coset_evals = vk.index_info.extended_coset_domain.coset_fft(&lu);
 
-            (powers_of_alpha, z_polys, l0_coset_evals, lu_coset_evals)
+            let q_blind = preprocessed.q_blind.as_ref().expect("Q blind must be defined when permutation is enabled");
+
+            (powers_of_alpha, z_polys, l0_coset_evals, lu_coset_evals, q_blind)
         } else {
-            (vec![], &empty, vec![], vec![])
+            (vec![], &empty, vec![], vec![], &dummy_fixed)
         };
+
+        let oracles_to_copy: Vec<&WitnessProverOracle<F>> = state
+            .witness_oracles
+            .iter()
+            .filter(|&oracle| oracle.should_permute)
+            .collect();
 
         for i in 0..vk.index_info.extended_coset_domain.size() {
             for (vo_index, vo) in state.vos.iter().enumerate() {
@@ -207,21 +223,20 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
             if let Some(permutation_argument) =
                 &vk.index_info.permutation_argument
             {
-                // permutation_argument.instantiate_argument_at_omega_i(
-                //     l_0_coset_evals,
-                //     q_last_coset_evals,
-                //     q_blind,
-                //     witness_oracles,
-                //     permutation_oracles,
-                //     agg_polys,
-                //     omega_index,
-                //     omega,
-                //     deltas,
-                //     beta,
-                //     gamma,
-                //     domain,
-                //     alpha_powers,
-                // );
+                numerator_evals[i] += permutation_argument.instantiate_argument_at_omega_i(
+                    &l0_coset_evals,
+                    &lu_coset_evals,
+                    q_blind,
+                    &oracles_to_copy,
+                    &preprocessed.permutation_oracles,
+                    &z_polys,
+                    i,
+                    vk.index_info.extended_coset_domain.element(i),
+                    verifier_permutation_msg.beta,
+                    verifier_permutation_msg.gamma,
+                    &state.domain,
+                    &permutation_alphas,
+                );
             }
         }
 
