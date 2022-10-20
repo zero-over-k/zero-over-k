@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
-use ark_ff::{PrimeField, Field};
-use ark_poly::{EvaluationDomain, Polynomial, univariate::DensePolynomial};
+use ark_ff::{Field, PrimeField};
+use ark_poly::{univariate::DensePolynomial, EvaluationDomain, Polynomial};
 use ark_poly_commit::{LabeledPolynomial, QuerySet};
 
 pub fn compute_vanishing_poly_over_coset<F, D>(
@@ -34,8 +34,7 @@ where
 pub fn evaluate_q_set<'a, F: PrimeField>(
     polys: impl IntoIterator<Item = &'a LabeledPolynomial<F, DensePolynomial<F>>>,
     query_set: &QuerySet<F>,
-) -> Vec<F>
-{
+) -> Vec<F> {
     let polys = BTreeMap::from_iter(polys.into_iter().map(|p| (p.label(), p)));
     let mut evaluations = vec![];
     for (label, (point_label, point)) in query_set {
@@ -44,7 +43,10 @@ pub fn evaluate_q_set<'a, F: PrimeField>(
             .expect("polynomial in evaluated lc is not found");
         let eval = poly.evaluate(&point);
         // evaluations.insert((label.clone(), point.clone()), eval);
-        println!("poly: {} in point: {} evaluates to: {}", label, point_label, eval);
+        println!(
+            "poly: {} in point: {} evaluates to: {}",
+            label, point_label, eval
+        );
         evaluations.push(eval);
     }
     evaluations

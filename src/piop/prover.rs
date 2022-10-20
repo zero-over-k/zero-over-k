@@ -117,6 +117,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
     }
 
     pub fn prover_first_round(
+        verifier_permutation_msg: &VerifierPermutationMsg<F>,
         verifier_msg: &VerifierFirstMsg<F>,
         state: &mut ProverState<F>,
         vk: &VerifierKey<F, PC>,
@@ -130,6 +131,43 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
 
         let mut numerator_evals =
             vec![F::zero(); vk.index_info.extended_coset_domain.size()];
+
+        let empty = vec![];
+        let (permutation_alphas, z_polys, l0_coset_evals, lu_coset_evals) = if let Some(permutation_argument) =
+            &vk.index_info.permutation_argument
+        {
+            let z_polys =
+                state.z_polys.as_ref().expect("z polys must be in state");
+            let number_of_alphas =
+                permutation_argument.number_of_alphas(z_polys.len());
+
+            // start from next of last power of alpha
+            let begin_with =
+                powers_of_alpha.last().unwrap().clone() * verifier_msg.alpha;
+            let powers_of_alpha: Vec<F> =
+                successors(Some(begin_with), |alpha_i| {
+                    Some(*alpha_i * verifier_msg.alpha)
+                })
+                .take(number_of_alphas)
+                .collect();
+
+            let domain_size = state.domain.size();
+            let mut l0_evals = vec![F::zero(); domain_size];
+            l0_evals[0] = F::one();
+            let l0 =
+                DensePolynomial::from_coefficients_slice(&state.domain.ifft(&l0_evals));
+            let l0_coset_evals = vk.index_info.extended_coset_domain.coset_fft(&l0);
+    
+            let mut lu_evals = vec![F::zero(); domain_size];
+            lu_evals[permutation_argument.u] = F::one();
+            let lu =
+                DensePolynomial::from_coefficients_slice(&state.domain.ifft(&lu_evals));
+            let lu_coset_evals = vk.index_info.extended_coset_domain.coset_fft(&lu);
+
+            (powers_of_alpha, z_polys, l0_coset_evals, lu_coset_evals)
+        } else {
+            (vec![], &empty, vec![], vec![])
+        };
 
         for i in 0..vk.index_info.extended_coset_domain.size() {
             for (vo_index, vo) in state.vos.iter().enumerate() {
@@ -164,6 +202,26 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
                 );
 
                 numerator_evals[i] += powers_of_alpha[vo_index] * vo_evaluation;
+            }
+
+            if let Some(permutation_argument) =
+                &vk.index_info.permutation_argument
+            {
+                // permutation_argument.instantiate_argument_at_omega_i(
+                //     l_0_coset_evals,
+                //     q_last_coset_evals,
+                //     q_blind,
+                //     witness_oracles,
+                //     permutation_oracles,
+                //     agg_polys,
+                //     omega_index,
+                //     omega,
+                //     deltas,
+                //     beta,
+                //     gamma,
+                //     domain,
+                //     alpha_powers,
+                // );
             }
         }
 

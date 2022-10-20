@@ -66,7 +66,7 @@ impl<F: PrimeField> PermutationArgument<F> {
         number_of_z_polys
     }
 
-    pub fn number_of_alphas(num_of_z_polys: usize) -> usize {
+    pub fn number_of_alphas(&self, num_of_z_polys: usize) -> usize {
         /*
             alphas len should be:
             + 1: for z_agg[first][0] = 1,

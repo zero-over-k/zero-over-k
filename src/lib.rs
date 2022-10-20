@@ -4,16 +4,16 @@ use std::marker::PhantomData;
 
 use ark_ff::{to_bytes, PrimeField};
 use ark_poly::univariate::DensePolynomial;
-use ark_poly::{EvaluationDomain, GeneralEvaluationDomain, Polynomial};
+use ark_poly::{EvaluationDomain, GeneralEvaluationDomain, Polynomial, UVPolynomial};
 use ark_poly_commit::{LabeledPolynomial, PCCommitterKey, PCUniversalParams};
 
-use error::Error;
 use ark_std::rand::{Rng, RngCore};
 use commitment::HomomorphicCommitment;
 use data_structures::{
     IndexInfo, Proof, ProverKey, ProverPreprocessedInput, UniversalSRS,
     VerifierKey, VerifierPreprocessedInput,
 };
+use error::Error;
 use multiproof::piop::Multiopen;
 use oracles::instance::{InstanceProverOracle, InstanceVerifierOracle};
 use oracles::query::QueryContext;
@@ -177,6 +177,7 @@ where
         // First round
 
         let quotient_chunk_oracles = PIOPforPolyIdentity::prover_first_round(
+            &verifier_permutation_msg,
             &verifier_first_msg,
             &mut prover_state,
             &pk.vk,
@@ -219,10 +220,8 @@ where
             &omegas,
         );
 
-        let witness_evals: Vec<F> = evaluate_q_set(
-            witness_oracles_labeled.iter(),
-            &witness_query_set,
-        );
+        let witness_evals: Vec<F> =
+            evaluate_q_set(witness_oracles_labeled.iter(), &witness_query_set);
 
         // Compute fixed evals
         let fixed_oracles_labeled: Vec<_> = preprocessed
@@ -238,7 +237,8 @@ where
             &omegas,
         );
 
-        let fixed_oracle_evals: Vec<F> = evaluate_q_set(&fixed_oracles_labeled, &fixed_query_set);
+        let fixed_oracle_evals: Vec<F> =
+            evaluate_q_set(&fixed_oracles_labeled, &fixed_query_set);
 
         // Compute quotient chunk evals
         // There are no rotations for q_i-s so we can just query at evaluation point
@@ -263,7 +263,7 @@ where
             &omegas,
         );
 
-        let z_evals = evaluate_q_set(z_polys_labeled.iter(), &z_query_set); 
+        let z_evals = evaluate_q_set(z_polys_labeled.iter(), &z_query_set);
 
         // Multiopen
         let mut oracles: Vec<&dyn Instantiable<F>> = witness_oracles
@@ -561,11 +561,13 @@ where
         // TODO: make sure that number of z_polys is correct on verifier side
         let num_of_z_polys = proof.z_commitments.len();
 
-
-        let u = if let Some(permutation_argument) = &vk.index_info.permutation_argument {
+        let u = if let Some(permutation_argument) =
+            &vk.index_info.permutation_argument
+        {
+            // let num_of_z_polys = permutation_argument.number_of_z_polys(num_of_polys_to_copy);
             permutation_argument.u
         } else {
-            0
+            0 // we don't care if permutation is not enabled
         };
 
         let mut z_polys: Vec<_> = proof
@@ -609,19 +611,12 @@ where
         for ((poly_label, (point_label, point)), &evaluation) in
             z_query_set.iter().zip(proof.z_evals.iter())
         {
-            println!("poly: {} in point: {} evaluates to: {}", poly_label, point_label, evaluation);
             match z_mapping.get(poly_label) {
                 Some(index) => z_polys[*index]
                     .register_eval_at_challenge(*point, evaluation),
                 None => panic!("Missing poly: {}", poly_label),
             };
         }
-
-        // for z in &z_polys {
-        //     for (point, eval) in &z.evals_at_challenges {
-        //         println!("poly: {} in point: {} evaluates at {}", z.label, point, eval);
-        //     }
-        // }
 
         // END CHALLENGE => EVALS MAPPING
 
@@ -630,6 +625,43 @@ where
         })
         .take(vos.len())
         .collect();
+
+        let (permutation_alphas, l0_eval, lu_eval) = if let Some(permutation_argument) =
+            &vk.index_info.permutation_argument
+        {
+            // let z_polys = state.z_polys.as_ref().expect("z polys must be in state");
+            let number_of_alphas =
+                permutation_argument.number_of_alphas(z_polys.len());
+
+            // start from next of last power of alpha
+            let begin_with = powers_of_alpha.last().unwrap().clone()
+                * verifier_first_msg.alpha;
+            let powers_of_alpha: Vec<F> =
+                successors(Some(begin_with), |alpha_i| {
+                    Some(*alpha_i * verifier_first_msg.alpha)
+                })
+                .take(number_of_alphas)
+                .collect();
+
+            // TODO: ENABLE FAST LAGRANGE EVALUATION
+            let mut l0_evals = vec![F::zero(); domain_size];
+            l0_evals[0] = F::one();
+            let l0 =
+                DensePolynomial::from_coefficients_slice(&domain.ifft(&l0_evals));
+
+            let mut lu_evals = vec![F::zero(); domain_size];
+            lu_evals[permutation_argument.u] = F::one();
+            let lu =
+                DensePolynomial::from_coefficients_slice(&domain.ifft(&lu_evals));
+
+            let l0_eval = l0.evaluate(&verifier_second_msg.xi);
+            let lu_eval = lu.evaluate(&verifier_second_msg.xi);
+
+
+            (powers_of_alpha, l0_eval, lu_eval)
+        } else {
+            (vec![], F::zero(), F::zero())
+        };
 
         let mut quotient_eval = F::zero();
         for (vo_index, vo) in vos.iter().enumerate() {
@@ -668,6 +700,25 @@ where
             );
 
             quotient_eval += powers_of_alpha[vo_index] * vo_evaluation;
+
+            // if let Some(permutation_argument) =
+            //     &vk.index_info.permutation_argument
+            // {
+                // let x = permutation_argument.open_argument(
+                //     l_0_eval, //TODO
+                //     q_last_eval, //TODO
+                //     q_blind, //TODO
+                //     &z_polys,
+                //     &preprocessed.permutation_oracles,
+                //     witness_oracles,
+                //     &permutation_argument.deltas,
+                //     verifier_permutation_msg.beta,
+                //     verifier_permutation_msg.gamma,
+                //     &domain,
+                //     verifier_second_msg.xi,
+                //     &permutation_alphas,
+                // );
+            // }
         }
 
         let x_n = verifier_second_msg.xi.pow([domain_size as u64, 0, 0, 0]);

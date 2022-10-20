@@ -191,7 +191,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
         let scaling_factor = extended_coset_domain.size() / domain.size();
         let (scaling_factor, permutation_argument) =
             if let Some(permutation_info) = permutation_info {
-                max(
+                let scaling_factor = max(
                     scaling_factor,
                     PermutationArgument::<F>::MINIMAL_SCALING_FACTOR,
                 );

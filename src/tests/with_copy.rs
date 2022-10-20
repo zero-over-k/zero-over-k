@@ -1146,11 +1146,28 @@ mod copy_constraint_tests {
             queried_rotations: BTreeSet::from([Rotation::curr()]),
         };
 
+        let mut q_blind_evals = vec![F::one(); domain.size()];
+        for i in 0..=u {
+            q_blind_evals[i] = F::zero();
+        }
+
+        let q_blind_poly = DensePolynomial::<F>::from_coefficients_slice(
+            &domain.ifft(&q_blind_evals),
+        );
+
+        let q_blind = FixedProverOracle {
+            label: "q_blind".to_string(),
+            poly: q_blind_poly.clone(),
+            evals_at_coset_of_extended_domain: None,
+            evals: q_blind_evals.to_vec(),
+            queried_rotations: BTreeSet::from([Rotation::curr()]),
+        };
+
         let mut witness_oracles = [a, b, c];
         let mut instance_oracles = [pi];
         let mut fixed_oracles = [qm, ql, qr, qo, qc];
 
-        let mut permutation_oracles = [sigma1, sigma2, sigma3];
+        let permutation_oracles = [sigma1, sigma2, sigma3];
 
         let mut plonk_vo = GenericVO::<F, PC>::init(
             PrecompiledPlonkArith::get_expr_and_queries(),
@@ -1253,21 +1270,14 @@ mod copy_constraint_tests {
             })
             .collect();
 
-
-        let labeled_sigmas: Vec<LabeledPolynomial<F, DensePolynomial<F>>> =
-        [
+        let labeled_sigmas: Vec<LabeledPolynomial<F, DensePolynomial<F>>> = [
             (sigma_1_poly.clone(), "sigma_1"),
             (sigma_2_poly.clone(), "sigma_2"),
             (sigma_3_poly.clone(), "sigma_3"),
         ]
         .iter()
         .map(|(poly, label)| {
-            LabeledPolynomial::new(
-                label.to_string(),
-                poly.clone(),
-                None,
-                None,
-            )
+            LabeledPolynomial::new(label.to_string(), poly.clone(), None, None)
         })
         .collect();
 
@@ -1275,14 +1285,14 @@ mod copy_constraint_tests {
             PC::commit(&ck, labeled_sigmas.iter(), None).unwrap();
 
         let sigma_oracles: Vec<_> = sigma_commitments
-        .iter()
-        .map(|cmt| FixedVerifierOracle::<F, PC> {
-            label: cmt.label().clone(),
-            queried_rotations: BTreeSet::from([Rotation::curr()]),
-            evals_at_challenges: BTreeMap::default(),
-            commitment: Some(cmt.commitment().clone()),
-        })
-        .collect();
+            .iter()
+            .map(|cmt| FixedVerifierOracle::<F, PC> {
+                label: cmt.label().clone(),
+                queried_rotations: BTreeSet::from([Rotation::curr()]),
+                evals_at_challenges: BTreeMap::default(),
+                commitment: Some(cmt.commitment().clone()),
+            })
+            .collect();
 
         let mut plonk_vo = GenericVO::<F, PC>::init(
             PrecompiledPlonkArith::get_expr_and_queries(),
