@@ -740,37 +740,37 @@ mod test {
         let (selector_commitments, _) =
             PC::commit(&ck, labeled_selectors.iter(), None).unwrap();
 
-        let mut selector_oracles: Vec<_> = selector_commitments
-            .iter()
-            .map(|cmt| FixedVerifierOracle::<F, PC> {
-                label: cmt.label().clone(),
-                queried_rotations: BTreeSet::default(),
-                evals_at_challenges: BTreeMap::default(),
-                commitment: Some(cmt.commitment().clone()),
-            })
-            .collect();
+        // let mut selector_oracles: Vec<_> = selector_commitments
+        //     .iter()
+        //     .map(|cmt| FixedVerifierOracle::<F, PC> {
+        //         label: cmt.label().clone(),
+        //         queried_rotations: BTreeSet::default(),
+        //         evals_at_challenges: BTreeMap::default(),
+        //         commitment: Some(cmt.commitment().clone()),
+        //     })
+        //     .collect();
 
-        let labeled_selectors: Vec<LabeledPolynomial<F, DensePolynomial<F>>> =
-            [
-                (qm_poly.clone(), "qm"),
-                (ql_poly.clone(), "ql"),
-                (qr_poly.clone(), "qr"),
-                (qo_poly.clone(), "qo"),
-                (qpi_poly.clone(), "qpi"),
-            ]
-            .iter()
-            .map(|(poly, label)| {
-                LabeledPolynomial::new(
-                    label.to_string(),
-                    poly.clone(),
-                    None,
-                    None,
-                )
-            })
-            .collect();
+        // let labeled_selectors: Vec<LabeledPolynomial<F, DensePolynomial<F>>> =
+        //     [
+        //         (qm_poly.clone(), "qm"),
+        //         (ql_poly.clone(), "ql"),
+        //         (qr_poly.clone(), "qr"),
+        //         (qo_poly.clone(), "qo"),
+        //         (qpi_poly.clone(), "qpi"),
+        //     ]
+        //     .iter()
+        //     .map(|(poly, label)| {
+        //         LabeledPolynomial::new(
+        //             label.to_string(),
+        //             poly.clone(),
+        //             None,
+        //             None,
+        //         )
+        //     })
+        //     .collect();
 
-        let (selector_commitments, _) =
-            PC::commit(&ck, labeled_selectors.iter(), None).unwrap();
+        // let (selector_commitments, _) =
+        //     PC::commit(&ck, labeled_selectors.iter(), None).unwrap();
 
         let mut selector_oracles: Vec<_> = selector_commitments
             .iter()

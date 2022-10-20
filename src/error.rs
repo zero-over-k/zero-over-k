@@ -14,6 +14,8 @@ pub enum Error<E> {
     /// Non zero over K indentity does not hold
     QuotientNotZero,
     MultiproofError(MultiproofError<E>),
+
+    QuotientTooSmall,
 }
 
 impl<E> From<IOPError> for Error<E> {

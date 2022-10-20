@@ -1,4 +1,9 @@
-use std::{cmp::max, collections::BTreeMap, iter, marker::PhantomData};
+use std::{
+    cmp::{max, min},
+    collections::BTreeMap,
+    iter,
+    marker::PhantomData,
+};
 
 use ark_ff::PrimeField;
 use ark_poly::{
@@ -18,6 +23,7 @@ use crate::{
         },
         witness::WitnessProverOracle,
     },
+    permutation::{self, PermutationArgument},
     util::compute_vanishing_poly_over_coset,
     vo::VirtualOracle,
 };
@@ -174,8 +180,34 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
             zH.degree(),
         );
 
+        // TODO: we can introduce next power of 2 check here
         let extended_coset_domain =
             GeneralEvaluationDomain::<F>::new(quotient_degree).unwrap();
+
+        if extended_coset_domain.size() < domain.size() {
+            return Err(Error::QuotientTooSmall);
+        }
+
+        let scaling_factor = extended_coset_domain.size() / domain.size();
+        let (scaling_factor, permutation_argument) =
+            if let Some(permutation_info) = permutation_info {
+                max(
+                    scaling_factor,
+                    PermutationArgument::<F>::MINIMAL_SCALING_FACTOR,
+                );
+                let permutation_argument = Some(PermutationArgument::<F>::new(
+                    scaling_factor,
+                    permutation_info.u,
+                    &permutation_info.deltas,
+                ));
+                (scaling_factor, permutation_argument)
+            } else {
+                (scaling_factor, None)
+            };
+
+        let extended_coset_domain =
+            GeneralEvaluationDomain::<F>::new(scaling_factor * domain.size())
+                .unwrap();
 
         let zh_inverses_over_coset =
             Self::compute_zh_evals(&domain, &extended_coset_domain, zH.clone());
@@ -183,7 +215,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
         let index_info = IndexInfo {
             quotient_degree,
             extended_coset_domain,
-            permutation_info,
+            permutation_argument,
         };
 
         let vk = VerifierKey {

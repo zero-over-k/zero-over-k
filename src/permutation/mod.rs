@@ -20,14 +20,14 @@ use crate::{
 pub mod grand_product;
 mod playground;
 
-pub struct PermutationArgument<F: PrimeField, PC: HomomorphicCommitment<F>> {
-    m: usize, // max number of columns that can be included per single grand product argument such that it does not exceed quotient degree
-    u: usize, // number of usable rows
-    _f: PhantomData<F>,
-    _pc: PhantomData<PC>,
+#[derive(Clone)]
+pub struct PermutationArgument<F: PrimeField> {
+    pub(crate) m: usize, // max number of columns that can be included per single grand product argument such that it does not exceed quotient degree
+    pub(crate) u: usize, // number of usable rows
+    pub(crate) deltas: Vec<F>,
 }
 
-impl<F: PrimeField, PC: HomomorphicCommitment<F>> PermutationArgument<F, PC> {
+impl<F: PrimeField> PermutationArgument<F> {
     /*
         Note that (1 - (q_last + q_blind)) * (Z(wX) * permutation_part - Z(x) * identity_part)) has two symmetrical parts that affect degree in same time
         So as baseline we have multiplication of let's say q_last * Z(wX) which gives degree 2n - 2 so after division with zH(X) we have 2n - 2 - n = n - 2
@@ -42,23 +42,45 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PermutationArgument<F, PC> {
 
     pub const MINIMAL_SCALING_FACTOR: usize = 2;
 
-    pub fn new(scaling_factor: usize, u: usize) -> Self {
+    pub fn new(scaling_factor: usize, u: usize, deltas: &[F]) -> Self {
         // extended coset domain is defined as Domain of size original_domain_size * scaling_factor, where minimal scaling factor,
         // as noted above, is 2
         let m = scaling_factor - 1; // smallest scaling factor is 2, so 2 - 1 will give us one permutation per chunk
         Self {
             m,
             u,
-            _f: PhantomData,
-            _pc: PhantomData,
+            deltas: deltas.to_vec(),
         }
+    }
+
+    pub fn number_of_z_polys(&self, num_of_polys_to_copy: usize) -> usize {
+        if num_of_polys_to_copy == 0 {
+            return 0;
+        }
+
+        let mut number_of_z_polys = num_of_polys_to_copy / self.m;
+        if num_of_polys_to_copy % self.m != 0 {
+            number_of_z_polys += 1;
+        }
+
+        number_of_z_polys
+    }
+
+    pub fn number_of_alphas(num_of_z_polys: usize) -> usize {
+        /*
+            alphas len should be:
+            + 1: for z_agg[first][0] = 1,
+            + 1:  for z_agg[last][u] = 0/1
+            + agg_polys_len - 1: for z_agg[i-1][u] = z_agg_[i][0] stitch between (i-1, i)
+            + agg_polys_len: for checking that each grand product chunks is correct
+        */
+        2 * num_of_z_polys + 1 + 1 - 1
     }
 
     pub fn construct_agg_polys<R: RngCore>(
         &self,
         witness_oracles: &[&WitnessProverOracle<F>], // Only oracles that are included in permutation
         permutation_oracles: &[FixedProverOracle<F>],
-        deltas: &[F],
         beta: F,
         gamma: F,
         domain: &GeneralEvaluationDomain<F>,
@@ -66,11 +88,11 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PermutationArgument<F, PC> {
         zk_rng: &mut R,
     ) -> Vec<WitnessProverOracle<F>> {
         assert_eq!(witness_oracles.len(), permutation_oracles.len());
-        assert_eq!(witness_oracles.len(), deltas.len());
+        assert_eq!(witness_oracles.len(), self.deltas.len());
 
         let oracle_chunks = witness_oracles.chunks(self.m);
         let sigma_chunks = permutation_oracles.chunks(self.m);
-        let delta_chunks = deltas.chunks(self.m);
+        let delta_chunks = self.deltas.chunks(self.m);
 
         let num_of_chunks = oracle_chunks.len();
 
@@ -88,13 +110,9 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PermutationArgument<F, PC> {
                 agg_polys[i - 1].evals()[self.u]
             };
 
-            let is_last = if i == num_of_chunks - 1 {
-                true
-            } else {
-                false
-            };
+            let is_last = if i == num_of_chunks - 1 { true } else { false };
 
-            let agg_i = GrandProductArgument::<F, PC>::construct_agg_poly(
+            let agg_i = GrandProductArgument::<F>::construct_agg_poly(
                 i,
                 is_last,
                 init_value,
@@ -176,7 +194,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PermutationArgument<F, PC> {
             .enumerate()
         {
             permutation_eval += alpha_powers[i + alpha_shift]
-                * GrandProductArgument::<F, PC>::instantiate_argument_at_omega_i(
+                * GrandProductArgument::<F>::instantiate_argument_at_omega_i(
                     q_last_coset_evals,
                     q_blind,
                     &agg_polys[i],
@@ -215,7 +233,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PermutationArgument<F, PC> {
         permutation_eval
     }
 
-    pub fn open_argument(
+    pub fn open_argument<PC: HomomorphicCommitment<F>>(
         &self,
         l_0_eval: F,
         q_last_eval: F,
@@ -263,7 +281,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PermutationArgument<F, PC> {
             .enumerate()
         {
             permutation_eval += alpha_powers[i + alpha_shift]
-                * GrandProductArgument::<F, PC>::open_argument(
+                * GrandProductArgument::<F>::open_argument(
                     q_last_eval,
                     q_blind,
                     &agg_polys[i],
@@ -528,12 +546,11 @@ mod test {
         let gamma = F::rand(&mut rng);
 
         let permutation_argument =
-            PermutationArgument::<F, PC>::new(scaling_factor, u);
+            PermutationArgument::<F>::new(scaling_factor, u, &deltas);
 
         let z_polys = permutation_argument.construct_agg_polys(
             &witness_oracles,
             &permutation_oracles,
-            &deltas,
             beta,
             gamma,
             &domain,
@@ -607,7 +624,7 @@ mod test {
         let l_0_eval = l0.evaluate(&evaluation_challenge);
         let l_u_eval = lu.evaluate(&evaluation_challenge);
 
-        let q_blind = FixedVerifierOracle {
+        let q_blind = FixedVerifierOracle::<F, PC> {
             label: "q_blind".into(),
             queried_rotations: BTreeSet::from([Rotation::curr()]),
             evals_at_challenges: BTreeMap::from([(

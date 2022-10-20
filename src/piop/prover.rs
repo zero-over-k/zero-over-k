@@ -39,7 +39,7 @@ pub struct ProverState<'a, F: PrimeField> {
     pub(crate) fixed_oracles_mapping: BTreeMap<String, usize>,
     pub(crate) witness_oracles: &'a [WitnessProverOracle<F>],
     pub(crate) instance_oracles: &'a [InstanceProverOracle<F>],
-    pub(crate) z_polys: Option<Vec<WitnessProverOracle<F>>>, 
+    pub(crate) z_polys: Option<Vec<WitnessProverOracle<F>>>,
     vos: &'a [&'a dyn VirtualOracle<F>],
     pub(crate) domain: GeneralEvaluationDomain<F>,
     pub(crate) vanishing_polynomial: DensePolynomial<F>,
@@ -47,7 +47,6 @@ pub struct ProverState<'a, F: PrimeField> {
 }
 
 impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
-    // NOTE: consider having indexed concrete oracles by initializing evals_at_coset_of_extended_domain (ex. selector polynomials)
     pub fn init_prover<'a>(
         witness_oracles: &'a [WitnessProverOracle<F>],
         instance_oracles: &'a [InstanceProverOracle<F>],
@@ -92,32 +91,24 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
     pub fn prover_permutation_round<'a, R: Rng>(
         permutation_msg: &VerifierPermutationMsg<F>,
         state: &mut ProverState<F>,
-        permutation_argument: Option<PermutationArgument<F, PC>>,
+        permutation_argument: &PermutationArgument<F>,
         preprocessed: &ProverPreprocessedInput<F, PC>,
-        index_info: &IndexInfo<F>,
+        extended_coset_domain: &GeneralEvaluationDomain<F>,
         zk_rng: &mut R,
     ) -> Vec<WitnessProverOracle<F>> {
-        if permutation_argument.is_none() {
-            return vec![]
-        }
-
         let oracles_to_copy: Vec<&WitnessProverOracle<F>> = state
             .witness_oracles
             .iter()
             .filter(|&oracle| oracle.should_permute)
             .collect();
-        let permutation_info = index_info
-            .permutation_info
-            .as_ref()
-            .expect("Permutation Info not defined");
-        let z_polys = permutation_argument.unwrap().construct_agg_polys(
+
+        let z_polys = permutation_argument.construct_agg_polys(
             &oracles_to_copy,
             &preprocessed.permutation_oracles,
-            &permutation_info.deltas,
             permutation_msg.beta,
             permutation_msg.gamma,
             &state.domain,
-            &index_info.extended_coset_domain,
+            extended_coset_domain,
             zk_rng,
         );
 
@@ -145,7 +136,6 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
                 let vo_evaluation = vo.get_expression().evaluate(
                     &|x: F| x,
                     &|query| {
-                        // ctx.replace_rotation(query.rotation);
                         match query.oracle_type {
                             OracleType::Witness => {
                                 match state.witness_oracles_mapping.get(&query.label) {

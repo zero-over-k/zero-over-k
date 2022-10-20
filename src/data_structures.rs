@@ -16,6 +16,7 @@ use crate::{
         fixed::{FixedProverOracle, FixedVerifierOracle},
         traits::Instantiable,
     },
+    permutation::PermutationArgument,
 };
 
 use ark_serialize::{
@@ -36,7 +37,7 @@ pub struct PermutationInfo<F: PrimeField> {
 pub struct IndexInfo<F: PrimeField> {
     pub quotient_degree: usize,
     pub extended_coset_domain: GeneralEvaluationDomain<F>,
-    pub permutation_info: Option<PermutationInfo<F>>,
+    pub permutation_argument: Option<PermutationArgument<F>>,
 }
 
 pub struct ProverPreprocessedInput<F: PrimeField, PC: HomomorphicCommitment<F>>
@@ -162,7 +163,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Proof<F, PC> {
             self.quotient_chunk_commitments.len(),
             self.quotient_chunks_evals.len(),
             self.fixed_oracle_evals.len(),
-            self.z_commitments.len(), 
+            self.z_commitments.len(),
             self.z_evals.len(),
             self.permutation_oracle_evals.len(),
             self.multiopen_proof.q_evals.len()

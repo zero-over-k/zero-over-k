@@ -8,8 +8,6 @@ use ark_poly::{EvaluationDomain, GeneralEvaluationDomain, Polynomial};
 use ark_poly_commit::{LabeledPolynomial, PCCommitterKey, PCUniversalParams};
 
 use error::Error;
-
-use ark_poly_commit::evaluate_query_set;
 use ark_std::rand::{Rng, RngCore};
 use commitment::HomomorphicCommitment;
 use data_structures::{
@@ -30,7 +28,7 @@ use crate::oracles::rotation::{Rotation, Sign};
 use crate::oracles::traits::CommittedOracle;
 use crate::permutation::PermutationArgument;
 use crate::piop::prover;
-use crate::util::compute_vanishing_poly_over_coset;
+use crate::util::{compute_vanishing_poly_over_coset, evaluate_q_set};
 
 pub mod commitment;
 pub mod data_structures;
@@ -139,35 +137,33 @@ where
         );
 
         let (verifier_permutation_msg, verifier_state) =
-        PIOPforPolyIdentity::<F, PC>::verifier_permutation_round(
-            verifier_init_state,
-            &mut fs_rng,
-        );
+            PIOPforPolyIdentity::<F, PC>::verifier_permutation_round(
+                verifier_init_state,
+                &mut fs_rng,
+            );
 
-        let permutation_argument = if let Some(permutation_info) = &pk.vk.index_info.permutation_info {
-            Some(PermutationArgument::new(2, permutation_info.u))
-        } else {
-            None
-        };
+        let z_polys: Vec<WitnessProverOracle<F>> =
+            if let Some(permutation_argument) =
+                &pk.vk.index_info.permutation_argument
+            {
+                PIOPforPolyIdentity::prover_permutation_round(
+                    &verifier_permutation_msg,
+                    &mut prover_state,
+                    permutation_argument,
+                    preprocessed,
+                    &pk.vk.index_info.extended_coset_domain,
+                    zk_rng,
+                )
+            } else {
+                vec![]
+            };
 
-        // TODO: make this nicer with arguments
-        let z_polys = PIOPforPolyIdentity::prover_permutation_round(
-            &verifier_permutation_msg,
-            &mut prover_state,
-            permutation_argument,
-            preprocessed,
-            &pk.vk.index_info,
-            zk_rng
-        );
-
-        let z_polys_labeled: Vec<_>= z_polys.iter().map(|z| z.to_labeled()).collect();
+        let z_polys_labeled: Vec<_> =
+            z_polys.iter().map(|z| z.to_labeled()).collect();
         // commit to z oracles
-        let (z_commitments, z_rands) = PC::commit(
-            &pk.committer_key,
-            &z_polys_labeled,
-            Some(zk_rng),
-        )
-        .map_err(Error::from_pc_err)?;
+        let (z_commitments, z_rands) =
+            PC::commit(&pk.committer_key, &z_polys_labeled, Some(zk_rng))
+                .map_err(Error::from_pc_err)?;
 
         fs_rng.absorb(&to_bytes![z_commitments].unwrap());
 
@@ -213,6 +209,8 @@ where
         let domain = GeneralEvaluationDomain::new(domain_size).unwrap();
         let omegas: Vec<F> = domain.elements().collect();
 
+        // TODO!!!! PUT ALL EVALS IN TRANSCRIPT
+
         // Compute witness evals
         let witness_query_set = PIOPforPolyIdentity::<F, PC>::get_query_set(
             &witness_oracles,
@@ -221,13 +219,10 @@ where
             &omegas,
         );
 
-        let witness_evals: Vec<F> = evaluate_query_set(
+        let witness_evals: Vec<F> = evaluate_q_set(
             witness_oracles_labeled.iter(),
             &witness_query_set,
-        )
-        .iter()
-        .map(|(_, eval)| *eval)
-        .collect();
+        );
 
         // Compute fixed evals
         let fixed_oracles_labeled: Vec<_> = preprocessed
@@ -243,11 +238,7 @@ where
             &omegas,
         );
 
-        let fixed_oracle_evals: Vec<F> =
-            evaluate_query_set(&fixed_oracles_labeled, &fixed_query_set)
-                .iter()
-                .map(|(_, eval)| *eval)
-                .collect();
+        let fixed_oracle_evals: Vec<F> = evaluate_q_set(&fixed_oracles_labeled, &fixed_query_set);
 
         // Compute quotient chunk evals
         // There are no rotations for q_i-s so we can just query at evaluation point
@@ -272,14 +263,7 @@ where
             &omegas,
         );
 
-        let z_evals: Vec<F> = evaluate_query_set(
-            z_polys_labeled.iter(),
-            &z_query_set,
-        )
-        .iter()
-        .map(|(_, eval)| *eval)
-        .collect();
-
+        let z_evals = evaluate_q_set(z_polys_labeled.iter(), &z_query_set); 
 
         // Multiopen
         let mut oracles: Vec<&dyn Instantiable<F>> = witness_oracles
@@ -303,6 +287,8 @@ where
             .chain(preprocessed.empty_rands_for_fixed.iter())
             .map(|rand| rand.clone())
             .collect();
+
+        assert_eq!(oracles.len(), oracle_rands.len());
 
         let multiopen_proof = Multiopen::<F, PC, FS>::prove(
             &pk.committer_key,
@@ -331,7 +317,7 @@ where
                 .iter()
                 .map(|c| c.commitment().clone())
                 .collect(),
-            z_evals, 
+            z_evals,
             permutation_oracle_evals,
             multiopen_proof,
         };
@@ -463,10 +449,10 @@ where
         fs_rng.absorb(&to_bytes![&proof.witness_commitments].unwrap());
 
         let (verifier_permutation_msg, verifier_state) =
-        PIOPforPolyIdentity::<F, PC>::verifier_permutation_round(
-            verifier_init_state,
-            &mut fs_rng,
-        );
+            PIOPforPolyIdentity::<F, PC>::verifier_permutation_round(
+                verifier_init_state,
+                &mut fs_rng,
+            );
 
         fs_rng.absorb(&to_bytes![&proof.z_commitments].unwrap());
 
@@ -556,10 +542,17 @@ where
             };
         }
 
-        // Map permutation evals 
+        // Map permutation evals
         // Permutation oracles are opened just in evaluation challenge
-        assert_eq!(preprocessed.permutation_oracles.len(), proof.permutation_oracle_evals.len());
-        for (sigma, &eval) in preprocessed.permutation_oracles.iter_mut().zip(proof.permutation_oracle_evals.iter()) {
+        assert_eq!(
+            preprocessed.permutation_oracles.len(),
+            proof.permutation_oracle_evals.len()
+        );
+        for (sigma, &eval) in preprocessed
+            .permutation_oracles
+            .iter_mut()
+            .zip(proof.permutation_oracle_evals.iter())
+        {
             sigma.register_eval_at_challenge(verifier_second_msg.xi, eval);
         }
 
@@ -567,26 +560,36 @@ where
         // Each z is evaluated at: x, wx and w^ux
         // TODO: make sure that number of z_polys is correct on verifier side
         let num_of_z_polys = proof.z_commitments.len();
-        let mut z_polys: Vec<_> = proof.z_commitments.iter().enumerate().map(|(i, zi)| {
-            let mut queried_rotations = BTreeSet::from([
-                Rotation::curr(), 
-                Rotation::next()
-            ]);
 
-            // if not last append w^ux
-            if i != num_of_z_polys - 1 {
-                // TODO: fix u
-                queried_rotations.insert(Rotation::new(1, Sign::Plus));
-            }
 
-            WitnessVerifierOracle::<F, PC> {
-                label: format!("agg_permutation_{}", i).to_string(),
-                queried_rotations,
-                evals_at_challenges: BTreeMap::default(),
-                commitment: Some(proof.z_commitments[i].clone()),
-                should_permute: false,
-            }
-        }).collect();
+        let u = if let Some(permutation_argument) = &vk.index_info.permutation_argument {
+            permutation_argument.u
+        } else {
+            0
+        };
+
+        let mut z_polys: Vec<_> = proof
+            .z_commitments
+            .iter()
+            .enumerate()
+            .map(|(i, zi)| {
+                let mut queried_rotations =
+                    BTreeSet::from([Rotation::curr(), Rotation::next()]);
+
+                // if not last append w^ux
+                if i != num_of_z_polys - 1 {
+                    queried_rotations.insert(Rotation::new(u, Sign::Plus));
+                }
+
+                WitnessVerifierOracle::<F, PC> {
+                    label: format!("agg_permutation_{}", i).to_string(),
+                    queried_rotations,
+                    evals_at_challenges: BTreeMap::default(),
+                    commitment: Some(zi.clone()),
+                    should_permute: false,
+                }
+            })
+            .collect();
 
         let z_query_set = PIOPforPolyIdentity::<F, PC>::get_query_set(
             &z_polys,
@@ -603,15 +606,22 @@ where
             .map(|(i, oracle)| (oracle.get_label(), i))
             .collect();
 
-        for ((poly_label, (_, point)), &evaluation) in
+        for ((poly_label, (point_label, point)), &evaluation) in
             z_query_set.iter().zip(proof.z_evals.iter())
         {
+            println!("poly: {} in point: {} evaluates to: {}", poly_label, point_label, evaluation);
             match z_mapping.get(poly_label) {
                 Some(index) => z_polys[*index]
                     .register_eval_at_challenge(*point, evaluation),
                 None => panic!("Missing poly: {}", poly_label),
             };
         }
+
+        // for z in &z_polys {
+        //     for (point, eval) in &z.evals_at_challenges {
+        //         println!("poly: {} in point: {} evaluates at {}", z.label, point, eval);
+        //     }
+        // }
 
         // END CHALLENGE => EVALS MAPPING
 
@@ -687,12 +697,13 @@ where
             .chain(z_polys.iter())
             .map(|a| a as &dyn CommittedOracle<F, PC>)
             .collect();
-        let preprocessed_oracles: Vec<&dyn CommittedOracle<F, PC>> = preprocessed
-            .fixed_oracles
-            .iter()
-            .chain(preprocessed.permutation_oracles.iter())
-            .map(|o| o as &dyn CommittedOracle<F, PC>)
-            .collect();
+        let preprocessed_oracles: Vec<&dyn CommittedOracle<F, PC>> =
+            preprocessed
+                .fixed_oracles
+                .iter()
+                .chain(preprocessed.permutation_oracles.iter())
+                .map(|o| o as &dyn CommittedOracle<F, PC>)
+                .collect();
         oracles.extend_from_slice(&preprocessed_oracles.as_slice());
 
         let res = Multiopen::<F, PC, FS>::verify(

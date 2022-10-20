@@ -21,12 +21,11 @@ use crate::{
 /// This module constructs one zero knowledge adjusted permutation check
 /// (1 - (q_blind + q_last)) * (z(wX) * product_0,m-1 (vi(X) + beta*sigma_i(X) + gamma) - z(X) * product_0,m-1 (vi(X) + beta*sigma^i*X + gamma))
 /// It isn't aware of outer context where splitting, copying across aggregation polynomials, beginning and ending constraints are happening
-pub struct GrandProductArgument<F: PrimeField, PC: HomomorphicCommitment<F>> {
+pub struct GrandProductArgument<F: PrimeField> {
     _field: PhantomData<F>,
-    _pc: PhantomData<PC>,
 }
 
-impl<F: PrimeField, PC: HomomorphicCommitment<F>> GrandProductArgument<F, PC> {
+impl<F: PrimeField> GrandProductArgument<F> {
     /// Given oracles constructs Z(X) polynomial that prover commits to
     pub fn construct_agg_poly<R: RngCore>(
         chunk_index: usize,
@@ -84,11 +83,8 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> GrandProductArgument<F, PC> {
         let evals_at_coset_of_extended_domain =
             Some(extended_coset_domain.coset_fft(&z_poly));
 
-
-        let mut queried_rotations = BTreeSet::from([
-            Rotation::curr(),
-            Rotation::next(),
-        ]);
+        let mut queried_rotations =
+            BTreeSet::from([Rotation::curr(), Rotation::next()]);
 
         if !is_last {
             queried_rotations.insert(Rotation::new(u, Sign::Plus));
@@ -144,7 +140,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> GrandProductArgument<F, PC> {
         zk_part * (lhs - rhs)
     }
 
-    pub fn open_argument(
+    pub fn open_argument<PC: HomomorphicCommitment<F>>(
         q_last_eval: F,
         q_blind: &FixedVerifierOracle<F, PC>,
         z: &WitnessVerifierOracle<F, PC>,
@@ -488,7 +484,7 @@ mod test {
 
         let deltas = [F::one(), F::from(13u64)];
 
-        let agg_poly = GrandProductArgument::<F, PC>::construct_agg_poly(
+        let agg_poly = GrandProductArgument::<F>::construct_agg_poly(
             0,
             true,
             F::one(),
@@ -515,7 +511,7 @@ mod test {
             Vec::<F>::with_capacity(extended_coset_domain.size());
         for i in 0..extended_coset_domain.size() {
             let gp_i =
-                GrandProductArgument::<F, PC>::instantiate_argument_at_omega_i(
+                GrandProductArgument::<F>::instantiate_argument_at_omega_i(
                     &l_u_coset_evals,
                     &q_blind,
                     &agg_poly,
