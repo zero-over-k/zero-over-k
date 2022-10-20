@@ -12,13 +12,14 @@ use ark_std::rand::Rng;
 
 use crate::{
     commitment::HomomorphicCommitment,
-    data_structures::{IndexInfo, ProverPreprocessedInput, VerifierKey},
+    data_structures::{ProverPreprocessedInput, VerifierKey},
     oracles::{
+        fixed::FixedProverOracle,
         instance::InstanceProverOracle,
-        query::{OracleType, QueryContext},
+        query::OracleType,
         rotation::Rotation,
         traits::{ConcreteOracle, Instantiable},
-        witness::WitnessProverOracle, fixed::FixedProverOracle,
+        witness::WitnessProverOracle,
     },
     permutation::PermutationArgument,
     piop::error::Error,
@@ -141,7 +142,13 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
             queried_rotations: BTreeSet::default(),
         };
 
-        let (permutation_alphas, z_polys, l0_coset_evals, lu_coset_evals, q_blind) = if let Some(permutation_argument) =
+        let (
+            permutation_alphas,
+            z_polys,
+            l0_coset_evals,
+            lu_coset_evals,
+            q_blind,
+        ) = if let Some(permutation_argument) =
             &vk.index_info.permutation_argument
         {
             let z_polys =
@@ -162,19 +169,32 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
             let domain_size = state.domain.size();
             let mut l0_evals = vec![F::zero(); domain_size];
             l0_evals[0] = F::one();
-            let l0 =
-                DensePolynomial::from_coefficients_slice(&state.domain.ifft(&l0_evals));
-            let l0_coset_evals = vk.index_info.extended_coset_domain.coset_fft(&l0);
-    
+            let l0 = DensePolynomial::from_coefficients_slice(
+                &state.domain.ifft(&l0_evals),
+            );
+            let l0_coset_evals =
+                vk.index_info.extended_coset_domain.coset_fft(&l0);
+
             let mut lu_evals = vec![F::zero(); domain_size];
             lu_evals[permutation_argument.u] = F::one();
-            let lu =
-                DensePolynomial::from_coefficients_slice(&state.domain.ifft(&lu_evals));
-            let lu_coset_evals = vk.index_info.extended_coset_domain.coset_fft(&lu);
+            let lu = DensePolynomial::from_coefficients_slice(
+                &state.domain.ifft(&lu_evals),
+            );
+            let lu_coset_evals =
+                vk.index_info.extended_coset_domain.coset_fft(&lu);
 
-            let q_blind = preprocessed.q_blind.as_ref().expect("Q blind must be defined when permutation is enabled");
+            let q_blind = preprocessed
+                .q_blind
+                .as_ref()
+                .expect("Q blind must be defined when permutation is enabled");
 
-            (powers_of_alpha, z_polys, l0_coset_evals, lu_coset_evals, q_blind)
+            (
+                powers_of_alpha,
+                z_polys,
+                l0_coset_evals,
+                lu_coset_evals,
+                q_blind,
+            )
         } else {
             (vec![], &empty, vec![], vec![], &dummy_fixed)
         };
@@ -223,20 +243,21 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
             if let Some(permutation_argument) =
                 &vk.index_info.permutation_argument
             {
-                numerator_evals[i] += permutation_argument.instantiate_argument_at_omega_i(
-                    &l0_coset_evals,
-                    &lu_coset_evals,
-                    q_blind,
-                    &oracles_to_copy,
-                    &preprocessed.permutation_oracles,
-                    &z_polys,
-                    i,
-                    vk.index_info.extended_coset_domain.element(i),
-                    verifier_permutation_msg.beta,
-                    verifier_permutation_msg.gamma,
-                    &state.domain,
-                    &permutation_alphas,
-                );
+                numerator_evals[i] += permutation_argument
+                    .instantiate_argument_at_omega_i(
+                        &l0_coset_evals,
+                        &lu_coset_evals,
+                        q_blind,
+                        &oracles_to_copy,
+                        &preprocessed.permutation_oracles,
+                        &z_polys,
+                        i,
+                        vk.index_info.extended_coset_domain.element(i),
+                        verifier_permutation_msg.beta,
+                        verifier_permutation_msg.gamma,
+                        &state.domain,
+                        &permutation_alphas,
+                    );
             }
         }
 

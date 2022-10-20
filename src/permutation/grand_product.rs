@@ -11,9 +11,8 @@ use crate::{
     commitment::HomomorphicCommitment,
     oracles::{
         fixed::{FixedProverOracle, FixedVerifierOracle},
-        query::{OracleQuery, OracleType, QueryContext},
         rotation::{Rotation, Sign},
-        traits::{ConcreteOracle, Instantiable, WitnessOracle},
+        traits::{ConcreteOracle, Instantiable},
         witness::{WitnessProverOracle, WitnessVerifierOracle},
     },
 };

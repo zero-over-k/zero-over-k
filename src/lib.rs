@@ -1,22 +1,24 @@
 use std::collections::{BTreeMap, BTreeSet};
-use std::iter::{successors, self};
+use std::iter::successors;
 use std::marker::PhantomData;
 
 use ark_ff::{to_bytes, PrimeField};
 use ark_poly::univariate::DensePolynomial;
-use ark_poly::{EvaluationDomain, GeneralEvaluationDomain, Polynomial, UVPolynomial};
+use ark_poly::{
+    EvaluationDomain, GeneralEvaluationDomain, Polynomial, UVPolynomial,
+};
 use ark_poly_commit::{LabeledPolynomial, PCCommitterKey, PCUniversalParams};
 
 use ark_std::rand::{Rng, RngCore};
 use commitment::HomomorphicCommitment;
 use data_structures::{
-    IndexInfo, Proof, ProverKey, ProverPreprocessedInput, UniversalSRS,
-    VerifierKey, VerifierPreprocessedInput,
+    Proof, ProverKey, ProverPreprocessedInput, UniversalSRS, VerifierKey,
+    VerifierPreprocessedInput,
 };
 use error::Error;
 use multiproof::piop::Multiopen;
 use oracles::instance::{InstanceProverOracle, InstanceVerifierOracle};
-use oracles::query::QueryContext;
+
 use oracles::traits::{ConcreteOracle, Instantiable};
 use oracles::witness::{WitnessProverOracle, WitnessVerifierOracle};
 use piop::PIOPforPolyIdentity;
@@ -27,9 +29,8 @@ use crate::oracles::fixed::FixedVerifierOracle;
 use crate::oracles::query::OracleType;
 use crate::oracles::rotation::{Rotation, Sign};
 use crate::oracles::traits::CommittedOracle;
-use crate::permutation::PermutationArgument;
-use crate::piop::prover;
-use crate::util::{compute_vanishing_poly_over_coset, evaluate_q_set};
+
+use crate::util::evaluate_q_set;
 
 pub mod commitment;
 pub mod data_structures;
@@ -619,7 +620,7 @@ where
             .map(|(i, oracle)| (oracle.get_label(), i))
             .collect();
 
-        for ((poly_label, (point_label, point)), &evaluation) in
+        for ((poly_label, (_point_label, point)), &evaluation) in
             z_query_set.iter().zip(proof.z_evals.iter())
         {
             match z_mapping.get(poly_label) {
@@ -630,8 +631,12 @@ where
         }
 
         if let Some(q_blind) = &mut preprocessed.q_blind {
-            let q_blind_eval = proof.q_blind_eval.as_ref().expect("q_blind eval missing");
-            q_blind.register_eval_at_challenge(verifier_second_msg.xi, q_blind_eval.clone());
+            let q_blind_eval =
+                proof.q_blind_eval.as_ref().expect("q_blind eval missing");
+            q_blind.register_eval_at_challenge(
+                verifier_second_msg.xi,
+                q_blind_eval.clone(),
+            );
         }
 
         // END CHALLENGE => EVALS MAPPING
@@ -649,44 +654,48 @@ where
             evals_at_challenges: BTreeMap::default(),
         };
 
-        let (permutation_alphas, l0_eval, lu_eval, q_blind) = if let Some(permutation_argument) =
-            &vk.index_info.permutation_argument
-        {
-            // let z_polys = state.z_polys.as_ref().expect("z polys must be in state");
-            let number_of_alphas =
-                permutation_argument.number_of_alphas(z_polys.len());
+        let (permutation_alphas, l0_eval, lu_eval, q_blind) =
+            if let Some(permutation_argument) =
+                &vk.index_info.permutation_argument
+            {
+                // let z_polys = state.z_polys.as_ref().expect("z polys must be in state");
+                let number_of_alphas =
+                    permutation_argument.number_of_alphas(z_polys.len());
 
-            // start from next of last power of alpha
-            let begin_with = powers_of_alpha.last().unwrap().clone()
-                * verifier_first_msg.alpha;
-            let powers_of_alpha: Vec<F> =
-                successors(Some(begin_with), |alpha_i| {
-                    Some(*alpha_i * verifier_first_msg.alpha)
-                })
-                .take(number_of_alphas)
-                .collect();
+                // start from next of last power of alpha
+                let begin_with = powers_of_alpha.last().unwrap().clone()
+                    * verifier_first_msg.alpha;
+                let powers_of_alpha: Vec<F> =
+                    successors(Some(begin_with), |alpha_i| {
+                        Some(*alpha_i * verifier_first_msg.alpha)
+                    })
+                    .take(number_of_alphas)
+                    .collect();
 
-            // TODO: ENABLE FAST LAGRANGE EVALUATION
-            let mut l0_evals = vec![F::zero(); domain_size];
-            l0_evals[0] = F::one();
-            let l0 =
-                DensePolynomial::from_coefficients_slice(&domain.ifft(&l0_evals));
+                // TODO: ENABLE FAST LAGRANGE EVALUATION
+                let mut l0_evals = vec![F::zero(); domain_size];
+                l0_evals[0] = F::one();
+                let l0 = DensePolynomial::from_coefficients_slice(
+                    &domain.ifft(&l0_evals),
+                );
 
-            let mut lu_evals = vec![F::zero(); domain_size];
-            lu_evals[permutation_argument.u] = F::one();
-            let lu =
-                DensePolynomial::from_coefficients_slice(&domain.ifft(&lu_evals));
+                let mut lu_evals = vec![F::zero(); domain_size];
+                lu_evals[permutation_argument.u] = F::one();
+                let lu = DensePolynomial::from_coefficients_slice(
+                    &domain.ifft(&lu_evals),
+                );
 
-            let l0_eval = l0.evaluate(&verifier_second_msg.xi);
-            let lu_eval = lu.evaluate(&verifier_second_msg.xi);
+                let l0_eval = l0.evaluate(&verifier_second_msg.xi);
+                let lu_eval = lu.evaluate(&verifier_second_msg.xi);
 
-            let q_blind = preprocessed.q_blind.as_ref().expect("Q blind must be initialized when permutation is used");
+                let q_blind = preprocessed.q_blind.as_ref().expect(
+                    "Q blind must be initialized when permutation is used",
+                );
 
-
-            (powers_of_alpha, l0_eval, lu_eval, q_blind)
-        } else {
-            (vec![], F::zero(), F::zero(), &dummy_fixed)
-        };
+                (powers_of_alpha, l0_eval, lu_eval, q_blind)
+            } else {
+                (vec![], F::zero(), F::zero(), &dummy_fixed)
+            };
 
         let mut quotient_eval = F::zero();
         for (vo_index, vo) in vos.iter().enumerate() {

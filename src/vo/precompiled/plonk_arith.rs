@@ -112,7 +112,7 @@ mod test {
     };
 
     use ark_poly_commit::{LabeledPolynomial, PolynomialCommitment};
-    use ark_serialize::CanonicalSerialize;
+    
     use ark_std::test_rng;
     use rand_chacha::ChaChaRng;
 
@@ -120,19 +120,19 @@ mod test {
         ProverKey, ProverPreprocessedInput, VerifierPreprocessedInput,
     };
     use crate::indexer::Indexer;
-    use crate::multiproof::poly;
+    
 
     use crate::oracles::fixed::{FixedProverOracle, FixedVerifierOracle};
     use crate::oracles::instance::{
         InstanceProverOracle, InstanceVerifierOracle,
     };
-    use crate::oracles::query;
-    use crate::oracles::traits::Instantiable;
+    
+    
     use crate::oracles::witness::{WitnessProverOracle, WitnessVerifierOracle};
     use crate::rng::SimpleHashFiatShamirRng;
     use crate::vo::generic_vo::GenericVO;
     use crate::vo::precompiled_vos::{
-        DeltaXorAnd, PrecompiledMul, PrecompiledPlonkArith, PrecompiledRescue,
+        PrecompiledPlonkArith,
         PrecompiledVO,
     };
     use crate::PIL;
@@ -141,7 +141,7 @@ mod test {
     use crate::commitment::KZG10;
     use crate::vo::VirtualOracle;
 
-    use itertools::izip;
+    
 
     type F = Fr;
     type FS = SimpleHashFiatShamirRng<Blake2s, ChaChaRng>;

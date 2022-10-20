@@ -23,13 +23,13 @@ mod test {
         ProverKey, ProverPreprocessedInput, VerifierPreprocessedInput,
     };
     use crate::indexer::Indexer;
-    use crate::multiproof::poly;
+    
 
     use crate::oracles::fixed::{FixedProverOracle, FixedVerifierOracle};
     use crate::oracles::instance::{
         InstanceProverOracle, InstanceVerifierOracle,
     };
-    use crate::oracles::query;
+    
     use crate::oracles::traits::Instantiable;
     use crate::oracles::witness::{WitnessProverOracle, WitnessVerifierOracle};
     use crate::rng::SimpleHashFiatShamirRng;
@@ -147,7 +147,7 @@ mod test {
             fixed_oracles: vec![],
             permutation_oracles: vec![],
             empty_rands_for_fixed: vec![],
-            q_blind: None
+            q_blind: None,
         };
 
         let proof = PilInstance::prove(
@@ -221,7 +221,7 @@ mod test {
         let preprocessed = VerifierPreprocessedInput {
             fixed_oracles: vec![],
             permutation_oracles: vec![],
-            q_blind: None
+            q_blind: None,
         };
 
         // Since we mutate fixed oracles by adding evals at challenge for specific proof
@@ -474,7 +474,7 @@ mod test {
         let verifier_pp = VerifierPreprocessedInput {
             fixed_oracles: selector_oracles.clone(),
             permutation_oracles: vec![],
-            q_blind: None
+            q_blind: None,
         };
 
         // We clone because fixed oracles must be mutable in order to add evals at challenge
@@ -815,7 +815,7 @@ mod test {
         let verifier_pp = VerifierPreprocessedInput {
             fixed_oracles: selector_oracles.clone(),
             permutation_oracles: vec![],
-            q_blind: None
+            q_blind: None,
         };
 
         // We clone because fixed oracles must be mutable in order to add evals at challenge
@@ -1105,7 +1105,7 @@ mod test {
         let verifier_pp = VerifierPreprocessedInput {
             fixed_oracles: fixed_oracles.clone(),
             permutation_oracles: vec![],
-            q_blind: None
+            q_blind: None,
         };
         // We clone because fixed oracles must be mutable in order to add evals at challenge
         // Another option is to create reset method which will just reset challenge to eval mapping

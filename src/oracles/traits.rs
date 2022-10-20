@@ -6,10 +6,7 @@ use ark_poly_commit::{LabeledPolynomial, QuerySet};
 
 use crate::commitment::HomomorphicCommitment;
 
-use super::{
-    query::QueryContext,
-    rotation::{self, Rotation, Sign},
-};
+use super::rotation::{Rotation, Sign};
 
 pub trait ConcreteOracle<F: FftField> {
     fn get_label(&self) -> String;

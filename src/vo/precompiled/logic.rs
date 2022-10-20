@@ -129,8 +129,8 @@ mod test {
     use std::collections::{BTreeMap, BTreeSet};
 
     use ark_bls12_381::{Bls12_381, Fr};
-    use ark_ff::{One, UniformRand, Zero};
-    use ark_poly::Polynomial;
+    use ark_ff::{One, Zero};
+    
     use ark_poly::{
         univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
         UVPolynomial,
@@ -145,19 +145,19 @@ mod test {
         ProverKey, ProverPreprocessedInput, VerifierPreprocessedInput,
     };
     use crate::indexer::Indexer;
-    use crate::multiproof::poly;
+    
 
     use crate::oracles::fixed::{FixedProverOracle, FixedVerifierOracle};
     use crate::oracles::instance::{
         InstanceProverOracle, InstanceVerifierOracle,
     };
-    use crate::oracles::query;
-    use crate::oracles::traits::Instantiable;
+    
+    
     use crate::oracles::witness::{WitnessProverOracle, WitnessVerifierOracle};
     use crate::rng::SimpleHashFiatShamirRng;
     use crate::vo::generic_vo::GenericVO;
     use crate::vo::precompiled_vos::{
-        DeltaXorAnd, PrecompiledMul, PrecompiledPlonkArith, PrecompiledRescue,
+        DeltaXorAnd,
         PrecompiledVO,
     };
     use crate::PIL;

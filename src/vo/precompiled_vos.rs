@@ -281,7 +281,7 @@ impl<F: PrimeField> PrecompiledVO<F> for DeltaXorAnd {
 
 #[cfg(test)]
 mod test {
-    use std::collections::{BTreeMap, BTreeSet};
+    use std::collections::{BTreeSet};
 
     use crate::{
         oracles::{

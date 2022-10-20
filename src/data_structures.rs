@@ -1,15 +1,9 @@
 use ark_ff::PrimeField;
-use ark_poly::{
-    univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
-};
-use ark_poly_commit::{
-    LabeledCommitment, LabeledPolynomial, PCCommitment, PCRandomness,
-    PolynomialCommitment,
-};
+use ark_poly::{univariate::DensePolynomial, GeneralEvaluationDomain};
+use ark_poly_commit::{PCCommitment, PCRandomness, PolynomialCommitment};
 
 use crate::{
     commitment::HomomorphicCommitment,
-    error::Error,
     // error::Error,
     multiproof::Proof as MultiOpenProof,
     oracles::{
@@ -69,7 +63,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>>
         }
 
         let (q_blind, rand_inc) = if let Some(q_blind) = q_blind {
-            let mut q_blind = q_blind.clone(); 
+            let mut q_blind = q_blind.clone();
             q_blind.compute_extended_evals(&index_info.extended_coset_domain);
             (Some(q_blind), 1)
         } else {
@@ -80,11 +74,12 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>>
             empty_rands_for_fixed: vec![
                 PC::Randomness::empty();
                 fixed_oracles.len()
-                    + permutation_oracles.len() + rand_inc
+                    + permutation_oracles.len()
+                    + rand_inc
             ],
             fixed_oracles,
             permutation_oracles,
-            q_blind
+            q_blind,
         }
     }
 }
@@ -105,7 +100,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Clone
         Self {
             fixed_oracles: self.fixed_oracles.clone(),
             permutation_oracles: self.permutation_oracles.clone(),
-            q_blind: self.q_blind.clone()
+            q_blind: self.q_blind.clone(),
         }
     }
 }

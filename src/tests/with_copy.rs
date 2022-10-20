@@ -28,7 +28,6 @@ mod copy_constraint_tests {
             traits::Instantiable,
             witness::WitnessVerifierOracle,
         },
-        permutation,
         rng::SimpleHashFiatShamirRng,
         util::compute_vanishing_poly_over_coset,
         vo::{
@@ -41,7 +40,7 @@ mod copy_constraint_tests {
 
     type PC = KZG10<Bls12_381>;
 
-    use itertools::izip;
+    
 
     use crate::PIL;
     use blake2::Blake2s;
@@ -141,7 +140,7 @@ mod copy_constraint_tests {
 
         let domain_size = 16;
         let poly_degree = domain_size - 1;
-        let max_degree = poly_degree;
+        let _max_degree = poly_degree;
 
         let domain = GeneralEvaluationDomain::<F>::new(domain_size).unwrap();
 
@@ -346,17 +345,17 @@ mod copy_constraint_tests {
         let c_poly =
             DensePolynomial::from_coefficients_slice(&domain.ifft(&c_evals));
 
-        let pi_poly =
+        let _pi_poly =
             DensePolynomial::from_coefficients_slice(&domain.ifft(&pi_evals));
 
-        let qm_poly =
+        let _qm_poly =
             DensePolynomial::from_coefficients_slice(&domain.ifft(&qm_evals));
-        let ql_poly =
+        let _ql_poly =
             DensePolynomial::from_coefficients_slice(&domain.ifft(&ql_evals));
-        let qr_poly =
+        let _qr_poly =
             DensePolynomial::from_coefficients_slice(&domain.ifft(&qr_evals));
 
-        let qo_poly =
+        let _qo_poly =
             DensePolynomial::from_coefficients_slice(&domain.ifft(&qo_evals));
 
         let sigma_1_poly = DensePolynomial::from_coefficients_slice(
@@ -814,7 +813,7 @@ mod copy_constraint_tests {
 
         let domain_size = 16;
         let poly_degree = domain_size - 1;
-        let max_degree = poly_degree;
+        let _max_degree = poly_degree;
 
         let domain = GeneralEvaluationDomain::<F>::new(domain_size).unwrap();
 
@@ -1294,9 +1293,8 @@ mod copy_constraint_tests {
             })
             .collect();
 
-          
         let q_blind_labeled = q_blind.to_labeled();
-        let (q_blind_commitment, _)  = 
+        let (q_blind_commitment, _) =
             PC::commit(&ck, &[q_blind_labeled], None).unwrap();
 
         let q_blind = FixedVerifierOracle::<F, PC> {
@@ -1334,7 +1332,7 @@ mod copy_constraint_tests {
         let verifier_pp = VerifierPreprocessedInput {
             fixed_oracles: selector_oracles.clone(),
             permutation_oracles: sigma_oracles.clone(),
-            q_blind: Some(q_blind)
+            q_blind: Some(q_blind),
         };
 
         // We clone because fixed oracles must be mutable in order to add evals at challenge

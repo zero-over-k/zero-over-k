@@ -4,7 +4,7 @@ use crate::{
     concrete_oracle::OracleType,
     vo::{
         expression::Expression,
-        query::{InstanceQuery, Rotation, VirtualQuery, WitnessQuery, Query},
+        query::{InstanceQuery, Query, Rotation, VirtualQuery, WitnessQuery},
         VirtualOracle,
     },
 };
@@ -113,13 +113,13 @@ impl<F: PrimeField> ArithVO<F> {
 
                     self.wtns_queries.push(query);
                     self.queries.push(Box::new(query.clone()))
-                },
+                }
                 OracleType::Instance => {
                     let query = InstanceQuery {
                         index: instance_indices[vq.index],
                         rotation: vq.rotation.clone(),
                     };
-                    
+
                     self.instance_queries.push(query);
                     self.queries.push(Box::new(query.clone()))
                 }

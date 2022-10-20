@@ -29,21 +29,52 @@ impl<F: PrimeField> PrecompiledVO<F> for PrecompiledMul {
 mod test {
     use std::collections::{BTreeMap, BTreeSet};
 
-    use crate::{
-        oracles::{
-            fixed::FixedProverOracle, instance::InstanceProverOracle,
-            witness::WitnessProverOracle,
-        },
-        vo::generic_vo::GenericVO,
+    use ark_bls12_381::{Bls12_381, Fr};
+    use ark_ff::{UniformRand, Zero};
+    use ark_poly::Polynomial;
+    use ark_poly::{
+        univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
+        UVPolynomial,
     };
 
-    use super::{PrecompiledMul, PrecompiledRescue, PrecompiledVO};
-    use crate::commitment::KZG10;
-    use ark_bls12_381::{Bls12_381, Fr as F};
-    use ark_ff::Zero;
-    use ark_poly::univariate::DensePolynomial;
+    
+    
+    use ark_std::test_rng;
+    use rand_chacha::ChaChaRng;
 
+    use crate::data_structures::{
+        ProverKey, ProverPreprocessedInput, VerifierPreprocessedInput,
+    };
+    use crate::indexer::Indexer;
+    
+
+    use crate::oracles::fixed::{FixedProverOracle, FixedVerifierOracle};
+    use crate::oracles::instance::{
+        InstanceProverOracle, InstanceVerifierOracle,
+    };
+    
+    
+    use crate::oracles::witness::{WitnessProverOracle, WitnessVerifierOracle};
+    use crate::rng::SimpleHashFiatShamirRng;
+    use crate::vo::generic_vo::GenericVO;
+    use crate::vo::precompiled_vos::{
+        PrecompiledMul,
+        PrecompiledVO,
+    };
+    use crate::PIL;
+    use blake2::Blake2s;
+
+    use crate::commitment::KZG10;
+    use crate::vo::VirtualOracle;
+
+    
+
+    type F = Fr;
+    type FS = SimpleHashFiatShamirRng<Blake2s, ChaChaRng>;
     type PC = KZG10<Bls12_381>;
+
+    type PilInstance = PIL<F, PC, FS>;
+
     #[test]
     fn test_simple_mul() {
         let domain_size = 16;
