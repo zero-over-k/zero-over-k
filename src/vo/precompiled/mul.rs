@@ -1,117 +1,239 @@
+use super::PrecompiledVO;
+use crate::{
+    oracles::{query::OracleType, rotation::Rotation},
+    vo::{query::VirtualQuery, virtual_expression::VirtualExpression},
+};
 use ark_ff::PrimeField;
 
-use crate::{
-    concrete_oracle::OracleType,
-    vo::{
-        expression::Expression,
-        query::{InstanceQuery, Rotation, VirtualQuery, WitnessQuery, Query},
-        VirtualOracle,
-    },
-};
+pub struct PrecompiledMul {}
 
-pub struct MulVO<F: PrimeField> {
-    virtual_queries: [VirtualQuery; 3],
-    witness_indices: Option<Vec<usize>>,
-    instance_indices: Option<Vec<usize>>,
-    wtns_queries: Vec<WitnessQuery>,
-    instance_queries: Vec<InstanceQuery>,
-    queries: Vec<Box<dyn Query>>,
-    expression: Option<Expression<F>>,
-}
+impl<F: PrimeField> PrecompiledVO<F> for PrecompiledMul {
+    fn get_expr_and_queries() -> (VirtualExpression<F>, Vec<VirtualQuery>) {
+        let q1 = VirtualQuery::new(0, Rotation::curr(), OracleType::Witness);
+        let q2 = VirtualQuery::new(1, Rotation::curr(), OracleType::Witness);
+        let q3 = VirtualQuery::new(0, Rotation::curr(), OracleType::Instance);
 
-impl<F: PrimeField> MulVO<F> {
-    pub fn new() -> Self {
-        let q1 = VirtualQuery {
-            index: 0,
-            rotation: Rotation::curr(),
-            oracle_type: OracleType::Witness,
-        };
-
-        let q2 = VirtualQuery {
-            index: 1,
-            rotation: Rotation::curr(),
-            oracle_type: OracleType::Witness,
-        };
-
-        let q3 = VirtualQuery {
-            index: 0,
-            rotation: Rotation::curr(),
-            oracle_type: OracleType::Instance,
-        };
-        let virtual_queries = [q1, q2, q3];
-
-        Self {
-            virtual_queries,
-            witness_indices: None,
-            instance_indices: None,
-            wtns_queries: vec![],
-            instance_queries: vec![],
-            queries: vec![],
-            expression: None,
-        }
-    }
-
-    // TODO: consider abstracting
-    pub fn configure(
-        &mut self,
-        witness_indices: &[usize; 2],
-        instance_indices: &[usize; 1],
-    ) {
-        self.witness_indices = Some(vec![]);
-        self.instance_indices = Some(vec![]);
-        for vq in &self.virtual_queries {
-            match vq.oracle_type {
-                OracleType::Witness => {
-                    let query = WitnessQuery {
-                        index: witness_indices[vq.index],
-                        rotation: vq.rotation.clone(),
-                    };
-
-                    self.wtns_queries.push(query);
-                    self.queries.push(Box::new(query.clone()))
-                },
-                OracleType::Instance => {
-                    let query = InstanceQuery {
-                        index: instance_indices[vq.index],
-                        rotation: vq.rotation.clone(),
-                    };
-                    
-                    self.instance_queries.push(query);
-                    self.queries.push(Box::new(query.clone()))
-                }
-            }
-        }
-
-        let mul_expression = || {
-            let a: Expression<F> = self.wtns_queries[0].into();
-            let b: Expression<F> = self.wtns_queries[1].into();
-            let c: Expression<F> = self.instance_queries[0].into();
+        let mul_expression = {
+            let a: VirtualExpression<F> = q1.clone().into();
+            let b: VirtualExpression<F> = q2.clone().into();
+            let c: VirtualExpression<F> = q3.clone().into();
 
             a * b - c
         };
 
-        self.expression = Some(mul_expression());
+        (mul_expression, vec![q1, q2, q3])
     }
 }
 
-impl<F: PrimeField> VirtualOracle<F> for MulVO<F> {
-    fn get_wtns_queries(&self) -> &[WitnessQuery] {
-        &self.wtns_queries
-    }
+#[cfg(test)]
+mod test {
+    use std::collections::{BTreeMap, BTreeSet};
 
-    fn get_instance_queries(&self) -> &[InstanceQuery] {
-        &self.instance_queries
-    }
+    use crate::{
+        oracles::{
+            fixed::FixedProverOracle, instance::InstanceProverOracle,
+            witness::WitnessProverOracle,
+        },
+        vo::generic_vo::GenericVO,
+    };
 
-    // panics if expression is not defined before proving started
-    fn get_expression(&self) -> &Expression<F> {
-        match self.expression.as_ref() {
-            None => panic!("Expression is not defined"),
-            Some(expression) => return expression,
+    use super::{PrecompiledMul, PrecompiledRescue, PrecompiledVO};
+    use crate::commitment::KZG10;
+    use ark_bls12_381::{Bls12_381, Fr as F};
+    use ark_ff::Zero;
+    use ark_poly::univariate::DensePolynomial;
+
+    type PC = KZG10<Bls12_381>;
+    #[test]
+    fn test_simple_mul() {
+        let domain_size = 16;
+        let poly_degree = domain_size - 1;
+        let max_degree = poly_degree;
+        let mut rng = test_rng();
+
+        let srs = PilInstance::universal_setup(max_degree, &mut rng).unwrap();
+
+        let (ck, verifier_key) = PilInstance::prepare_keys(&srs).unwrap();
+
+        let domain = GeneralEvaluationDomain::<F>::new(domain_size).unwrap();
+
+        let a_poly = DensePolynomial::<F>::rand(poly_degree, &mut rng);
+        let b_poly = DensePolynomial::<F>::rand(poly_degree, &mut rng);
+
+        let a_evals = domain.fft(&a_poly);
+        let b_evals = domain.fft(&b_poly);
+
+        let c_evals = a_evals
+            .iter()
+            .zip(b_evals.iter())
+            .map(|(&a, &b)| a * b)
+            .collect::<Vec<_>>();
+
+        let c_poly =
+            DensePolynomial::from_coefficients_slice(&domain.ifft(&c_evals));
+
+        for elem in domain.elements() {
+            assert_eq!(
+                a_poly.evaluate(&elem) * b_poly.evaluate(&elem)
+                    - c_poly.evaluate(&elem),
+                F::zero()
+            );
         }
-    }
 
-    fn get_queries(&self) -> &[Box<dyn Query>] {
-        &self.queries
+        let a = WitnessProverOracle {
+            label: "a".to_string(),
+            poly: a_poly,
+            evals_at_coset_of_extended_domain: None,
+            queried_rotations: BTreeSet::new(),
+            should_permute: false,
+            evals: a_evals,
+        };
+
+        let b = WitnessProverOracle {
+            label: "b".to_string(),
+            poly: b_poly,
+            evals_at_coset_of_extended_domain: None,
+            queried_rotations: BTreeSet::new(),
+            should_permute: false,
+            evals: b_evals,
+        };
+
+        let c = InstanceProverOracle {
+            label: "c".to_string(),
+            poly: c_poly.clone(),
+            evals_at_coset_of_extended_domain: None,
+            queried_rotations: BTreeSet::new(),
+            evals: c_evals.clone(),
+        };
+
+        let mut mul_vo =
+            GenericVO::<F, PC>::init(PrecompiledMul::get_expr_and_queries());
+
+        let mut witness_oracles = [a, b];
+        let mut instance_oracles = [c];
+        let mut fixed_oracles: [FixedProverOracle<F>; 0] = [];
+
+        mul_vo.configure(
+            &mut witness_oracles,
+            &mut instance_oracles,
+            &mut fixed_oracles,
+        );
+
+        let vos: Vec<&dyn VirtualOracle<F>> = vec![&mul_vo];
+
+        let vk = Indexer::index(
+            &verifier_key,
+            &vos,
+            &witness_oracles,
+            &instance_oracles,
+            &fixed_oracles,
+            domain,
+            &domain.vanishing_polynomial().into(),
+            None,
+        )
+        .unwrap();
+
+        let pk = ProverKey::from_ck_and_vk(&ck, &vk);
+
+        let preprocessed = ProverPreprocessedInput {
+            fixed_oracles: vec![],
+            permutation_oracles: vec![],
+            empty_rands_for_fixed: vec![],
+            q_blind: None,
+        };
+
+        let proof = PilInstance::prove(
+            &pk,
+            &preprocessed,
+            &mut witness_oracles,
+            &mut instance_oracles,
+            &vos,
+            domain_size,
+            &domain.vanishing_polynomial().into(),
+            &mut rng,
+        )
+        .unwrap();
+
+        println!("{}", proof.info());
+        println!("{}", proof.cumulative_info());
+
+        // Verifier
+        let a_ver = WitnessVerifierOracle {
+            label: "a".to_string(),
+            queried_rotations: BTreeSet::default(),
+            should_permute: false,
+            evals_at_challenges: BTreeMap::default(),
+            commitment: None,
+        };
+
+        let b_ver = WitnessVerifierOracle {
+            label: "b".to_string(),
+            queried_rotations: BTreeSet::default(),
+            should_permute: false,
+            evals_at_challenges: BTreeMap::default(),
+            commitment: None,
+        };
+
+        // Repeat just to make sure some change from prover does not affect this
+        let c = InstanceVerifierOracle {
+            label: "c".to_string(),
+            poly: c_poly.clone(),
+            evals: c_evals.clone(),
+            queried_rotations: BTreeSet::new(),
+        };
+
+        let mut ver_wtns_oracles = [a_ver, b_ver];
+        let mut instance_oracles = [c];
+        let mut fixed_oracles: [FixedVerifierOracle<F, PC>; 0] = [];
+
+        let mut mul_vo =
+            GenericVO::<F, PC>::init(PrecompiledMul::get_expr_and_queries());
+
+        mul_vo.configure(
+            &mut ver_wtns_oracles,
+            &mut instance_oracles,
+            &mut fixed_oracles,
+        );
+
+        let vos: Vec<&dyn VirtualOracle<F>> = vec![&mul_vo];
+
+        // Repeat but this time provide verifier witness oracles
+        let mut vk = Indexer::index(
+            &verifier_key,
+            &vos,
+            &mut ver_wtns_oracles,
+            &instance_oracles,
+            &fixed_oracles,
+            domain,
+            &domain.vanishing_polynomial().into(),
+            None,
+        )
+        .unwrap();
+
+        let preprocessed = VerifierPreprocessedInput {
+            fixed_oracles: vec![],
+            permutation_oracles: vec![],
+            q_blind: None,
+        };
+
+        // Since we mutate fixed oracles by adding evals at challenge for specific proof
+        // preprocessed input is cloned in order to enable preserving original preprocessed
+        // Second option is just to "reset" preprocessed after verification ends
+        let mut pp_clone = preprocessed.clone();
+
+        let res = PilInstance::verify(
+            &mut vk,
+            &mut pp_clone,
+            proof,
+            &mut ver_wtns_oracles,
+            &mut instance_oracles,
+            &vos,
+            domain_size,
+            &domain.vanishing_polynomial().into(),
+            &mut rng,
+        )
+        .unwrap();
+
+        assert_eq!(res, ());
     }
 }
