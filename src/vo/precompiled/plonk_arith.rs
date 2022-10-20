@@ -100,6 +100,7 @@ impl<F: PrimeField> PrecompiledVO<F> for PlonkArith4 {
 
 #[cfg(test)]
 mod test {
+    use super::*;
 
     use std::collections::{BTreeMap, BTreeSet};
 
@@ -112,7 +113,7 @@ mod test {
     };
 
     use ark_poly_commit::{LabeledPolynomial, PolynomialCommitment};
-    
+
     use ark_std::test_rng;
     use rand_chacha::ChaChaRng;
 
@@ -120,28 +121,20 @@ mod test {
         ProverKey, ProverPreprocessedInput, VerifierPreprocessedInput,
     };
     use crate::indexer::Indexer;
-    
 
     use crate::oracles::fixed::{FixedProverOracle, FixedVerifierOracle};
     use crate::oracles::instance::{
         InstanceProverOracle, InstanceVerifierOracle,
     };
-    
-    
+
     use crate::oracles::witness::{WitnessProverOracle, WitnessVerifierOracle};
     use crate::rng::SimpleHashFiatShamirRng;
     use crate::vo::generic_vo::GenericVO;
-    use crate::vo::precompiled_vos::{
-        PrecompiledPlonkArith,
-        PrecompiledVO,
-    };
+    use crate::vo::VirtualOracle;
     use crate::PIL;
     use blake2::Blake2s;
 
     use crate::commitment::KZG10;
-    use crate::vo::VirtualOracle;
-
-    
 
     type F = Fr;
     type FS = SimpleHashFiatShamirRng<Blake2s, ChaChaRng>;

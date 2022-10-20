@@ -10,7 +10,6 @@ pub mod error;
 pub mod generic_vo;
 pub mod new_expression;
 pub mod precompiled;
-pub mod precompiled_vos;
 pub mod query;
 pub mod virtual_expression;
 

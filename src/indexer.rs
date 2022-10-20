@@ -12,7 +12,7 @@ use crate::{
     error::Error,
     oracles::{
         query::OracleType,
-        traits::{ConcreteOracle, FixedOracle, InstanceOracle, WitnessOracle},
+        traits::{FixedOracle, InstanceOracle, WitnessOracle},
     },
     permutation::PermutationArgument,
     util::compute_vanishing_poly_over_coset,

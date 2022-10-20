@@ -1,7 +1,6 @@
 use ark_ff::PrimeField;
 use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
 use ark_std::rand::RngCore;
-use itertools::Itertools;
 
 use crate::{
     commitment::HomomorphicCommitment,

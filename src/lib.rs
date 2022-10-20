@@ -7,7 +7,7 @@ use ark_poly::univariate::DensePolynomial;
 use ark_poly::{
     EvaluationDomain, GeneralEvaluationDomain, Polynomial, UVPolynomial,
 };
-use ark_poly_commit::{LabeledPolynomial, PCCommitterKey, PCUniversalParams};
+use ark_poly_commit::{LabeledPolynomial, PCUniversalParams};
 
 use ark_std::rand::{Rng, RngCore};
 use commitment::HomomorphicCommitment;
@@ -44,8 +44,6 @@ pub mod vo;
 pub mod indexer;
 pub mod multiproof;
 pub mod permutation;
-
-mod tests;
 
 pub struct PIL<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng> {
     _field: PhantomData<F>,

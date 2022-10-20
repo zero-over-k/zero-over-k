@@ -125,12 +125,13 @@ impl<F: PrimeField> PrecompiledVO<F> for DeltaXorAnd {
 
 #[cfg(test)]
 mod test {
+    use super::*;
 
     use std::collections::{BTreeMap, BTreeSet};
 
     use ark_bls12_381::{Bls12_381, Fr};
     use ark_ff::{One, Zero};
-    
+
     use ark_poly::{
         univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
         UVPolynomial,
@@ -145,21 +146,15 @@ mod test {
         ProverKey, ProverPreprocessedInput, VerifierPreprocessedInput,
     };
     use crate::indexer::Indexer;
-    
 
     use crate::oracles::fixed::{FixedProverOracle, FixedVerifierOracle};
     use crate::oracles::instance::{
         InstanceProverOracle, InstanceVerifierOracle,
     };
-    
-    
+
     use crate::oracles::witness::{WitnessProverOracle, WitnessVerifierOracle};
     use crate::rng::SimpleHashFiatShamirRng;
     use crate::vo::generic_vo::GenericVO;
-    use crate::vo::precompiled_vos::{
-        DeltaXorAnd,
-        PrecompiledVO,
-    };
     use crate::PIL;
     use blake2::Blake2s;
 

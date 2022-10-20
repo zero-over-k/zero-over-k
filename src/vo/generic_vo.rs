@@ -6,7 +6,7 @@ use crate::{
     commitment::HomomorphicCommitment,
     oracles::{
         query::{OracleQuery, OracleType},
-        traits::{ConcreteOracle, FixedOracle, InstanceOracle, WitnessOracle},
+        traits::{FixedOracle, InstanceOracle, WitnessOracle},
     },
 };
 

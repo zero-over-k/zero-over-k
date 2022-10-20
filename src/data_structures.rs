@@ -1,6 +1,6 @@
 use ark_ff::PrimeField;
 use ark_poly::{univariate::DensePolynomial, GeneralEvaluationDomain};
-use ark_poly_commit::{PCCommitment, PCRandomness, PolynomialCommitment};
+use ark_poly_commit::{PCRandomness, PolynomialCommitment};
 
 use crate::{
     commitment::HomomorphicCommitment,

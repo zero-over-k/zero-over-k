@@ -6,7 +6,7 @@ use std::{
 use ark_ff::PrimeField;
 use ark_poly::{
     univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
-    Polynomial, UVPolynomial,
+    UVPolynomial,
 };
 use ark_std::rand::Rng;
 

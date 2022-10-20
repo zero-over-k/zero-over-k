@@ -8,3 +8,4 @@ pub trait PrecompiledVO<F: PrimeField> {
 pub mod logic;
 pub mod mul;
 pub mod plonk_arith;
+pub mod rescue;
