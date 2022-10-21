@@ -41,7 +41,8 @@ pub struct ProverState<'a, F: PrimeField> {
     pub(crate) witness_oracles: &'a [WitnessProverOracle<F>],
     pub(crate) instance_oracles: &'a [InstanceProverOracle<F>],
     pub(crate) z_polys: Option<Vec<WitnessProverOracle<F>>>,
-    vos: &'a [&'a dyn VirtualOracle<F>],
+    pub(crate) oracles_to_copy: Vec<&'a WitnessProverOracle<F>>,
+    pub(crate) vos: &'a [&'a dyn VirtualOracle<F>],
     pub(crate) domain: GeneralEvaluationDomain<F>,
     pub(crate) vanishing_polynomial: DensePolynomial<F>,
     pub(crate) quotient_chunks: Option<Vec<WitnessProverOracle<F>>>,
@@ -75,6 +76,12 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
             .map(|(i, oracle)| (oracle.get_label(), i))
             .collect();
 
+
+        let oracles_to_copy: Vec<&WitnessProverOracle<F>> = witness_oracles
+        .iter()
+        .filter(|&oracle| oracle.should_permute)
+        .collect();
+
         ProverState {
             witness_oracles_mapping,
             instance_oracles_mapping,
@@ -82,6 +89,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
             witness_oracles,
             instance_oracles,
             z_polys: None,
+            oracles_to_copy,
             vos,
             domain,
             vanishing_polynomial: vanishing_polynomial.clone(),
@@ -97,14 +105,8 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
         extended_coset_domain: &GeneralEvaluationDomain<F>,
         zk_rng: &mut R,
     ) -> Vec<WitnessProverOracle<F>> {
-        let oracles_to_copy: Vec<&WitnessProverOracle<F>> = state
-            .witness_oracles
-            .iter()
-            .filter(|&oracle| oracle.should_permute)
-            .collect();
-
         let z_polys = permutation_argument.construct_agg_polys(
-            &oracles_to_copy,
+            &state.oracles_to_copy,
             &preprocessed.permutation_oracles,
             permutation_msg.beta,
             permutation_msg.gamma,
@@ -165,12 +167,6 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
         let lu_coset_evals =
             vk.index_info.extended_coset_domain.coset_fft(&lu);
 
-        let oracles_to_copy: Vec<&WitnessProverOracle<F>> = state
-            .witness_oracles
-            .iter()
-            .filter(|&oracle| oracle.should_permute)
-            .collect();
-
         for i in 0..vk.index_info.extended_coset_domain.size() {
             for (vo_index, vo) in state.vos.iter().enumerate() {
                 let vo_evaluation = vo.get_expression().evaluate(
@@ -211,7 +207,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
                     &l0_coset_evals,
                     &lu_coset_evals,
                     &preprocessed.q_blind,
-                    &oracles_to_copy,
+                    &state.oracles_to_copy,
                     &preprocessed.permutation_oracles,
                     &z_polys,
                     i,
