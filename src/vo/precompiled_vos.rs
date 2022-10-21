@@ -6,6 +6,7 @@ pub trait PrecompiledVO<F: PrimeField> {
     fn get_expr_and_queries() -> (VirtualExpression<F>, Vec<VirtualQuery>);
 }
 
+/// PrecompiledMul implements a multiplication gate.
 pub struct PrecompiledMul {}
 
 impl<F: PrimeField> PrecompiledVO<F> for PrecompiledMul {
@@ -25,6 +26,30 @@ impl<F: PrimeField> PrecompiledVO<F> for PrecompiledMul {
         (mul_expression, vec![q1, q2, q3])
     }
 }
+
+/// PrecompiledX2 implements a gate that squares the input.
+pub struct PrecompiledX2 {}
+
+impl<F> PrecompiledVO<F> for PrecompiledX2
+where
+    F: PrimeField,
+{
+    fn get_expr_and_queries() -> (VirtualExpression<F>, Vec<VirtualQuery>) {
+        let q1 = VirtualQuery::new(0, Rotation::curr(), OracleType::Witness);
+        let q2 = VirtualQuery::new(0, Rotation::curr(), OracleType::Instance);
+
+        let expr = {
+            let a0: VirtualExpression<F> = q1.clone().into();
+            let a1: VirtualExpression<F> = q1.clone().into();
+            let b: VirtualExpression<F> = q2.clone().into();
+            
+            a0 * a1 - b
+        };
+
+        (expr, vec![q1, q2])
+    }
+}
+
 
 /// Rescue VO implements a 4 element vector multiplication and a exponentiation:
 /// (q1, q2, q3, q4) * (w1, w2, w3, w4)^5  = w5
@@ -281,7 +306,7 @@ impl<F: PrimeField> PrecompiledVO<F> for DeltaXorAnd {
 
 #[cfg(test)]
 mod test {
-    use std::collections::{BTreeMap, BTreeSet};
+    use std::collections::BTreeSet;
 
     use crate::{
         oracles::{
@@ -291,13 +316,51 @@ mod test {
         vo::generic_vo::GenericVO,
     };
 
-    use super::{PrecompiledMul, PrecompiledRescue, PrecompiledVO};
+    use super::{
+        PrecompiledMul,
+        PrecompiledRescue,
+        PrecompiledVO,
+        PrecompiledX2,
+    };
     use crate::commitment::KZG10;
     use ark_bls12_381::{Bls12_381, Fr as F};
     use ark_ff::Zero;
     use ark_poly::univariate::DensePolynomial;
 
     type PC = KZG10<Bls12_381>;
+
+    // Test PrecompiledX2
+    #[test]
+    fn test_x2() {
+        let mut x2_vo =
+            GenericVO::<F, PC>::init(PrecompiledX2::get_expr_and_queries());
+        let a = WitnessProverOracle::<F> {
+            label: "a0".to_string(),
+            poly: DensePolynomial::default(),
+            evals_at_coset_of_extended_domain: None,
+            queried_rotations: BTreeSet::new(),
+            should_permute: false,
+            evals: vec![F::zero(); 1],
+        };
+
+        let b = InstanceProverOracle::<F> {
+            label: "b".to_string(),
+            poly: DensePolynomial::default(),
+            evals_at_coset_of_extended_domain: None,
+            queried_rotations: BTreeSet::new(),
+            evals: vec![F::zero(); 1],
+        };
+
+        let mut witness_oracles = vec![a];
+        let mut instance_oracles = vec![b];
+        let mut fixed_oracles: Vec<FixedProverOracle<F>> = vec![];
+
+        x2_vo.configure(
+            &mut witness_oracles,
+            &mut instance_oracles,
+            &mut fixed_oracles,
+        );
+    }
 
     #[test]
     fn test_simple_mul() {
