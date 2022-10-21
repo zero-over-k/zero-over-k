@@ -14,7 +14,7 @@ use crate::{
         query::OracleType,
         traits::{FixedOracle, InstanceOracle, WitnessOracle},
     },
-    permutation::PermutationArgument,
+    permutation::{PermutationArgument, self},
     util::compute_vanishing_poly_over_coset,
     vo::VirtualOracle,
 };
@@ -139,7 +139,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
         fixed_oracles: &[impl FixedOracle<F>],
         domain: GeneralEvaluationDomain<F>,
         zH: &DensePolynomial<F>,
-        permutation_info: Option<PermutationInfo<F>>,
+        permutation_info: PermutationInfo<F>,
     ) -> Result<VerifierKey<F, PC>, Error<PC::Error>> {
         let witness_oracles_mapping: BTreeMap<String, usize> = witness_oracles
             .iter()
@@ -171,7 +171,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
             zH.degree(),
         );
 
-        // TODO: we can introduce next power of 2 check here
+        // TODO: we can introduce next power of 2 check here instead of creating domain and then dividing
         let extended_coset_domain =
             GeneralEvaluationDomain::<F>::new(quotient_degree).unwrap();
 
@@ -180,21 +180,9 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
         }
 
         let scaling_factor = extended_coset_domain.size() / domain.size();
-        let (scaling_factor, permutation_argument) =
-            if let Some(permutation_info) = permutation_info {
-                let scaling_factor = max(
-                    scaling_factor,
-                    PermutationArgument::<F>::MINIMAL_SCALING_FACTOR,
-                );
-                let permutation_argument = Some(PermutationArgument::<F>::new(
-                    scaling_factor,
-                    permutation_info.u,
-                    &permutation_info.deltas,
-                ));
-                (scaling_factor, permutation_argument)
-            } else {
-                (scaling_factor, None)
-            };
+        let scaling_factor = max(scaling_factor, PermutationArgument::<F>::MINIMAL_SCALING_FACTOR);
+
+        let permutation_argument = PermutationArgument::new(scaling_factor, permutation_info.u, &permutation_info.deltas);
 
         let extended_coset_domain =
             GeneralEvaluationDomain::<F>::new(scaling_factor * domain.size())

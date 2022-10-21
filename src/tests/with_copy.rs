@@ -32,8 +32,7 @@ mod copy_constraint_tests {
         util::compute_vanishing_poly_over_coset,
         vo::{
             generic_vo::GenericVO,
-            precompiled_vos::{PrecompiledPlonkArith, PrecompiledVO},
-            VirtualOracle,
+            VirtualOracle, precompiled::{plonk_arith::PrecompiledPlonkArith, PrecompiledVO},
         },
     };
     use ark_bls12_381::{Bls12_381, Fr as F};
@@ -702,7 +701,7 @@ mod copy_constraint_tests {
             should_permute: false,
         };
 
-        let witness_oracles = [a, b, c];
+        let witness_oracles = [&a, &b, &c];
         let permutation_oracles = [sigma_1, sigma_2, sigma_3];
         let z_polys = [z_poly_0, z_poly_1, z_poly_2];
 
@@ -713,7 +712,6 @@ mod copy_constraint_tests {
             &z_polys,
             &permutation_oracles,
             &witness_oracles,
-            &deltas,
             beta,
             gamma,
             &domain,
@@ -1192,7 +1190,7 @@ mod copy_constraint_tests {
             &fixed_oracles,
             domain,
             &domain.vanishing_polynomial().into(),
-            Some(permutation_info.clone()),
+            permutation_info.clone(),
         )
         .unwrap();
 
@@ -1201,7 +1199,7 @@ mod copy_constraint_tests {
         let preprocessed = ProverPreprocessedInput::new(
             &fixed_oracles.to_vec(),
             &permutation_oracles.to_vec(),
-            Some(q_blind.clone()),
+            &q_blind,
             &vk.index_info,
         );
 
@@ -1222,7 +1220,7 @@ mod copy_constraint_tests {
             .map(|label| WitnessVerifierOracle::<F, PC> {
                 label: label.to_string(),
                 queried_rotations: BTreeSet::new(),
-                should_permute: false,
+                should_permute: true,
                 evals_at_challenges: BTreeMap::default(),
                 commitment: None,
             })
@@ -1325,14 +1323,14 @@ mod copy_constraint_tests {
             &selector_oracles,
             domain,
             &domain.vanishing_polynomial().into(),
-            Some(permutation_info),
+            permutation_info,
         )
         .unwrap();
 
         let verifier_pp = VerifierPreprocessedInput {
             fixed_oracles: selector_oracles.clone(),
             permutation_oracles: sigma_oracles.clone(),
-            q_blind: Some(q_blind),
+            q_blind: q_blind,
         };
 
         // We clone because fixed oracles must be mutable in order to add evals at challenge

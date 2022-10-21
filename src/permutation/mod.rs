@@ -235,8 +235,7 @@ impl<F: PrimeField> PermutationArgument<F> {
         q_blind: &FixedVerifierOracle<F, PC>,
         agg_polys: &[WitnessVerifierOracle<F, PC>],
         permutation_oracles: &[FixedVerifierOracle<F, PC>],
-        witness_oracles: &[WitnessVerifierOracle<F, PC>],
-        deltas: &[F],
+        witness_oracles: &[&WitnessVerifierOracle<F, PC>],
         beta: F,
         gamma: F,
         domain: &GeneralEvaluationDomain<F>,
@@ -244,11 +243,11 @@ impl<F: PrimeField> PermutationArgument<F> {
         alpha_powers: &[F], // quotient separation challenges
     ) -> F {
         assert_eq!(witness_oracles.len(), permutation_oracles.len());
-        assert_eq!(witness_oracles.len(), deltas.len());
+        assert_eq!(witness_oracles.len(), self.deltas.len());
 
         let oracle_chunks = witness_oracles.chunks(self.m);
         let sigma_chunks = permutation_oracles.chunks(self.m);
-        let delta_chunks = deltas.chunks(self.m);
+        let delta_chunks = self.deltas.chunks(self.m);
 
         assert_eq!(oracle_chunks.len(), sigma_chunks.len());
         assert_eq!(oracle_chunks.len(), delta_chunks.len());
@@ -721,7 +720,7 @@ mod test {
             should_permute: false,
         };
 
-        let witness_oracles = [a, b];
+        let witness_oracles = [&a, &b];
         let permutation_oracles = [sigma_1, sigma_2];
         let z_polys = [z_poly_0, z_poly_1];
 
@@ -731,8 +730,8 @@ mod test {
             &q_blind,
             &z_polys,
             &permutation_oracles,
-            &witness_oracles,
-            &deltas,
+            witness_oracles.as_slice(),
+            // &deltas,
             beta,
             gamma,
             &domain,

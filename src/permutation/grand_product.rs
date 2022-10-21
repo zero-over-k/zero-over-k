@@ -144,7 +144,7 @@ impl<F: PrimeField> GrandProductArgument<F> {
         q_blind: &FixedVerifierOracle<F, PC>,
         z: &WitnessVerifierOracle<F, PC>,
         permutation_oracles: &[FixedVerifierOracle<F, PC>],
-        witness_oracles: &[WitnessVerifierOracle<F, PC>],
+        witness_oracles: &[&WitnessVerifierOracle<F, PC>],
         deltas: &[F],
         beta: F,
         gamma: F,
@@ -616,7 +616,7 @@ mod test {
             commitment: None,
         };
 
-        let witness_oracles = [a, b];
+        let witness_oracles = [&a, &b];
         let permutation_oracles = [sigma_1, sigma_2];
 
         let opening = GrandProductArgument::open_argument(

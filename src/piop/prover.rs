@@ -133,71 +133,104 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
         let mut numerator_evals =
             vec![F::zero(); vk.index_info.extended_coset_domain.size()];
 
-        let empty = vec![];
-        let dummy_fixed = FixedProverOracle {
-            label: "".to_string(),
-            poly: DensePolynomial::default(),
-            evals: vec![F::zero(); 1],
-            evals_at_coset_of_extended_domain: None,
-            queried_rotations: BTreeSet::default(),
-        };
+        let z_polys = state.z_polys.as_ref().expect("Z polys are not in state");
 
-        let (
-            permutation_alphas,
-            z_polys,
-            l0_coset_evals,
-            lu_coset_evals,
-            q_blind,
-        ) = if let Some(permutation_argument) =
-            &vk.index_info.permutation_argument
-        {
-            let z_polys =
-                state.z_polys.as_ref().expect("z polys must be in state");
-            let number_of_alphas =
-                permutation_argument.number_of_alphas(z_polys.len());
+        let number_of_alphas =
+            vk.index_info.permutation_argument.number_of_alphas(z_polys.len());
 
-            // start from next of last power of alpha
-            let begin_with =
-                powers_of_alpha.last().unwrap().clone() * verifier_msg.alpha;
-            let powers_of_alpha: Vec<F> =
-                successors(Some(begin_with), |alpha_i| {
-                    Some(*alpha_i * verifier_msg.alpha)
-                })
-                .take(number_of_alphas)
-                .collect();
+        // start from next of last power of alpha
+        let begin_with =
+            powers_of_alpha.last().unwrap().clone() * verifier_msg.alpha;
+        let permutation_alphas: Vec<F> =
+            successors(Some(begin_with), |alpha_i| {
+                Some(*alpha_i * verifier_msg.alpha)
+            })
+            .take(number_of_alphas)
+            .collect();
 
-            let domain_size = state.domain.size();
-            let mut l0_evals = vec![F::zero(); domain_size];
-            l0_evals[0] = F::one();
-            let l0 = DensePolynomial::from_coefficients_slice(
-                &state.domain.ifft(&l0_evals),
-            );
-            let l0_coset_evals =
-                vk.index_info.extended_coset_domain.coset_fft(&l0);
+        let domain_size = state.domain.size();
+        let mut l0_evals = vec![F::zero(); domain_size];
+        l0_evals[0] = F::one();
+        let l0 = DensePolynomial::from_coefficients_slice(
+            &state.domain.ifft(&l0_evals),
+        );
+        let l0_coset_evals =
+            vk.index_info.extended_coset_domain.coset_fft(&l0);
 
-            let mut lu_evals = vec![F::zero(); domain_size];
-            lu_evals[permutation_argument.u] = F::one();
-            let lu = DensePolynomial::from_coefficients_slice(
-                &state.domain.ifft(&lu_evals),
-            );
-            let lu_coset_evals =
-                vk.index_info.extended_coset_domain.coset_fft(&lu);
+        let mut lu_evals = vec![F::zero(); domain_size];
+        lu_evals[vk.index_info.permutation_argument.u] = F::one();
+        let lu = DensePolynomial::from_coefficients_slice(
+            &state.domain.ifft(&lu_evals),
+        );
+        let lu_coset_evals =
+            vk.index_info.extended_coset_domain.coset_fft(&lu);
+        
 
-            let q_blind = preprocessed
-                .q_blind
-                .as_ref()
-                .expect("Q blind must be defined when permutation is enabled");
+        // let empty = vec![];
+        // let dummy_fixed = FixedProverOracle {
+        //     label: "".to_string(),
+        //     poly: DensePolynomial::default(),
+        //     evals: vec![F::zero(); 1],
+        //     evals_at_coset_of_extended_domain: None,
+        //     queried_rotations: BTreeSet::default(),
+        // };
 
-            (
-                powers_of_alpha,
-                z_polys,
-                l0_coset_evals,
-                lu_coset_evals,
-                q_blind,
-            )
-        } else {
-            (vec![], &empty, vec![], vec![], &dummy_fixed)
-        };
+        // let (
+        //     permutation_alphas,
+        //     z_polys,
+        //     l0_coset_evals,
+        //     lu_coset_evals,
+        //     q_blind,
+        // ) = if let Some(permutation_argument) =
+        //     &vk.index_info.permutation_argument
+        // {
+        //     let z_polys =
+        //         state.z_polys.as_ref().expect("z polys must be in state");
+        //     let number_of_alphas =
+        //         permutation_argument.number_of_alphas(z_polys.len());
+
+        //     // start from next of last power of alpha
+        //     let begin_with =
+        //         powers_of_alpha.last().unwrap().clone() * verifier_msg.alpha;
+        //     let powers_of_alpha: Vec<F> =
+        //         successors(Some(begin_with), |alpha_i| {
+        //             Some(*alpha_i * verifier_msg.alpha)
+        //         })
+        //         .take(number_of_alphas)
+        //         .collect();
+
+        //     let domain_size = state.domain.size();
+        //     let mut l0_evals = vec![F::zero(); domain_size];
+        //     l0_evals[0] = F::one();
+        //     let l0 = DensePolynomial::from_coefficients_slice(
+        //         &state.domain.ifft(&l0_evals),
+        //     );
+        //     let l0_coset_evals =
+        //         vk.index_info.extended_coset_domain.coset_fft(&l0);
+
+        //     let mut lu_evals = vec![F::zero(); domain_size];
+        //     lu_evals[permutation_argument.u] = F::one();
+        //     let lu = DensePolynomial::from_coefficients_slice(
+        //         &state.domain.ifft(&lu_evals),
+        //     );
+        //     let lu_coset_evals =
+        //         vk.index_info.extended_coset_domain.coset_fft(&lu);
+
+        //     let q_blind = preprocessed
+        //         .q_blind
+        //         .as_ref()
+        //         .expect("Q blind must be defined when permutation is enabled");
+
+        //     (
+        //         powers_of_alpha,
+        //         z_polys,
+        //         l0_coset_evals,
+        //         lu_coset_evals,
+        //         q_blind,
+        //     )
+        // } else {
+        //     (vec![], &empty, vec![], vec![], &dummy_fixed)
+        // };
 
         let oracles_to_copy: Vec<&WitnessProverOracle<F>> = state
             .witness_oracles
@@ -240,25 +273,21 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
                 numerator_evals[i] += powers_of_alpha[vo_index] * vo_evaluation;
             }
 
-            if let Some(permutation_argument) =
-                &vk.index_info.permutation_argument
-            {
-                numerator_evals[i] += permutation_argument
-                    .instantiate_argument_at_omega_i(
-                        &l0_coset_evals,
-                        &lu_coset_evals,
-                        q_blind,
-                        &oracles_to_copy,
-                        &preprocessed.permutation_oracles,
-                        &z_polys,
-                        i,
-                        vk.index_info.extended_coset_domain.element(i),
-                        verifier_permutation_msg.beta,
-                        verifier_permutation_msg.gamma,
-                        &state.domain,
-                        &permutation_alphas,
-                    );
-            }
+            numerator_evals[i] += vk.index_info.permutation_argument
+                .instantiate_argument_at_omega_i(
+                    &l0_coset_evals,
+                    &lu_coset_evals,
+                    &preprocessed.q_blind,
+                    &oracles_to_copy,
+                    &preprocessed.permutation_oracles,
+                    &z_polys,
+                    i,
+                    vk.index_info.extended_coset_domain.element(i),
+                    verifier_permutation_msg.beta,
+                    verifier_permutation_msg.gamma,
+                    &state.domain,
+                    &permutation_alphas,
+                );
         }
 
         let quotient_evals: Vec<_> = numerator_evals

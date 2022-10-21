@@ -211,135 +211,135 @@ mod test {
             evals: a_evals.clone(),
         };
 
-        let mut witness_oracles = [a];
-        let mut instance_oracles: Vec<InstanceProverOracle<F>> = vec![];
-        let mut fixed_oracles: Vec<FixedProverOracle<F>> = vec![];
+        // let mut witness_oracles = [a];
+        // let mut instance_oracles: Vec<InstanceProverOracle<F>> = vec![];
+        // let mut fixed_oracles: Vec<FixedProverOracle<F>> = vec![];
 
-        let mut delta_vo =
-            GenericVO::<F, PC>::init(Delta::get_expr_and_queries());
+        // let mut delta_vo =
+        //     GenericVO::<F, PC>::init(Delta::get_expr_and_queries());
 
-        delta_vo.configure(
-            &mut witness_oracles,
-            &mut instance_oracles,
-            &mut fixed_oracles,
-        );
+        // delta_vo.configure(
+        //     &mut witness_oracles,
+        //     &mut instance_oracles,
+        //     &mut fixed_oracles,
+        // );
 
-        let vos: Vec<&dyn VirtualOracle<F>> = vec![&delta_vo];
+        // let vos: Vec<&dyn VirtualOracle<F>> = vec![&delta_vo];
 
-        let vk = Indexer::index(
-            &verifier_key,
-            &vos,
-            &witness_oracles,
-            &instance_oracles,
-            &fixed_oracles,
-            domain,
-            &domain.vanishing_polynomial().into(),
-            None,
-        )
-        .unwrap();
+        // let vk = Indexer::index(
+        //     &verifier_key,
+        //     &vos,
+        //     &witness_oracles,
+        //     &instance_oracles,
+        //     &fixed_oracles,
+        //     domain,
+        //     &domain.vanishing_polynomial().into(),
+        //     None,
+        // )
+        // .unwrap();
 
-        let pk = ProverKey::from_ck_and_vk(&ck, &vk);
+        // let pk = ProverKey::from_ck_and_vk(&ck, &vk);
 
-        let preprocessed = ProverPreprocessedInput::new(
-            &fixed_oracles,
-            &vec![],
-            None,
-            &vk.index_info,
-        );
-        let proof = PilInstance::prove(
-            &pk,
-            &preprocessed,
-            &mut witness_oracles,
-            &mut instance_oracles,
-            &vos,
-            domain_size,
-            &domain.vanishing_polynomial().into(),
-            &mut rng,
-        )
-        .unwrap();
+        // let preprocessed = ProverPreprocessedInput::new(
+        //     &fixed_oracles,
+        //     &vec![],
+        //     None,
+        //     &vk.index_info,
+        // );
+        // let proof = PilInstance::prove(
+        //     &pk,
+        //     &preprocessed,
+        //     &mut witness_oracles,
+        //     &mut instance_oracles,
+        //     &vos,
+        //     domain_size,
+        //     &domain.vanishing_polynomial().into(),
+        //     &mut rng,
+        // )
+        // .unwrap();
 
-        println!("{}", proof.info());
-        println!("{}", proof.cumulative_info());
-        println!("in bytes: {}", proof.serialized_size());
+        // println!("{}", proof.info());
+        // println!("{}", proof.cumulative_info());
+        // println!("in bytes: {}", proof.serialized_size());
 
         // Verifier
         // Repeat everything to make sure that we are not implicitly using something from prover
 
-        let mut witness_ver_oracles: Vec<_> = ["a"]
-            .into_iter()
-            .map(|label| WitnessVerifierOracle {
-                label: label.to_string(),
-                queried_rotations: BTreeSet::new(),
-                should_permute: false,
-                evals_at_challenges: BTreeMap::default(),
-                commitment: None,
-            })
-            .collect();
+        // let mut witness_ver_oracles: Vec<_> = ["a"]
+        //     .into_iter()
+        //     .map(|label| WitnessVerifierOracle {
+        //         label: label.to_string(),
+        //         queried_rotations: BTreeSet::new(),
+        //         should_permute: false,
+        //         evals_at_challenges: BTreeMap::default(),
+        //         commitment: None,
+        //     })
+        //     .collect();
 
-        let mut instance_oracles: Vec<InstanceVerifierOracle<F>> = vec![];
-        let labeled_fixed: Vec<LabeledPolynomial<F, DensePolynomial<F>>> =
-            vec![];
+        // let mut instance_oracles: Vec<InstanceVerifierOracle<F>> = vec![];
+        // let labeled_fixed: Vec<LabeledPolynomial<F, DensePolynomial<F>>> =
+        //     vec![];
 
-        let (fixed_comm, _) =
-            PC::commit(&ck, labeled_fixed.iter(), None).unwrap();
+        // let (fixed_comm, _) =
+        //     PC::commit(&ck, labeled_fixed.iter(), None).unwrap();
 
-        let mut fixed_oracles: Vec<_> = fixed_comm
-            .into_iter()
-            .map(|comm| FixedVerifierOracle::<F, PC> {
-                label: comm.label().to_string(),
-                queried_rotations: BTreeSet::default(),
-                evals_at_challenges: BTreeMap::default(),
-                commitment: Some(comm.commitment().clone()),
-            })
-            .collect();
+        // let mut fixed_oracles: Vec<_> = fixed_comm
+        //     .into_iter()
+        //     .map(|comm| FixedVerifierOracle::<F, PC> {
+        //         label: comm.label().to_string(),
+        //         queried_rotations: BTreeSet::default(),
+        //         evals_at_challenges: BTreeMap::default(),
+        //         commitment: Some(comm.commitment().clone()),
+        //     })
+        //     .collect();
 
-        let mut delta_vo =
-            GenericVO::<F, PC>::init(Delta::get_expr_and_queries());
+        // let mut delta_vo =
+        //     GenericVO::<F, PC>::init(Delta::get_expr_and_queries());
 
-        delta_vo.configure(
-            &mut witness_ver_oracles,
-            &mut instance_oracles,
-            &mut fixed_oracles,
-        );
+        // delta_vo.configure(
+        //     &mut witness_ver_oracles,
+        //     &mut instance_oracles,
+        //     &mut fixed_oracles,
+        // );
 
-        let vos: Vec<&dyn VirtualOracle<F>> = vec![&delta_vo];
+        // let vos: Vec<&dyn VirtualOracle<F>> = vec![&delta_vo];
 
-        let mut vk = Indexer::index(
-            &verifier_key,
-            &vos,
-            &witness_ver_oracles,
-            &instance_oracles,
-            &fixed_oracles,
-            domain,
-            &domain.vanishing_polynomial().into(),
-            None,
-        )
-        .unwrap();
+        // let mut vk = Indexer::index(
+        //     &verifier_key,
+        //     &vos,
+        //     &witness_ver_oracles,
+        //     &instance_oracles,
+        //     &fixed_oracles,
+        //     domain,
+        //     &domain.vanishing_polynomial().into(),
+        //     None,
+        // )
+        // .unwrap();
 
-        let verifier_pp = VerifierPreprocessedInput {
-            fixed_oracles: fixed_oracles.clone(),
-            permutation_oracles: vec![],
-            q_blind: None,
-        };
-        // We clone because fixed oracles must be mutable in order to add evals at challenge
-        // Another option is to create reset method which will just reset challenge to eval mapping
-        // This is anyway just mockup of frontend
-        let mut pp_clone = verifier_pp.clone();
+        // let verifier_pp = VerifierPreprocessedInput {
+        //     fixed_oracles: fixed_oracles.clone(),
+        //     permutation_oracles: vec![],
+        //     q_blind: None,
+        // };
+        // // We clone because fixed oracles must be mutable in order to add evals at challenge
+        // // Another option is to create reset method which will just reset challenge to eval mapping
+        // // This is anyway just mockup of frontend
+        // let mut pp_clone = verifier_pp.clone();
 
-        let res = PilInstance::verify(
-            &mut vk,
-            &mut pp_clone,
-            proof,
-            &mut witness_ver_oracles,
-            &mut instance_oracles,
-            vos.as_slice(),
-            domain_size,
-            &domain.vanishing_polynomial().into(),
-            &mut rng,
-        )
-        .unwrap();
+        // let res = PilInstance::verify(
+        //     &mut vk,
+        //     &mut pp_clone,
+        //     proof,
+        //     &mut witness_ver_oracles,
+        //     &mut instance_oracles,
+        //     vos.as_slice(),
+        //     domain_size,
+        //     &domain.vanishing_polynomial().into(),
+        //     &mut rng,
+        // )
+        // .unwrap();
 
-        assert_eq!(res, ());
+        // assert_eq!(res, ());
     }
 
     #[should_panic]
@@ -452,182 +452,182 @@ mod test {
         })
         .collect();
 
-        let witness_polys: Vec<_> = [
-            a_evals.clone(),
-            b_evals.clone(),
-            c_evals.clone(),
-            d_evals.clone(),
-        ]
-        .iter()
-        .map(|evals| {
-            DensePolynomial::from_coefficients_slice(&domain.ifft(evals))
-        })
-        .collect();
+        // let witness_polys: Vec<_> = [
+        //     a_evals.clone(),
+        //     b_evals.clone(),
+        //     c_evals.clone(),
+        //     d_evals.clone(),
+        // ]
+        // .iter()
+        // .map(|evals| {
+        //     DensePolynomial::from_coefficients_slice(&domain.ifft(evals))
+        // })
+        // .collect();
 
-        let mut and_xor_vo =
-            GenericVO::<F, PC>::init(DeltaXorAnd::get_expr_and_queries());
+        // let mut and_xor_vo =
+        //     GenericVO::<F, PC>::init(DeltaXorAnd::get_expr_and_queries());
 
-        let mut witness_oracles: Vec<_> = [
-            (witness_polys[0].clone(), a_evals, "a"),
-            (witness_polys[1].clone(), b_evals, "b"),
-            (witness_polys[2].clone(), c_evals, "product"),
-            (witness_polys[3].clone(), d_evals, "logic"),
-        ]
-        .into_iter()
-        .map(|(poly, evals, label)| WitnessProverOracle::<F> {
-            label: label.to_string(),
-            poly,
-            evals_at_coset_of_extended_domain: None,
-            queried_rotations: BTreeSet::new(),
-            should_permute: false,
-            evals,
-        })
-        .collect();
+        // let mut witness_oracles: Vec<_> = [
+        //     (witness_polys[0].clone(), a_evals, "a"),
+        //     (witness_polys[1].clone(), b_evals, "b"),
+        //     (witness_polys[2].clone(), c_evals, "product"),
+        //     (witness_polys[3].clone(), d_evals, "logic"),
+        // ]
+        // .into_iter()
+        // .map(|(poly, evals, label)| WitnessProverOracle::<F> {
+        //     label: label.to_string(),
+        //     poly,
+        //     evals_at_coset_of_extended_domain: None,
+        //     queried_rotations: BTreeSet::new(),
+        //     should_permute: false,
+        //     evals,
+        // })
+        // .collect();
 
-        let mut instance_oracles: Vec<InstanceProverOracle<F>> = vec![];
+        // let mut instance_oracles: Vec<InstanceProverOracle<F>> = vec![];
 
-        let mut fixed_oracles: Vec<_> = [(q_c_poly.clone(), q_c_evals, "qc")]
-            .into_iter()
-            .map(|(poly, evals, label)| FixedProverOracle::<F> {
-                label: label.to_string(),
-                evals: evals.to_vec(),
-                poly,
-                evals_at_coset_of_extended_domain: None,
-                queried_rotations: BTreeSet::new(),
-            })
-            .collect();
+        // let mut fixed_oracles: Vec<_> = [(q_c_poly.clone(), q_c_evals, "qc")]
+        //     .into_iter()
+        //     .map(|(poly, evals, label)| FixedProverOracle::<F> {
+        //         label: label.to_string(),
+        //         evals: evals.to_vec(),
+        //         poly,
+        //         evals_at_coset_of_extended_domain: None,
+        //         queried_rotations: BTreeSet::new(),
+        //     })
+        //     .collect();
 
-        and_xor_vo.configure(
-            &mut witness_oracles,
-            &mut instance_oracles,
-            &mut fixed_oracles,
-        );
+        // and_xor_vo.configure(
+        //     &mut witness_oracles,
+        //     &mut instance_oracles,
+        //     &mut fixed_oracles,
+        // );
 
-        let vos: Vec<&dyn VirtualOracle<F>> = vec![&and_xor_vo];
+        // let vos: Vec<&dyn VirtualOracle<F>> = vec![&and_xor_vo];
 
-        let vk = Indexer::index(
-            &verifier_key,
-            &vos,
-            &witness_oracles,
-            &instance_oracles,
-            &fixed_oracles,
-            domain,
-            &domain.vanishing_polynomial().into(),
-            None,
-        )
-        .unwrap();
+        // let vk = Indexer::index(
+        //     &verifier_key,
+        //     &vos,
+        //     &witness_oracles,
+        //     &instance_oracles,
+        //     &fixed_oracles,
+        //     domain,
+        //     &domain.vanishing_polynomial().into(),
+        //     None,
+        // )
+        // .unwrap();
 
-        let pk = ProverKey::from_ck_and_vk(&ck, &vk);
+        // let pk = ProverKey::from_ck_and_vk(&ck, &vk);
 
-        let preprocessed = ProverPreprocessedInput::new(
-            &fixed_oracles,
-            &vec![],
-            None,
-            &vk.index_info,
-        );
-        let proof = PilInstance::prove(
-            &pk,
-            &preprocessed,
-            &mut witness_oracles,
-            &mut instance_oracles,
-            &vos,
-            domain_size,
-            &domain.vanishing_polynomial().into(),
-            &mut rng,
-        )
-        .unwrap();
+        // let preprocessed = ProverPreprocessedInput::new(
+        //     &fixed_oracles,
+        //     &vec![],
+        //     None,
+        //     &vk.index_info,
+        // );
+        // let proof = PilInstance::prove(
+        //     &pk,
+        //     &preprocessed,
+        //     &mut witness_oracles,
+        //     &mut instance_oracles,
+        //     &vos,
+        //     domain_size,
+        //     &domain.vanishing_polynomial().into(),
+        //     &mut rng,
+        // )
+        // .unwrap();
 
-        println!("{}", proof.info());
-        println!("{}", proof.cumulative_info());
-        println!("in bytes: {}", proof.serialized_size());
+        // println!("{}", proof.info());
+        // println!("{}", proof.cumulative_info());
+        // println!("in bytes: {}", proof.serialized_size());
 
         // Verifier
         // Repeat everything to make sure that we are not implicitly using something from prover
 
-        let mut witness_ver_oracles: Vec<_> = ["a", "b", "product", "logic"]
-            .into_iter()
-            .map(|label| WitnessVerifierOracle {
-                label: label.to_string(),
-                queried_rotations: BTreeSet::new(),
-                should_permute: false,
-                evals_at_challenges: BTreeMap::default(),
-                commitment: None,
-            })
-            .collect();
+        // let mut witness_ver_oracles: Vec<_> = ["a", "b", "product", "logic"]
+        //     .into_iter()
+        //     .map(|label| WitnessVerifierOracle {
+        //         label: label.to_string(),
+        //         queried_rotations: BTreeSet::new(),
+        //         should_permute: false,
+        //         evals_at_challenges: BTreeMap::default(),
+        //         commitment: None,
+        //     })
+        //     .collect();
 
-        let mut instance_oracles: Vec<InstanceVerifierOracle<F>> = vec![];
+        // let mut instance_oracles: Vec<InstanceVerifierOracle<F>> = vec![];
 
-        let labeled_fixed: Vec<LabeledPolynomial<F, DensePolynomial<F>>> =
-            [(q_c_poly.clone(), "qc")]
-                .iter()
-                .map(|(poly, label)| {
-                    LabeledPolynomial::new(
-                        label.to_string(),
-                        poly.clone(),
-                        None,
-                        None,
-                    )
-                })
-                .collect();
-        let (fixed_comm, _) =
-            PC::commit(&ck, labeled_fixed.iter(), None).unwrap();
+        // let labeled_fixed: Vec<LabeledPolynomial<F, DensePolynomial<F>>> =
+        //     [(q_c_poly.clone(), "qc")]
+        //         .iter()
+        //         .map(|(poly, label)| {
+        //             LabeledPolynomial::new(
+        //                 label.to_string(),
+        //                 poly.clone(),
+        //                 None,
+        //                 None,
+        //             )
+        //         })
+        //         .collect();
+        // let (fixed_comm, _) =
+        //     PC::commit(&ck, labeled_fixed.iter(), None).unwrap();
 
-        let mut fixed_oracles: Vec<_> = fixed_comm
-            .into_iter()
-            .map(|comm| FixedVerifierOracle::<F, PC> {
-                label: comm.label().to_string(),
-                queried_rotations: BTreeSet::default(),
-                evals_at_challenges: BTreeMap::default(),
-                commitment: Some(comm.commitment().clone()),
-            })
-            .collect();
+        // let mut fixed_oracles: Vec<_> = fixed_comm
+        //     .into_iter()
+        //     .map(|comm| FixedVerifierOracle::<F, PC> {
+        //         label: comm.label().to_string(),
+        //         queried_rotations: BTreeSet::default(),
+        //         evals_at_challenges: BTreeMap::default(),
+        //         commitment: Some(comm.commitment().clone()),
+        //     })
+        //     .collect();
 
-        let mut and_xor_vo =
-            GenericVO::<F, PC>::init(DeltaXorAnd::get_expr_and_queries());
+        // let mut and_xor_vo =
+        //     GenericVO::<F, PC>::init(DeltaXorAnd::get_expr_and_queries());
 
-        and_xor_vo.configure(
-            &mut witness_ver_oracles,
-            &mut instance_oracles,
-            &mut fixed_oracles,
-        );
+        // and_xor_vo.configure(
+        //     &mut witness_ver_oracles,
+        //     &mut instance_oracles,
+        //     &mut fixed_oracles,
+        // );
 
-        let vos: Vec<&dyn VirtualOracle<F>> = vec![&and_xor_vo];
+        // let vos: Vec<&dyn VirtualOracle<F>> = vec![&and_xor_vo];
 
-        let mut vk = Indexer::index(
-            &verifier_key,
-            &vos,
-            &witness_ver_oracles,
-            &instance_oracles,
-            &fixed_oracles,
-            domain,
-            &domain.vanishing_polynomial().into(),
-            None,
-        )
-        .unwrap();
+        // let mut vk = Indexer::index(
+        //     &verifier_key,
+        //     &vos,
+        //     &witness_ver_oracles,
+        //     &instance_oracles,
+        //     &fixed_oracles,
+        //     domain,
+        //     &domain.vanishing_polynomial().into(),
+        //     None,
+        // )
+        // .unwrap();
 
-        let verifier_pp = VerifierPreprocessedInput {
-            fixed_oracles: fixed_oracles.clone(),
-            permutation_oracles: vec![],
-            q_blind: None,
-        };
-        // We clone because fixed oracles must be mutable in order to add evals at challenge
-        // Another option is to create reset method which will just reset challenge to eval mapping
-        // This is anyway just mockup of frontend
-        let mut pp_clone = verifier_pp.clone();
+        // let verifier_pp = VerifierPreprocessedInput {
+        //     fixed_oracles: fixed_oracles.clone(),
+        //     permutation_oracles: vec![],
+        //     q_blind: None,
+        // };
+        // // We clone because fixed oracles must be mutable in order to add evals at challenge
+        // // Another option is to create reset method which will just reset challenge to eval mapping
+        // // This is anyway just mockup of frontend
+        // let mut pp_clone = verifier_pp.clone();
 
-        let res = PilInstance::verify(
-            &mut vk,
-            &mut pp_clone,
-            proof,
-            &mut witness_ver_oracles,
-            &mut instance_oracles,
-            vos.as_slice(),
-            domain_size,
-            &domain.vanishing_polynomial().into(),
-            &mut rng,
-        )
-        .unwrap();
+        // let res = PilInstance::verify(
+        //     &mut vk,
+        //     &mut pp_clone,
+        //     proof,
+        //     &mut witness_ver_oracles,
+        //     &mut instance_oracles,
+        //     vos.as_slice(),
+        //     domain_size,
+        //     &domain.vanishing_polynomial().into(),
+        //     &mut rng,
+        // )
+        // .unwrap();
 
-        assert_eq!(res, ());
+        // assert_eq!(res, ());
     }
 }

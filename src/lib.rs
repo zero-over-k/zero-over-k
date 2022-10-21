@@ -1,5 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet};
-use std::iter::successors;
+use std::iter::{successors, self};
 use std::marker::PhantomData;
 
 use ark_ff::{to_bytes, PrimeField};
@@ -44,6 +44,8 @@ pub mod vo;
 pub mod indexer;
 pub mod multiproof;
 pub mod permutation;
+
+mod tests;
 
 pub struct PIL<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng> {
     _field: PhantomData<F>,
@@ -142,21 +144,14 @@ where
                 &mut fs_rng,
             );
 
-        let z_polys: Vec<WitnessProverOracle<F>> =
-            if let Some(permutation_argument) =
-                &pk.vk.index_info.permutation_argument
-            {
-                PIOPforPolyIdentity::prover_permutation_round(
-                    &verifier_permutation_msg,
-                    &mut prover_state,
-                    permutation_argument,
-                    preprocessed,
-                    &pk.vk.index_info.extended_coset_domain,
-                    zk_rng,
-                )
-            } else {
-                vec![]
-            };
+        let z_polys: Vec<WitnessProverOracle<F>> = PIOPforPolyIdentity::prover_permutation_round(
+            &verifier_permutation_msg,
+            &mut prover_state,
+            &pk.vk.index_info.permutation_argument,
+            preprocessed,
+            &pk.vk.index_info.extended_coset_domain,
+            zk_rng,
+        );
 
         let z_polys_labeled: Vec<_> =
             z_polys.iter().map(|z| z.to_labeled()).collect();
@@ -265,6 +260,9 @@ where
 
         let z_evals = evaluate_q_set(z_polys_labeled.iter(), &z_query_set);
 
+        // compute q_blind eval
+        let q_blind_eval = preprocessed.q_blind.polynomial().evaluate(&verifier_second_msg.xi);
+
         // Multiopen
         let mut oracles: Vec<&dyn Instantiable<F>> = witness_oracles
             .iter()
@@ -272,19 +270,13 @@ where
             .chain(z_polys.iter())
             .map(|o| o as &dyn Instantiable<F>)
             .collect();
-        let mut preprocessed_oracles: Vec<&dyn Instantiable<F>> = preprocessed
+        let preprocessed_oracles: Vec<&dyn Instantiable<F>> = preprocessed
             .fixed_oracles
             .iter()
             .chain(preprocessed.permutation_oracles.iter())
+            .chain(iter::once(&preprocessed.q_blind))
             .map(|o| o as &dyn Instantiable<F>)
             .collect();
-
-        let q_blind_eval = if let Some(q_blind) = &preprocessed.q_blind {
-            preprocessed_oracles.push(q_blind as &dyn Instantiable<F>);
-            Some(q_blind.polynomial().evaluate(&verifier_second_msg.xi))
-        } else {
-            None
-        };
 
         oracles.extend_from_slice(&preprocessed_oracles.as_slice());
 
@@ -566,20 +558,16 @@ where
             sigma.register_eval_at_challenge(verifier_second_msg.xi, eval);
         }
 
+        let oracles_to_copy: Vec<&WitnessVerifierOracle<F, PC>> = witness_oracles
+        .iter()
+        .filter(|&oracle| oracle.should_permute)
+        .collect();
+
         // Map z permutation oracles
-        // Each z is evaluated at: x, wx and w^ux
-        // TODO: make sure that number of z_polys is correct on verifier side
-        let num_of_z_polys = proof.z_commitments.len();
+        let num_of_z_polys = vk.index_info.permutation_argument.number_of_z_polys(oracles_to_copy.len());
+        assert_eq!(num_of_z_polys, proof.z_commitments.len());
 
-        let u = if let Some(permutation_argument) =
-            &vk.index_info.permutation_argument
-        {
-            // let num_of_z_polys = permutation_argument.number_of_z_polys(num_of_polys_to_copy);
-            permutation_argument.u
-        } else {
-            0 // we don't care if permutation is not enabled
-        };
-
+        // Each z is evaluated at: x, wx and w^ux(except the last one)
         let mut z_polys: Vec<_> = proof
             .z_commitments
             .iter()
@@ -590,7 +578,7 @@ where
 
                 // if not last append w^ux
                 if i != num_of_z_polys - 1 {
-                    queried_rotations.insert(Rotation::new(u, Sign::Plus));
+                    queried_rotations.insert(Rotation::new(vk.index_info.permutation_argument.u, Sign::Plus));
                 }
 
                 WitnessVerifierOracle::<F, PC> {
@@ -628,14 +616,7 @@ where
             };
         }
 
-        if let Some(q_blind) = &mut preprocessed.q_blind {
-            let q_blind_eval =
-                proof.q_blind_eval.as_ref().expect("q_blind eval missing");
-            q_blind.register_eval_at_challenge(
-                verifier_second_msg.xi,
-                q_blind_eval.clone(),
-            );
-        }
+        preprocessed.q_blind.register_eval_at_challenge(verifier_second_msg.xi, proof.q_blind_eval.clone());
 
         // END CHALLENGE => EVALS MAPPING
 
@@ -645,55 +626,84 @@ where
         .take(vos.len())
         .collect();
 
-        let dummy_fixed = FixedVerifierOracle::<F, PC> {
-            label: "".to_string(),
-            queried_rotations: BTreeSet::default(),
-            commitment: None,
-            evals_at_challenges: BTreeMap::default(),
-        };
+        let number_of_alphas =
+        vk.index_info.permutation_argument.number_of_alphas(z_polys.len());
 
-        let (permutation_alphas, l0_eval, lu_eval, q_blind) =
-            if let Some(permutation_argument) =
-                &vk.index_info.permutation_argument
-            {
-                // let z_polys = state.z_polys.as_ref().expect("z polys must be in state");
-                let number_of_alphas =
-                    permutation_argument.number_of_alphas(z_polys.len());
+        // start from next of last power of alpha
+        let begin_with = powers_of_alpha.last().unwrap().clone()
+            * verifier_first_msg.alpha;
+        let permutation_alphas: Vec<F> =
+            successors(Some(begin_with), |alpha_i| {
+                Some(*alpha_i * verifier_first_msg.alpha)
+            })
+            .take(number_of_alphas)
+            .collect();
 
-                // start from next of last power of alpha
-                let begin_with = powers_of_alpha.last().unwrap().clone()
-                    * verifier_first_msg.alpha;
-                let powers_of_alpha: Vec<F> =
-                    successors(Some(begin_with), |alpha_i| {
-                        Some(*alpha_i * verifier_first_msg.alpha)
-                    })
-                    .take(number_of_alphas)
-                    .collect();
+        // TODO: ENABLE FAST LAGRANGE EVALUATION
+        let mut l0_evals = vec![F::zero(); domain_size];
+        l0_evals[0] = F::one();
+        let l0 = DensePolynomial::from_coefficients_slice(
+            &domain.ifft(&l0_evals),
+        );
 
-                // TODO: ENABLE FAST LAGRANGE EVALUATION
-                let mut l0_evals = vec![F::zero(); domain_size];
-                l0_evals[0] = F::one();
-                let l0 = DensePolynomial::from_coefficients_slice(
-                    &domain.ifft(&l0_evals),
-                );
+        let mut lu_evals = vec![F::zero(); domain_size];
+        lu_evals[vk.index_info.permutation_argument.u] = F::one();
+        let lu = DensePolynomial::from_coefficients_slice(
+            &domain.ifft(&lu_evals),
+        );
 
-                let mut lu_evals = vec![F::zero(); domain_size];
-                lu_evals[permutation_argument.u] = F::one();
-                let lu = DensePolynomial::from_coefficients_slice(
-                    &domain.ifft(&lu_evals),
-                );
+        let l0_eval = l0.evaluate(&verifier_second_msg.xi);
+        let lu_eval = lu.evaluate(&verifier_second_msg.xi);
 
-                let l0_eval = l0.evaluate(&verifier_second_msg.xi);
-                let lu_eval = lu.evaluate(&verifier_second_msg.xi);
+        // let dummy_fixed = FixedVerifierOracle::<F, PC> {
+        //     label: "".to_string(),
+        //     queried_rotations: BTreeSet::default(),
+        //     commitment: None,
+        //     evals_at_challenges: BTreeMap::default(),
+        // };
 
-                let q_blind = preprocessed.q_blind.as_ref().expect(
-                    "Q blind must be initialized when permutation is used",
-                );
+        // let (permutation_alphas, l0_eval, lu_eval, q_blind) =
+        //     if let Some(permutation_argument) =
+        //         &vk.index_info.permutation_argument
+        //     {
+        //         // let z_polys = state.z_polys.as_ref().expect("z polys must be in state");
+        //         let number_of_alphas =
+        //             permutation_argument.number_of_alphas(z_polys.len());
 
-                (powers_of_alpha, l0_eval, lu_eval, q_blind)
-            } else {
-                (vec![], F::zero(), F::zero(), &dummy_fixed)
-            };
+        //         // start from next of last power of alpha
+        //         let begin_with = powers_of_alpha.last().unwrap().clone()
+        //             * verifier_first_msg.alpha;
+        //         let powers_of_alpha: Vec<F> =
+        //             successors(Some(begin_with), |alpha_i| {
+        //                 Some(*alpha_i * verifier_first_msg.alpha)
+        //             })
+        //             .take(number_of_alphas)
+        //             .collect();
+
+        //         // TODO: ENABLE FAST LAGRANGE EVALUATION
+        //         let mut l0_evals = vec![F::zero(); domain_size];
+        //         l0_evals[0] = F::one();
+        //         let l0 = DensePolynomial::from_coefficients_slice(
+        //             &domain.ifft(&l0_evals),
+        //         );
+
+        //         let mut lu_evals = vec![F::zero(); domain_size];
+        //         lu_evals[permutation_argument.u] = F::one();
+        //         let lu = DensePolynomial::from_coefficients_slice(
+        //             &domain.ifft(&lu_evals),
+        //         );
+
+        //         let l0_eval = l0.evaluate(&verifier_second_msg.xi);
+        //         let lu_eval = lu.evaluate(&verifier_second_msg.xi);
+
+        //         let q_blind = preprocessed.q_blind.as_ref().expect(
+        //             "Q blind must be initialized when permutation is used",
+        //         );
+
+        //         (powers_of_alpha, l0_eval, lu_eval, q_blind)
+        //     } else {
+        //         (vec![], F::zero(), F::zero(), &dummy_fixed)
+        //     };
 
         let mut quotient_eval = F::zero();
         for (vo_index, vo) in vos.iter().enumerate() {
@@ -733,24 +743,20 @@ where
 
             quotient_eval += powers_of_alpha[vo_index] * vo_evaluation;
 
-            if let Some(permutation_argument) =
-                &vk.index_info.permutation_argument
-            {
-                quotient_eval += permutation_argument.open_argument(
-                    l0_eval,
-                    lu_eval,
-                    q_blind,
-                    &z_polys,
-                    &preprocessed.permutation_oracles,
-                    witness_oracles,
-                    &permutation_argument.deltas,
-                    verifier_permutation_msg.beta,
-                    verifier_permutation_msg.gamma,
-                    &domain,
-                    verifier_second_msg.xi,
-                    &permutation_alphas,
-                );
-            }
+            quotient_eval += vk.index_info.permutation_argument.open_argument(
+                l0_eval,
+                lu_eval,
+                &preprocessed.q_blind,
+                &z_polys,
+                &preprocessed.permutation_oracles,
+                oracles_to_copy.as_slice(),
+                // &permutation_argument.deltas,
+                verifier_permutation_msg.beta,
+                verifier_permutation_msg.gamma,
+                &domain,
+                verifier_second_msg.xi,
+                &permutation_alphas,
+            );
         }
 
         let x_n = verifier_second_msg.xi.pow([domain_size as u64, 0, 0, 0]);
@@ -785,12 +791,9 @@ where
                 .fixed_oracles
                 .iter()
                 .chain(preprocessed.permutation_oracles.iter())
+                .chain(iter::once(&preprocessed.q_blind))
                 .map(|o| o as &dyn CommittedOracle<F, PC>)
                 .collect();
-
-        if let Some(q_blind) = &preprocessed.q_blind {
-            preprocessed_oracles.push(q_blind as &dyn CommittedOracle<F, PC>);
-        }
 
         oracles.extend_from_slice(&preprocessed_oracles.as_slice());
 

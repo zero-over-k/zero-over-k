@@ -31,14 +31,14 @@ pub struct PermutationInfo<F: PrimeField> {
 pub struct IndexInfo<F: PrimeField> {
     pub quotient_degree: usize,
     pub extended_coset_domain: GeneralEvaluationDomain<F>,
-    pub permutation_argument: Option<PermutationArgument<F>>,
+    pub permutation_argument: PermutationArgument<F>,
 }
 
 pub struct ProverPreprocessedInput<F: PrimeField, PC: HomomorphicCommitment<F>>
 {
     pub fixed_oracles: Vec<FixedProverOracle<F>>,
     pub permutation_oracles: Vec<FixedProverOracle<F>>,
-    pub q_blind: Option<FixedProverOracle<F>>,
+    pub q_blind: FixedProverOracle<F>,
     pub empty_rands_for_fixed: Vec<PC::Randomness>,
 }
 
@@ -48,7 +48,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>>
     pub fn new(
         fixed_oracles: &Vec<FixedProverOracle<F>>,
         permutation_oracles: &Vec<FixedProverOracle<F>>,
-        q_blind: Option<FixedProverOracle<F>>,
+        q_blind: &FixedProverOracle<F>,
         index_info: &IndexInfo<F>,
     ) -> Self {
         let mut fixed_oracles = fixed_oracles.clone();
@@ -62,20 +62,15 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>>
             oracle.compute_extended_evals(&index_info.extended_coset_domain);
         }
 
-        let (q_blind, rand_inc) = if let Some(q_blind) = q_blind {
-            let mut q_blind = q_blind.clone();
-            q_blind.compute_extended_evals(&index_info.extended_coset_domain);
-            (Some(q_blind), 1)
-        } else {
-            (None, 0)
-        };
+        let mut q_blind = q_blind.clone();
+        q_blind.compute_extended_evals(&index_info.extended_coset_domain);
 
         Self {
             empty_rands_for_fixed: vec![
                 PC::Randomness::empty();
                 fixed_oracles.len()
                     + permutation_oracles.len()
-                    + rand_inc
+                    + 1 // for q_blind
             ],
             fixed_oracles,
             permutation_oracles,
@@ -90,7 +85,7 @@ pub struct VerifierPreprocessedInput<
 > {
     pub fixed_oracles: Vec<FixedVerifierOracle<F, PC>>,
     pub permutation_oracles: Vec<FixedVerifierOracle<F, PC>>,
-    pub q_blind: Option<FixedVerifierOracle<F, PC>>,
+    pub q_blind: FixedVerifierOracle<F, PC>,
 }
 
 impl<F: PrimeField, PC: HomomorphicCommitment<F>> Clone
@@ -147,7 +142,7 @@ pub struct Proof<F: PrimeField, PC: HomomorphicCommitment<F>> {
     pub z_commitments: Vec<PC::Commitment>,
     pub z_evals: Vec<F>,
     pub permutation_oracle_evals: Vec<F>,
-    pub q_blind_eval: Option<F>,
+    pub q_blind_eval: F,
     pub multiopen_proof: MultiOpenProof<F, PC>,
 }
 
@@ -163,7 +158,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Proof<F, PC> {
             z commitments: {}
             z evals {}
             permutation oracle evals: {}
-            q_blind_eval {}
+            q_blind_eval 1
             MultiOpenProof:
                 q_evals: {}
                 f_commit: 1
@@ -177,7 +172,6 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Proof<F, PC> {
             self.z_commitments.len(),
             self.z_evals.len(),
             self.permutation_oracle_evals.len(),
-            self.q_blind_eval.map_or(0, |_| 1),
             self.multiopen_proof.q_evals.len()
         )
         .to_string()
@@ -193,7 +187,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Proof<F, PC> {
             + self.fixed_oracle_evals.len()
             + self.z_evals.len()
             + self.permutation_oracle_evals.len()
-            + self.q_blind_eval.map_or(0, |_| 1)
+            + 1 // q_blind
             + self.multiopen_proof.q_evals.len();
 
         format!(
