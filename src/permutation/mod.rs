@@ -1,17 +1,13 @@
-use std::marker::PhantomData;
-
 use ark_ff::PrimeField;
 use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
 use ark_std::rand::RngCore;
-use itertools::Itertools;
 
 use crate::{
     commitment::HomomorphicCommitment,
     oracles::{
         fixed::{FixedProverOracle, FixedVerifierOracle},
-        query::QueryContext,
         rotation::{Rotation, Sign},
-        traits::{ConcreteOracle, Instantiable, WitnessOracle},
+        traits::{ConcreteOracle, Instantiable},
         witness::{WitnessProverOracle, WitnessVerifierOracle},
     },
     permutation::grand_product::GrandProductArgument,

@@ -1,9 +1,4 @@
-use std::{
-    cmp::{max, min},
-    collections::BTreeMap,
-    iter,
-    marker::PhantomData,
-};
+use std::{cmp::max, collections::BTreeMap, iter, marker::PhantomData};
 
 use ark_ff::PrimeField;
 use ark_poly::{
@@ -17,13 +12,9 @@ use crate::{
     error::Error,
     oracles::{
         query::OracleType,
-        traits::{
-            ConcreteOracle, FixedOracle, InstanceOracle, Instantiable,
-            WitnessOracle,
-        },
-        witness::WitnessProverOracle,
+        traits::{FixedOracle, InstanceOracle, WitnessOracle},
     },
-    permutation::{self, PermutationArgument},
+    permutation::PermutationArgument,
     util::compute_vanishing_poly_over_coset,
     vo::VirtualOracle,
 };

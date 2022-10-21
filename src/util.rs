@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
-use ark_ff::{Field, PrimeField};
-use ark_poly::{univariate::DensePolynomial, EvaluationDomain, Polynomial};
+use ark_ff::PrimeField;
+use ark_poly::{univariate::DensePolynomial, EvaluationDomain};
 use ark_poly_commit::{LabeledPolynomial, QuerySet};
 
 pub fn compute_vanishing_poly_over_coset<F, D>(
