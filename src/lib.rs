@@ -898,7 +898,7 @@ where
                 // if not last append w^ux
                 if i != num_of_z_polys - 1 {
                     queried_rotations.insert(Rotation::new(
-                        vk.index_info.permutation_argument.u,
+                        vk.index_info.permutation_argument.usable_rows,
                         Sign::Plus,
                     ));
                 }
@@ -991,7 +991,7 @@ where
             DensePolynomial::from_coefficients_slice(&domain.ifft(&l0_evals));
 
         let mut lu_evals = vec![F::zero(); domain_size];
-        lu_evals[vk.index_info.permutation_argument.u] = F::one();
+        lu_evals[vk.index_info.permutation_argument.usable_rows] = F::one();
         let lu =
             DensePolynomial::from_coefficients_slice(&domain.ifft(&lu_evals));
 

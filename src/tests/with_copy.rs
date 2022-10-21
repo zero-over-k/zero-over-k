@@ -438,9 +438,12 @@ mod copy_constraint_tests {
             queried_rotations: BTreeSet::from([Rotation::curr()]),
         };
 
-        let u = 8; // see Note at comment on top
+        let perm_params = PermutationInfo {
+            u: 8, // see Note at comment on top
+            deltas: deltas.to_vec(),
+        };
         let permutation_argument =
-            PermutationArgument::<F>::new(scaling_factor, u, &deltas);
+            PermutationArgument::<F>::new(scaling_factor, &perm_params);
 
         let witness_oracles = [&a, &b, &c];
         let permutation_oracles = [sigma1, sigma2, sigma3];

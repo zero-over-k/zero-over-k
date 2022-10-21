@@ -15,22 +15,24 @@ use crate::{
         query::OracleType,
         traits::{FixedOracle, InstanceOracle, WitnessOracle},
     },
-    permutation::PermutationArgument,
+    permutation::{self, PermutationArgument},
     util::compute_vanishing_poly_over_coset,
     vo::{LookupVirtualOracle, VirtualOracle},
 };
 
 /*
-    We want to support both Plonkish like zero over K checks, where each gate is separated with selector, ex: (q_1, gate_1), (q_2, gate_2),
-    and also arbitrary polynomial constraints, (ex. https://eprint.iacr.org/2021/1342.pdf look at proof of functional relation)
+    We want to support both Plonkish like zero over K checks, where each gate is separated with
+    selector, ex: (q_1, gate_1), (q_2, gate_2), and also arbitrary polynomial constraints,
+    (ex. https://eprint.iacr.org/2021/1342.pdf look at proof of functional relation)
     where there is no concept of selector.
 
     There are multiple ways of how to blind some oracles.
 
-    1. In Plonkish like style we can reserve some t rows for blinding and simply when constructing vanishing argument all selectors
-    are zero at that t rows.
+    1. In Plonkish like style we can reserve some t rows for blinding and simply when constructing
+    vanishing argument all selectors are zero at that t rows.
 
-    2. When there are no selectors we can still use some t rows for blinding, but now instead of checking that something vanishes on
+    2. When there are no selectors we can still use some t rows for blinding, but now instead of
+    checking that something vanishes on
 
     zH = X^n - 1, we can check that it vanishes on zH = (X^n - 1) / prod{i in last [t]} (x - w_i)
 */
@@ -43,10 +45,10 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
     fn compute_quotient_degree(
         witness_oracles: &[impl WitnessOracle<F>],
         instance_oracles: &[impl InstanceOracle<F>],
-        selector_oracles: &[impl FixedOracle<F>],
+        fixed_oracles: &[impl FixedOracle<F>],
         witness_oracles_mapping: &BTreeMap<String, usize>,
         instance_oracles_mapping: &BTreeMap<String, usize>,
-        selector_oracles_mapping: &BTreeMap<String, usize>,
+        fixed_oracles_mapping: &BTreeMap<String, usize>,
         vos: &[&dyn VirtualOracle<F>],
         domain_size: usize,
         z_h_degree: usize,
@@ -77,8 +79,8 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
                             }
                         }
                         OracleType::Fixed => {
-                            match selector_oracles_mapping.get(&query.label) {
-                                Some(index) => selector_oracles[*index]
+                            match fixed_oracles_mapping.get(&query.label) {
+                                Some(index) => fixed_oracles[*index]
                                     .get_degree(domain_size),
                                 None => panic!(
                                     "Fixed oracle with label {} not found",
@@ -101,8 +103,8 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
     ) -> Vec<F> {
         assert!(domain.size() <= extended_coset_domain.size());
         /*
-            Consider case when simple mul over whole domain is being checked: a * b - c = 0 and zH = X^n - 1,
-            extended_coset_domain will be exactly domain and zH.coset_fft() will not work since zH.degree() = 16 > 15
+        Consider case when simple mul over whole domain is being checked: a * b - c = 0 and zH = X^n - 1,
+        extended_coset_domain will be exactly domain and zH.coset_fft() will not work since zH.degree() = 16 > 15
         */
         let domain_size = domain.size();
         let vanish_dense: DensePolynomial<F> =
@@ -149,6 +151,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
             .enumerate()
             .map(|(i, oracle)| (oracle.get_label(), i))
             .collect();
+
         let instance_oracles_mapping: BTreeMap<String, usize> =
             instance_oracles
                 .iter()
@@ -182,6 +185,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
             return Err(Error::QuotientTooSmall);
         }
 
+<<<<<<< HEAD
         // it is possible that there are no oracles to permute
         let num_of_oracles_to_permute =
             witness_oracles.iter().fold(0usize, |sum, oracle| {
@@ -214,6 +218,16 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
             permutation_info.u,
             &permutation_info.deltas,
         );
+=======
+        let scaling_factor = extended_coset_domain.size() / domain.size();
+        let scaling_factor = max(
+            scaling_factor,
+            PermutationArgument::<F>::MINIMAL_SCALING_FACTOR,
+        );
+
+        let permutation_argument =
+            PermutationArgument::new(scaling_factor, &permutation_info);
+>>>>>>> 331294e (Modify `PermutationArgument::new(..)`)
 
         let extended_coset_domain =
             GeneralEvaluationDomain::<F>::new(scaling_factor * domain.size())

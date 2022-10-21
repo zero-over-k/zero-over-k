@@ -15,7 +15,6 @@ use crate::{
     data_structures::{IndexInfo, ProverPreprocessedInput, VerifierKey},
     lookup::{self, subset_equality::SubsetEqualityArgument, LookupArgument},
     oracles::{
-        fixed::FixedProverOracle,
         instance::InstanceProverOracle,
         query::OracleType,
         rotation::Rotation,
@@ -294,7 +293,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
         let l0_coset_evals = vk.index_info.extended_coset_domain.coset_fft(&l0);
 
         let mut lu_evals = vec![F::zero(); domain_size];
-        lu_evals[vk.index_info.permutation_argument.u] = F::one();
+        lu_evals[vk.index_info.permutation_argument.usable_rows] = F::one();
         let lu = DensePolynomial::from_coefficients_slice(
             &state.domain.ifft(&lu_evals),
         );

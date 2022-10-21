@@ -24,8 +24,20 @@ pub type UniversalSRS<F, PC> =
 
 #[derive(Clone)]
 pub struct PermutationInfo<F: PrimeField> {
-    pub u: usize,       // usable rows
-    pub deltas: Vec<F>, // separators for different wires
+    /// Usable rows
+    pub u: usize,
+    /// Separators for different wires
+    pub deltas: Vec<F>,
+}
+
+impl<F: PrimeField> PermutationInfo<F> {
+    /// Returns empty PermutationInfo used when the permutation argument is not used.
+    pub fn empty() -> Self {
+        Self {
+            u: 0usize,
+            deltas: Vec::new(),
+        }
+    }
 }
 
 impl<F: PrimeField> PermutationInfo<F> {
