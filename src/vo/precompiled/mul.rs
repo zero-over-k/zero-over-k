@@ -148,6 +148,7 @@ mod test {
         let vk = Indexer::index(
             &verifier_key,
             &vos,
+            vec![],
             &witness_oracles,
             &instance_oracles,
             &fixed_oracles,
@@ -168,6 +169,7 @@ mod test {
         };
 
         let preprocessed = ProverPreprocessedInput::new(
+            &vec![],
             &vec![],
             &vec![],
             &q_blind,
@@ -233,6 +235,7 @@ mod test {
         let mut vk = Indexer::index(
             &verifier_key,
             &vos,
+            vec![],
             &mut ver_wtns_oracles,
             &instance_oracles,
             &fixed_oracles,

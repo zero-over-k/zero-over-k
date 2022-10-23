@@ -14,9 +14,9 @@ use crate::{
         query::OracleType,
         traits::{FixedOracle, InstanceOracle, WitnessOracle},
     },
-    permutation::{self, PermutationArgument},
+    permutation::PermutationArgument,
     util::compute_vanishing_poly_over_coset,
-    vo::VirtualOracle,
+    vo::{VirtualOracle, LookupVirtualOracle},
 };
 
 /*
@@ -131,16 +131,17 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
         zh_inverses_over_coset
     }
 
-    pub fn index(
+    pub fn index<'a>(
         vk: &PC::VerifierKey,
         vos: &[&dyn VirtualOracle<F>],
+        lookups: Vec<&'a dyn LookupVirtualOracle<F>>,
         witness_oracles: &[impl WitnessOracle<F>],
         instance_oracles: &[impl InstanceOracle<F>],
         fixed_oracles: &[impl FixedOracle<F>],
         domain: GeneralEvaluationDomain<F>,
         zH: &DensePolynomial<F>,
         permutation_info: PermutationInfo<F>,
-    ) -> Result<VerifierKey<F, PC>, Error<PC::Error>> {
+    ) -> Result<VerifierKey<'a, F, PC>, Error<PC::Error>> {
         let witness_oracles_mapping: BTreeMap<String, usize> = witness_oracles
             .iter()
             .enumerate()
@@ -217,6 +218,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
             quotient_degree,
             extended_coset_domain,
             permutation_argument,
+            lookups
         };
 
         let vk = VerifierKey {

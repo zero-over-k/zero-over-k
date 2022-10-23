@@ -10,7 +10,7 @@ use crate::{
         fixed::{FixedProverOracle, FixedVerifierOracle},
         traits::Instantiable,
     },
-    permutation::PermutationArgument,
+    permutation::PermutationArgument, vo::LookupVirtualOracle,
 };
 
 use ark_serialize::{
@@ -37,16 +37,18 @@ impl<F: PrimeField> PermutationInfo<F> {
 }
 
 #[derive(Clone)]
-pub struct IndexInfo<F: PrimeField> {
+pub struct IndexInfo<'a, F: PrimeField> {
     pub quotient_degree: usize,
     pub extended_coset_domain: GeneralEvaluationDomain<F>,
     pub permutation_argument: PermutationArgument<F>,
+    pub lookups: Vec<&'a dyn LookupVirtualOracle<F>>
 }
 
 pub struct ProverPreprocessedInput<F: PrimeField, PC: HomomorphicCommitment<F>>
 {
     pub fixed_oracles: Vec<FixedProverOracle<F>>,
     pub permutation_oracles: Vec<FixedProverOracle<F>>,
+    pub table_oracles: Vec<FixedProverOracle<F>>,
     pub q_blind: FixedProverOracle<F>,
     pub empty_rands_for_fixed: Vec<PC::Randomness>,
 }
@@ -57,17 +59,23 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>>
     pub fn new(
         fixed_oracles: &Vec<FixedProverOracle<F>>,
         permutation_oracles: &Vec<FixedProverOracle<F>>,
+        table_oracles: &Vec<FixedProverOracle<F>>,
         q_blind: &FixedProverOracle<F>,
         index_info: &IndexInfo<F>,
     ) -> Self {
         let mut fixed_oracles = fixed_oracles.clone();
         let mut permutation_oracles = permutation_oracles.clone();
+        let mut table_oracles = table_oracles.clone();
 
         for oracle in fixed_oracles.iter_mut() {
             oracle.compute_extended_evals(&index_info.extended_coset_domain);
         }
 
         for oracle in permutation_oracles.iter_mut() {
+            oracle.compute_extended_evals(&index_info.extended_coset_domain);
+        }
+
+        for oracle in table_oracles.iter_mut() {
             oracle.compute_extended_evals(&index_info.extended_coset_domain);
         }
 
@@ -79,10 +87,12 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>>
                 PC::Randomness::empty();
                 fixed_oracles.len()
                     + permutation_oracles.len()
+                    + table_oracles.len()
                     + 1 // for q_blind
             ],
             fixed_oracles,
             permutation_oracles,
+            table_oracles,
             q_blind,
         }
     }
@@ -108,13 +118,13 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Clone
         }
     }
 }
-pub struct VerifierKey<F: PrimeField, PC: HomomorphicCommitment<F>> {
+pub struct VerifierKey<'a, F: PrimeField, PC: HomomorphicCommitment<F>> {
     pub verifier_key: PC::VerifierKey,
-    pub index_info: IndexInfo<F>,
+    pub index_info: IndexInfo<'a, F>,
     pub zh_inverses_over_coset: Vec<F>,
 }
 
-impl<F: PrimeField, PC: HomomorphicCommitment<F>> Clone for VerifierKey<F, PC> {
+impl<'a, F: PrimeField, PC: HomomorphicCommitment<F>> Clone for VerifierKey<'a, F, PC> {
     fn clone(&self) -> Self {
         Self {
             verifier_key: self.verifier_key.clone(),
@@ -124,15 +134,15 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Clone for VerifierKey<F, PC> {
     }
 }
 
-pub struct ProverKey<F: PrimeField, PC: HomomorphicCommitment<F>> {
-    pub vk: VerifierKey<F, PC>,
+pub struct ProverKey<'a, F: PrimeField, PC: HomomorphicCommitment<F>> {
+    pub vk: VerifierKey<'a, F, PC>,
     pub committer_key: PC::CommitterKey,
 }
 
-impl<F: PrimeField, PC: HomomorphicCommitment<F>> ProverKey<F, PC> {
+impl<'a, F: PrimeField, PC: HomomorphicCommitment<F>> ProverKey<'a, F, PC> {
     pub fn from_ck_and_vk(
         ck: &PC::CommitterKey,
-        vk: &VerifierKey<F, PC>,
+        vk: &VerifierKey<'a, F, PC>,
     ) -> Self {
         Self {
             vk: vk.clone(),

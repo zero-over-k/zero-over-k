@@ -1184,6 +1184,7 @@ mod copy_constraint_tests {
         let vk = Indexer::<F, PC>::index(
             &verifier_key,
             &vos,
+            vec![],
             &witness_oracles,
             &instance_oracles,
             &fixed_oracles,
@@ -1198,6 +1199,7 @@ mod copy_constraint_tests {
         let preprocessed = ProverPreprocessedInput::new(
             &fixed_oracles.to_vec(),
             &permutation_oracles.to_vec(),
+            &vec![],
             &q_blind,
             &vk.index_info,
         );
@@ -1317,6 +1319,7 @@ mod copy_constraint_tests {
         let mut vk = Indexer::index(
             &verifier_key,
             &vos,
+            vec![],
             &witness_ver_oracles,
             &instance_oracles,
             &selector_oracles,
