@@ -21,7 +21,7 @@ use crate::{
         instance::{InstanceProverOracle, InstanceVerifierOracle},
         query::{OracleQuery, OracleType},
         rotation::Rotation,
-        traits::{ConcreteOracle, Instantiable},
+        traits::{ConcreteOracle, Instantiable, CommittedOracle},
         witness::{WitnessProverOracle, WitnessVerifierOracle},
     },
     vo::new_expression::NewExpression,
@@ -325,8 +325,63 @@ impl<F: PrimeField> LookupArgument<F> {
         lookup_index: usize,
         lookup_expressions: &Vec<NewExpression<F>>,
         table_queries: &Vec<OracleQuery>,
-        theta: F, // lookup aggregation expression
+        theta: F, // lookup aggregation expression, 
+        evaluation_challenge: F, // evaluation_challenge
+        omegas: &Vec<F>
     ) {
+        assert_eq!(lookup_expressions.len(), table_queries.len());
+        let lookup_arith = lookup_expressions.len();
+
+        let powers_of_theta: Vec<F> =
+            successors(Some(F::one()), |theta_i| Some(*theta_i * theta))
+                .take(lookup_arith)
+                .collect();
+
+
+        let expression_evals = lookup_expressions.iter().map(|lookup_expr| {
+            lookup_expr.evaluate(
+                &|x: F| x,
+                &|query| {
+                    match query.oracle_type {
+                        OracleType::Witness => {
+                            let evaluation_challenge = query.rotation.compute_evaluation_point(
+                                evaluation_challenge,
+                                omegas,
+                            );
+                            match witness_oracles_mapping.get(&query.label) {
+                                Some(index) => witness_oracles[*index].query(&evaluation_challenge),
+                                None => panic!("Witness oracle with label {} not found", query.label)
+                            }
+                        },
+                        OracleType::Instance => {
+                            match instance_oracles_mapping.get(&query.label) {
+                                Some(index) => instance_oracles[*index].query(&evaluation_challenge),
+                                None => panic!("Instance oracle with label {} not found", query.label)
+                            }
+                        },
+                        OracleType::Fixed => {
+                            match fixed_oracles_mapping.get(&query.label) {
+                                Some(index) => fixed_oracles[*index].query(&evaluation_challenge),
+                                None => panic!("Fixed oracle with label {} not found", query.label)
+                            }
+                        },
+                    }
+                },
+                &|x: F| -x,
+                &|x: F, y: F| x + y,
+                &|x: F, y: F| x * y,
+                &|x: F, y: F| x * y,
+            )
+        });
+
+        let mut agg = F::zero();
+        for (expr_i, theta_i) in
+            expression_evals.zip(powers_of_theta.iter())
+        {
+            agg += expr_i * theta_i
+        }
+
+        
     }
 
     pub fn instantiate_argument_at_omega_i(
