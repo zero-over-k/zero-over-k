@@ -74,7 +74,9 @@ pub trait CommittedOracle<F: PrimeField, PC: HomomorphicCommitment<F>>:
     fn get_commitment(&self) -> &PC::Commitment;
 }
 
-pub trait WitnessOracle<F: PrimeField>: ConcreteOracle<F> {}
+pub trait WitnessOracle<F: PrimeField>: ConcreteOracle<F> {
+    fn should_include_in_copy(&self) -> bool;
+}
 
 pub trait InstanceOracle<F: PrimeField>: ConcreteOracle<F> {}
 

@@ -173,7 +173,7 @@ where
         // --------------------------------------------------------------------
         // First round
 
-        let quotient_chunk_oracles = PIOPforPolyIdentity::prover_first_round(
+        let quotient_chunk_oracles = PIOPforPolyIdentity::prover_quotient_round(
             &verifier_permutation_msg,
             &verifier_first_msg,
             &mut prover_state,
@@ -708,19 +708,25 @@ where
 
             quotient_eval += powers_of_alpha[vo_index] * vo_evaluation;
 
-            quotient_eval += vk.index_info.permutation_argument.open_argument(
-                l0_eval,
-                lu_eval,
-                &preprocessed.q_blind,
-                &z_polys,
-                &preprocessed.permutation_oracles,
-                oracles_to_copy.as_slice(),
-                verifier_permutation_msg.beta,
-                verifier_permutation_msg.gamma,
-                &domain,
-                verifier_second_msg.xi,
-                &permutation_alphas,
-            );
+            // Permutation argument
+            // If there are no oracles to enforce copy constraints on, we just return zero 
+            quotient_eval += if oracles_to_copy.len() > 0 {
+                vk.index_info.permutation_argument.open_argument(
+                    l0_eval,
+                    lu_eval,
+                    &preprocessed.q_blind,
+                    &z_polys,
+                    &preprocessed.permutation_oracles,
+                    oracles_to_copy.as_slice(),
+                    verifier_permutation_msg.beta,
+                    verifier_permutation_msg.gamma,
+                    &domain,
+                    verifier_second_msg.xi,
+                    &permutation_alphas,
+                )
+            } else {
+                F::zero()
+            }
         }
 
         let x_n = verifier_second_msg.xi.pow([domain_size as u64, 0, 0, 0]);

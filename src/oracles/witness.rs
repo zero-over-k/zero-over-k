@@ -27,7 +27,11 @@ pub struct WitnessProverOracle<F: PrimeField> {
     pub(crate) should_permute: bool,
 }
 
-impl<F: PrimeField> WitnessOracle<F> for WitnessProverOracle<F> {}
+impl<F: PrimeField> WitnessOracle<F> for WitnessProverOracle<F> {
+    fn should_include_in_copy(&self) -> bool {
+        self.should_permute
+    }
+}
 
 impl<F: PrimeField> ConcreteOracle<F> for WitnessProverOracle<F> {
     fn register_rotation(&mut self, rotation: Rotation) {
@@ -106,6 +110,9 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> WitnessVerifierOracle<F, PC> {
 impl<F: PrimeField, PC: HomomorphicCommitment<F>> WitnessOracle<F>
     for WitnessVerifierOracle<F, PC>
 {
+    fn should_include_in_copy(&self) -> bool {
+        self.should_permute
+    }
 }
 
 impl<F: PrimeField, PC: HomomorphicCommitment<F>> Clone

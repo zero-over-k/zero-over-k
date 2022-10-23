@@ -226,7 +226,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> CommittedOracle<F, PC>
     fn get_commitment(&self) -> &<PC>::Commitment {
         match &self.commitment {
             Some(c) => c,
-            None => panic!("Commitment not provided"),
+            None => panic!("Commitment for oracle {} not provided of type fixed", self.label),
         }
     }
 }

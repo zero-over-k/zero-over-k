@@ -27,6 +27,15 @@ pub struct PermutationInfo<F: PrimeField> {
     pub deltas: Vec<F>, // separators for different wires
 }
 
+impl<F: PrimeField> PermutationInfo<F> {
+    pub fn dummy() -> Self {
+        Self {
+            u: 0, 
+            deltas: vec![]
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct IndexInfo<F: PrimeField> {
     pub quotient_degree: usize,

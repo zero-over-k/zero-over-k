@@ -104,6 +104,11 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
         extended_coset_domain: &GeneralEvaluationDomain<F>,
         zk_rng: &mut R,
     ) -> Vec<WitnessProverOracle<F>> {
+        // if nothing to copy just return empty vector
+        if state.oracles_to_copy.len() == 0 {
+            state.z_polys = Some(vec![]);
+            return vec![]
+        }
         let z_polys = permutation_argument.construct_agg_polys(
             &state.oracles_to_copy,
             &preprocessed.permutation_oracles,
@@ -118,7 +123,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
         z_polys
     }
 
-    pub fn prover_first_round(
+    pub fn prover_quotient_round(
         verifier_permutation_msg: &VerifierPermutationMsg<F>,
         verifier_msg: &VerifierFirstMsg<F>,
         state: &mut ProverState<F>,
@@ -201,7 +206,10 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
                 numerator_evals[i] += powers_of_alpha[vo_index] * vo_evaluation;
             }
 
-            numerator_evals[i] += vk
+            // Permutation argument
+            // If there are no oracles to enforce copy constraints on, we just return zero 
+            numerator_evals[i] += if state.oracles_to_copy.len() > 0 {
+                vk
                 .index_info
                 .permutation_argument
                 .instantiate_argument_at_omega_i(
@@ -217,7 +225,10 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
                     verifier_permutation_msg.gamma,
                     &state.domain,
                     &permutation_alphas,
-                );
+                )
+            } else {
+                F::zero()
+            };
         }
 
         let quotient_evals: Vec<_> = numerator_evals

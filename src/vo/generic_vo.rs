@@ -88,12 +88,12 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> GenericVO<F, PC> {
 impl<F: PrimeField, PC: HomomorphicCommitment<F>> VirtualOracle<F>
     for GenericVO<F, PC>
 {
-    fn get_queries(&self) -> &[OracleQuery] {
-        match &self.queries {
-            Some(queries) => &queries,
-            None => panic!("Queries are not initialized"),
-        }
-    }
+    // fn get_queries(&self) -> &[OracleQuery] {
+    //     match &self.queries {
+    //         Some(queries) => &queries,
+    //         None => panic!("Queries are not initialized"),
+    //     }
+    // }
 
     fn get_expression(&self) -> &NewExpression<F> {
         match &self.expression {
