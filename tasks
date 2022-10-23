@@ -1,5 +1,5 @@
-1. design circuit with copy constraints
-2. finalize permutation integration 
-3. add lookups
-4. design circuit with lookups
-5. extract halo2 assignment then prove&verify it
+1. integrate lookups
+2. design circuit with lookups
+3. extract halo2 assignment then prove&verify it
+4. extract zkgarage assignment then prove&verify it
+
