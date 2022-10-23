@@ -10,7 +10,8 @@ use crate::{
         fixed::{FixedProverOracle, FixedVerifierOracle},
         traits::Instantiable,
     },
-    permutation::PermutationArgument, vo::LookupVirtualOracle,
+    permutation::PermutationArgument,
+    vo::LookupVirtualOracle,
 };
 
 use ark_serialize::{
@@ -41,7 +42,7 @@ pub struct IndexInfo<'a, F: PrimeField> {
     pub quotient_degree: usize,
     pub extended_coset_domain: GeneralEvaluationDomain<F>,
     pub permutation_argument: PermutationArgument<F>,
-    pub lookups: Vec<&'a dyn LookupVirtualOracle<F>>
+    pub lookups: Vec<&'a dyn LookupVirtualOracle<F>>,
 }
 
 pub struct ProverPreprocessedInput<F: PrimeField, PC: HomomorphicCommitment<F>>
@@ -124,7 +125,9 @@ pub struct VerifierKey<'a, F: PrimeField, PC: HomomorphicCommitment<F>> {
     pub zh_inverses_over_coset: Vec<F>,
 }
 
-impl<'a, F: PrimeField, PC: HomomorphicCommitment<F>> Clone for VerifierKey<'a, F, PC> {
+impl<'a, F: PrimeField, PC: HomomorphicCommitment<F>> Clone
+    for VerifierKey<'a, F, PC>
+{
     fn clone(&self) -> Self {
         Self {
             verifier_key: self.verifier_key.clone(),

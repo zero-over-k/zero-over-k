@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 
 use ark_ff::{FftField, PrimeField};
-use ark_poly::{univariate::DensePolynomial, GeneralEvaluationDomain, domain};
+use ark_poly::{domain, univariate::DensePolynomial, GeneralEvaluationDomain};
 use ark_poly_commit::{LabeledPolynomial, QuerySet};
 
 use crate::commitment::HomomorphicCommitment;
@@ -66,26 +66,27 @@ pub trait Instantiable<F: FftField>: ConcreteOracle<F> {
         return eval;
     }
 
-    fn query_at_omega_in_original_domain(&self, omega_index: usize, rotation: Rotation) -> F {
+    fn query_at_omega_in_original_domain(
+        &self,
+        omega_index: usize,
+        rotation: Rotation,
+    ) -> F {
         let evals = self.evals();
-        let domain_size = evals.len(); 
+        let domain_size = evals.len();
         if rotation.degree == 0 {
             return evals[omega_index];
         }
 
         let eval = match &rotation.sign {
-            Sign::Plus => {
-                evals[(omega_index + rotation.degree) % domain_size]
-            }
+            Sign::Plus => evals[(omega_index + rotation.degree) % domain_size],
             // TODO: test negative rotations
             Sign::Minus => {
                 let index = omega_index as i64 - (rotation.degree) as i64;
                 if index >= 0 {
                     evals[index as usize]
                 } else {
-                    let move_from_end = (rotation.degree
-                        - omega_index)
-                        % domain_size;
+                    let move_from_end =
+                        (rotation.degree - omega_index) % domain_size;
                     evals[domain_size - move_from_end]
                 }
             }

@@ -16,7 +16,7 @@ use crate::{
     },
     permutation::PermutationArgument,
     util::compute_vanishing_poly_over_coset,
-    vo::{VirtualOracle, LookupVirtualOracle},
+    vo::{LookupVirtualOracle, VirtualOracle},
 };
 
 /*
@@ -218,7 +218,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
             quotient_degree,
             extended_coset_domain,
             permutation_argument,
-            lookups
+            lookups,
         };
 
         let vk = VerifierKey {

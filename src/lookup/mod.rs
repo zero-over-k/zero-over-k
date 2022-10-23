@@ -1,18 +1,30 @@
-use std::{marker::PhantomData, collections::{BTreeMap, BTreeSet}, iter::successors};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    iter::successors,
+    marker::PhantomData,
+};
 
 use ark_ff::PrimeField;
-use ark_poly::{EvaluationDomain, GeneralEvaluationDomain, univariate::DensePolynomial, UVPolynomial};
+use ark_poly::{
+    univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
+    UVPolynomial,
+};
 use ark_std::rand::Rng;
 
 use crate::{
     commitment::HomomorphicCommitment,
-    lookup::{subset_equality::SubsetEqualityArgument, permute::permute_for_lookup},
+    lookup::{
+        permute::permute_for_lookup, subset_equality::SubsetEqualityArgument,
+    },
     oracles::{
         fixed::{FixedProverOracle, FixedVerifierOracle},
+        instance::{InstanceProverOracle, InstanceVerifierOracle},
+        query::{OracleQuery, OracleType},
         rotation::Rotation,
         traits::{ConcreteOracle, Instantiable},
-        witness::{WitnessProverOracle, WitnessVerifierOracle}, query::{OracleQuery, OracleType}, instance::InstanceProverOracle,
-    }, vo::new_expression::NewExpression,
+        witness::{WitnessProverOracle, WitnessVerifierOracle},
+    },
+    vo::new_expression::NewExpression,
 };
 
 pub mod permute;
@@ -36,38 +48,38 @@ impl<F: PrimeField> LookupArgument<F> {
         table_oracles_mapping: &BTreeMap<String, usize>,
         witness_oracles: &'a [WitnessProverOracle<F>],
         instance_oracles: &'a [InstanceProverOracle<F>],
-        fixed_oracles: &'a [InstanceProverOracle<F>],
-        table_oracles: &'a [InstanceProverOracle<F>],
+        fixed_oracles: &'a [FixedProverOracle<F>],
+        table_oracles: &'a [FixedProverOracle<F>],
         usable_rows: usize,
         lookup_index: usize,
         lookup_expressions: &Vec<NewExpression<F>>,
         table_queries: &Vec<OracleQuery>,
         theta: F, // lookup aggregation expression
-        domain: &GeneralEvaluationDomain<F>, 
-        extended_coset_domain: &GeneralEvaluationDomain<F>, 
-        zk_rng: &mut R
+        domain: &GeneralEvaluationDomain<F>,
+        extended_coset_domain: &GeneralEvaluationDomain<F>,
+        zk_rng: &mut R,
     ) -> Vec<WitnessProverOracle<F>> {
         // When working on prover we want to construct A, A', S and S' as WitnessProverOracles
         // We need both polys and coset evals for them, one approach is to compute polynomials and then to do coset fft
-        // But it's faster if we evaluate expression 2 times, one in coset and one in just domain 
+        // But it's faster if we evaluate expression 2 times, one in coset and one in just domain
         // 1. compute all expressions and and all table queries in original domain and coset
         // 2. compress them to derive A and S
         // 3. Permute a_evals and s_evals to get a_prime_evals and s_prime_evals
-        // 4. Compute cosets and polys for a_prime and s_prime 
+        // 4. Compute cosets and polys for a_prime and s_prime
 
         // each lookup expressions is matched with one table query
         assert_eq!(lookup_expressions.len(), table_queries.len());
         let lookup_arith = lookup_expressions.len();
 
-        let powers_of_theta: Vec<F> = successors(Some(F::one()), |theta_i| {
-            Some(*theta_i * theta)
-        })
-        .take(lookup_arith)
-        .collect();
+        let powers_of_theta: Vec<F> =
+            successors(Some(F::one()), |theta_i| Some(*theta_i * theta))
+                .take(lookup_arith)
+                .collect();
 
-
-        let mut a_original_domain_evals = Vec::<F>::with_capacity(domain.size()); 
-        let mut a_extended_coset_domain_evals = Vec::<F>::with_capacity(domain.size()); 
+        let mut a_original_domain_evals =
+            Vec::<F>::with_capacity(domain.size());
+        let mut a_extended_coset_domain_evals =
+            Vec::<F>::with_capacity(domain.size());
 
         for i in 0..domain.size() {
             let expressions_at_i = lookup_expressions.iter().map(|lookup_expr| {
@@ -103,8 +115,10 @@ impl<F: PrimeField> LookupArgument<F> {
                 )
             });
 
-            let mut agg = F::zero(); 
-            for (expr_i, theta_i) in expressions_at_i.zip(powers_of_theta.iter()) {
+            let mut agg = F::zero();
+            for (expr_i, theta_i) in
+                expressions_at_i.zip(powers_of_theta.iter())
+            {
                 agg += expr_i * theta_i
             }
 
@@ -144,8 +158,10 @@ impl<F: PrimeField> LookupArgument<F> {
                 )
             });
 
-            let mut agg = F::zero(); 
-            for (expr_i, theta_i) in expressions_at_i.zip(powers_of_theta.iter()) {
+            let mut agg = F::zero();
+            for (expr_i, theta_i) in
+                expressions_at_i.zip(powers_of_theta.iter())
+            {
                 agg += expr_i * theta_i
             }
 
@@ -154,36 +170,49 @@ impl<F: PrimeField> LookupArgument<F> {
 
         let a = WitnessProverOracle {
             label: format!("lookup_a_{}_poly", lookup_index).to_string(),
-            poly: DensePolynomial::from_coefficients_slice(&domain.ifft(&a_original_domain_evals)),
+            poly: DensePolynomial::from_coefficients_slice(
+                &domain.ifft(&a_original_domain_evals),
+            ),
             evals: a_original_domain_evals,
-            evals_at_coset_of_extended_domain: Some(a_extended_coset_domain_evals),
-            queried_rotations: BTreeSet::from([
-                Rotation::curr(), 
-            ]),
+            evals_at_coset_of_extended_domain: Some(
+                a_extended_coset_domain_evals,
+            ),
+            queried_rotations: BTreeSet::from([Rotation::curr()]),
             should_permute: false,
         };
 
-        // For now we are supporting just fixed table queries, easily we can extend it to table expressions and 
+        // For now we are supporting just fixed table queries, easily we can extend it to table expressions and
         // we will just repeat what is done for A
-        let mut s_original_domain_evals = Vec::<F>::with_capacity(domain.size()); 
-        let mut s_extended_coset_domain_evals = Vec::<F>::with_capacity(domain.size()); 
+        let mut s_original_domain_evals =
+            Vec::<F>::with_capacity(domain.size());
+        let mut s_extended_coset_domain_evals =
+            Vec::<F>::with_capacity(domain.size());
 
         for i in 0..domain.size() {
             let table_evals_at_i = table_queries.iter().map(|table_query| {
                 match table_query.oracle_type {
-                    OracleType::Witness => panic!("Witness not allowed as table query"),
-                    OracleType::Instance => panic!("Instance not allowed as table query"),
+                    OracleType::Witness => {
+                        panic!("Witness not allowed as table query")
+                    }
+                    OracleType::Instance => {
+                        panic!("Instance not allowed as table query")
+                    }
                     OracleType::Fixed => {
                         match table_oracles_mapping.get(&table_query.label) {
                             Some(index) => table_oracles[*index].evals[i],
-                            None => panic!("Fixed oracle with label {} not found", table_query.label),
+                            None => panic!(
+                                "Fixed oracle with label {} not found",
+                                table_query.label
+                            ),
                         }
-                    },
+                    }
                 }
             });
 
-            let mut agg = F::zero(); 
-            for (expr_i, theta_i) in table_evals_at_i.zip(powers_of_theta.iter()) {
+            let mut agg = F::zero();
+            for (expr_i, theta_i) in
+                table_evals_at_i.zip(powers_of_theta.iter())
+            {
                 agg += expr_i * theta_i
             }
 
@@ -193,19 +222,29 @@ impl<F: PrimeField> LookupArgument<F> {
         for i in 0..extended_coset_domain.size() {
             let table_evals_at_i = table_queries.iter().map(|table_query| {
                 match table_query.oracle_type {
-                    OracleType::Witness => panic!("Witness not allowed as table query"),
-                    OracleType::Instance => panic!("Instance not allowed as table query"),
+                    OracleType::Witness => {
+                        panic!("Witness not allowed as table query")
+                    }
+                    OracleType::Instance => {
+                        panic!("Instance not allowed as table query")
+                    }
                     OracleType::Fixed => {
                         match table_oracles_mapping.get(&table_query.label) {
-                            Some(index) => table_oracles[*index].query_in_coset(i, Rotation::curr()),
-                            None => panic!("Fixed oracle with label {} not found", table_query.label),
+                            Some(index) => table_oracles[*index]
+                                .query_in_coset(i, Rotation::curr()),
+                            None => panic!(
+                                "Fixed oracle with label {} not found",
+                                table_query.label
+                            ),
                         }
-                    },
+                    }
                 }
             });
 
-            let mut agg = F::zero(); 
-            for (expr_i, theta_i) in table_evals_at_i.zip(powers_of_theta.iter()) {
+            let mut agg = F::zero();
+            for (expr_i, theta_i) in
+                table_evals_at_i.zip(powers_of_theta.iter())
+            {
                 agg += expr_i * theta_i
             }
 
@@ -214,17 +253,22 @@ impl<F: PrimeField> LookupArgument<F> {
 
         let s = WitnessProverOracle {
             label: format!("lookup_s_{}_poly", lookup_index).to_string(),
-            poly: DensePolynomial::from_coefficients_slice(&domain.ifft(&s_original_domain_evals)),
+            poly: DensePolynomial::from_coefficients_slice(
+                &domain.ifft(&s_original_domain_evals),
+            ),
             evals: s_original_domain_evals,
-            evals_at_coset_of_extended_domain: Some(s_extended_coset_domain_evals),
-            queried_rotations: BTreeSet::from([
-                Rotation::curr(), 
-            ]),
+            evals_at_coset_of_extended_domain: Some(
+                s_extended_coset_domain_evals,
+            ),
+            queried_rotations: BTreeSet::from([Rotation::curr()]),
             should_permute: false,
         };
 
         // We care just about usable rows, rest are used for blinding
-        let (mut a_prime_evals, mut s_prime_evals) = permute_for_lookup(&a.evals[..usable_rows], &s.evals[..usable_rows]);
+        let (mut a_prime_evals, mut s_prime_evals) = permute_for_lookup(
+            &a.evals[..usable_rows],
+            &s.evals[..usable_rows],
+        );
 
         for _ in usable_rows..domain.size() {
             a_prime_evals.push(F::rand(zk_rng));
@@ -236,28 +280,53 @@ impl<F: PrimeField> LookupArgument<F> {
 
         let a_prime = WitnessProverOracle {
             label: format!("lookup_a_prime_{}_poly", lookup_index).to_string(),
-            poly: DensePolynomial::from_coefficients_slice(&domain.ifft(&a_prime_evals)),
-            evals_at_coset_of_extended_domain: Some(extended_coset_domain.coset_fft(&a_prime_evals)),
+            poly: DensePolynomial::from_coefficients_slice(
+                &domain.ifft(&a_prime_evals),
+            ),
+            evals_at_coset_of_extended_domain: Some(
+                extended_coset_domain.coset_fft(&a_prime_evals),
+            ),
             evals: a_prime_evals,
             queried_rotations: BTreeSet::from([
-                Rotation::curr(), 
-                Rotation::prev() // A'(X) is queried at w^(-1) in lookup argument check
+                Rotation::curr(),
+                Rotation::prev(), // A'(X) is queried at w^(-1) in lookup argument check
             ]),
             should_permute: false,
         };
 
         let s_prime = WitnessProverOracle {
             label: format!("lookup_s_prime_{}_poly", lookup_index).to_string(),
-            poly: DensePolynomial::from_coefficients_slice(&domain.ifft(&s_prime_evals)),
-            evals_at_coset_of_extended_domain: Some(extended_coset_domain.coset_fft(&s_prime_evals)),
+            poly: DensePolynomial::from_coefficients_slice(
+                &domain.ifft(&s_prime_evals),
+            ),
+            evals_at_coset_of_extended_domain: Some(
+                extended_coset_domain.coset_fft(&s_prime_evals),
+            ),
             evals: s_prime_evals,
-            queried_rotations: BTreeSet::from([
-                Rotation::curr(), 
-            ]),
+            queried_rotations: BTreeSet::from([Rotation::curr()]),
             should_permute: false,
         };
 
         vec![a, a_prime, s, s_prime]
+    }
+
+    fn construct_a_and_s_unpermuted_polys_verifier<
+        'a,
+        PC: HomomorphicCommitment<F>,
+    >(
+        witness_oracles_mapping: &BTreeMap<String, usize>,
+        instance_oracles_mapping: &BTreeMap<String, usize>,
+        fixed_oracles_mapping: &BTreeMap<String, usize>,
+        table_oracles_mapping: &BTreeMap<String, usize>,
+        witness_oracles: &'a [WitnessVerifierOracle<F, PC>],
+        instance_oracles: &'a [InstanceVerifierOracle<F>],
+        fixed_oracles: &'a [FixedVerifierOracle<F, PC>],
+        table_oracles: &'a [FixedVerifierOracle<F, PC>],
+        lookup_index: usize,
+        lookup_expressions: &Vec<NewExpression<F>>,
+        table_queries: &Vec<OracleQuery>,
+        theta: F, // lookup aggregation expression
+    ) {
     }
 
     pub fn instantiate_argument_at_omega_i(
