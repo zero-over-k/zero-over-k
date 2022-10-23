@@ -2,12 +2,21 @@ use std::marker::PhantomData;
 
 use ark_ff::PrimeField;
 
-use crate::{commitment::HomomorphicCommitment, oracles::{query::{OracleQuery, OracleType}, traits::{WitnessOracle, InstanceOracle, FixedOracle}}};
+use crate::{
+    commitment::HomomorphicCommitment,
+    oracles::{
+        query::{OracleQuery, OracleType},
+        traits::{FixedOracle, InstanceOracle, WitnessOracle},
+    },
+};
 
-use super::{virtual_expression::VirtualExpression, query::VirtualQuery, new_expression::NewExpression, LookupVirtualOracle};
+use super::{
+    new_expression::NewExpression, query::VirtualQuery,
+    virtual_expression::VirtualExpression, LookupVirtualOracle,
+};
 
 #[derive(Clone)]
-pub struct GenericVO<F: PrimeField, PC: HomomorphicCommitment<F>> {
+pub struct GenericLookupVO<F: PrimeField, PC: HomomorphicCommitment<F>> {
     pub(crate) virtual_expressions: Vec<VirtualExpression<F>>,
     pub(crate) virtual_queries: Vec<VirtualQuery>,
     pub(crate) virtual_table_queries: Vec<VirtualQuery>, // for now table query is just querying of fixed oracle, later we can introduce TableOracle, TableQuery, etc...
@@ -16,8 +25,14 @@ pub struct GenericVO<F: PrimeField, PC: HomomorphicCommitment<F>> {
     _pc: PhantomData<PC>,
 }
 
-impl<F: PrimeField, PC: HomomorphicCommitment<F>> GenericVO<F, PC> {
-    pub fn init(cfg: (Vec<VirtualExpression<F>>, Vec<VirtualQuery>, Vec<VirtualQuery>)) -> Self {
+impl<F: PrimeField, PC: HomomorphicCommitment<F>> GenericLookupVO<F, PC> {
+    pub fn init(
+        cfg: (
+            Vec<VirtualExpression<F>>,
+            Vec<VirtualQuery>,
+            Vec<VirtualQuery>,
+        ),
+    ) -> Self {
         Self {
             virtual_expressions: cfg.0,
             virtual_queries: cfg.1,
@@ -33,7 +48,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> GenericVO<F, PC> {
         witness_oracles: &mut [impl WitnessOracle<F>],
         instance_oracles: &mut [impl InstanceOracle<F>],
         fixed_oracles: &mut [impl FixedOracle<F>],
-        table_oracles: &mut [impl FixedOracle<F>]
+        table_oracles: &mut [impl FixedOracle<F>],
     ) {
         for query in &self.virtual_queries {
             match query.oracle_type {
@@ -51,31 +66,47 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> GenericVO<F, PC> {
                 }
             };
         }
-        
-        let mut table_queries = Vec::<OracleQuery>::with_capacity(self.virtual_table_queries.len());
+
+        let mut table_queries =
+            Vec::<OracleQuery>::with_capacity(self.virtual_table_queries.len());
         for query in &self.virtual_table_queries {
             match query.oracle_type {
-                OracleType::Witness => panic!("Witness query is not allowed to serve as table query"), //see: https:github.com/zcash/halo2/issues/534
-                OracleType::Instance => panic!("Instance query is not allowed to serve as table query"), //see: https:github.com/zcash/halo2/issues/534
+                OracleType::Witness => panic!(
+                    "Witness query is not allowed to serve as table query"
+                ), //see: https:github.com/zcash/halo2/issues/534
+                OracleType::Instance => panic!(
+                    "Instance query is not allowed to serve as table query"
+                ), //see: https:github.com/zcash/halo2/issues/534
                 OracleType::Fixed => {
-                    table_oracles[query.index].register_rotation(query.rotation);
-                    table_queries.push(
-                        OracleQuery { label: table_oracles[query.index].get_label().clone(), rotation: query.rotation, oracle_type: OracleType::Fixed }
-                    )
+                    table_oracles[query.index]
+                        .register_rotation(query.rotation);
+                    table_queries.push(OracleQuery {
+                        label: table_oracles[query.index].get_label().clone(),
+                        rotation: query.rotation,
+                        oracle_type: OracleType::Fixed,
+                    })
                 }
             }
         }
 
-        let expressions: Vec<NewExpression<F>> = self.virtual_expressions.iter().map(|v_exp| {
-            v_exp.to_expression(witness_oracles, instance_oracles, fixed_oracles)
-        }).collect(); 
+        let expressions: Vec<NewExpression<F>> = self
+            .virtual_expressions
+            .iter()
+            .map(|v_exp| {
+                v_exp.to_expression(
+                    witness_oracles,
+                    instance_oracles,
+                    fixed_oracles,
+                )
+            })
+            .collect();
 
         self.expressions = Some(expressions)
     }
 }
 
 impl<F: PrimeField, PC: HomomorphicCommitment<F>> LookupVirtualOracle<F>
-    for GenericVO<F, PC>
+    for GenericLookupVO<F, PC>
 {
     fn get_expressions(&self) -> &[NewExpression<F>] {
         match &self.expressions {

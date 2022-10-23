@@ -42,7 +42,8 @@ mod test {
     use rand_chacha::ChaChaRng;
 
     use crate::data_structures::{
-        ProverKey, ProverPreprocessedInput, VerifierPreprocessedInput, PermutationInfo,
+        PermutationInfo, ProverKey, ProverPreprocessedInput,
+        VerifierPreprocessedInput,
     };
     use crate::indexer::Indexer;
 
@@ -58,7 +59,7 @@ mod test {
     use crate::PIL;
     use blake2::Blake2s;
 
-    use crate::commitment::{KZG10, HomomorphicCommitment};
+    use crate::commitment::{HomomorphicCommitment, KZG10};
     use crate::vo::VirtualOracle;
 
     type F = Fr;

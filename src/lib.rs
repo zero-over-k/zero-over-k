@@ -173,13 +173,14 @@ where
         // --------------------------------------------------------------------
         // First round
 
-        let quotient_chunk_oracles = PIOPforPolyIdentity::prover_quotient_round(
-            &verifier_permutation_msg,
-            &verifier_first_msg,
-            &mut prover_state,
-            &pk.vk,
-            &preprocessed,
-        )?;
+        let quotient_chunk_oracles =
+            PIOPforPolyIdentity::prover_quotient_round(
+                &verifier_permutation_msg,
+                &verifier_first_msg,
+                &mut prover_state,
+                &pk.vk,
+                &preprocessed,
+            )?;
 
         let quotient_chunks_labeled: Vec<
             LabeledPolynomial<F, DensePolynomial<F>>,
@@ -709,7 +710,7 @@ where
             quotient_eval += powers_of_alpha[vo_index] * vo_evaluation;
 
             // Permutation argument
-            // If there are no oracles to enforce copy constraints on, we just return zero 
+            // If there are no oracles to enforce copy constraints on, we just return zero
             quotient_eval += if oracles_to_copy.len() > 0 {
                 vk.index_info.permutation_argument.open_argument(
                     l0_eval,

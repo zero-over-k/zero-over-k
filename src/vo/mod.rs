@@ -7,13 +7,13 @@ use self::new_expression::NewExpression;
 // use self::expression::Expression;
 pub mod error;
 // pub mod expression;
+pub mod generic_lookup_vo;
 pub mod generic_vo;
 pub mod new_expression;
 pub mod precompiled;
 pub mod precompiled_lookups;
 pub mod query;
 pub mod virtual_expression;
-pub mod generic_lookup_vo;
 
 // Note: VirtualOracle trait is very lightweight such that different use-cases
 // can be built on top of this prover

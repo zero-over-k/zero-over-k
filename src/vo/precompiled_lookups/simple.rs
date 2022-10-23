@@ -31,3 +31,86 @@ impl<F: PrimeField> PrecompiledLookupVO<F> for PrecompiledSimple3ArithLookup<F> 
         (expressions, queries, table_queries)
     }
 }
+
+#[cfg(test)]
+mod test {
+    use std::collections::BTreeSet;
+
+    use ark_ff::Zero;
+    use ark_poly::univariate::DensePolynomial;
+
+    use crate::{oracles::{witness::{WitnessProverOracle}, instance::{InstanceProverOracle}, fixed::FixedProverOracle}, vo::{generic_lookup_vo::GenericLookupVO, precompiled_lookups::PrecompiledLookupVO}};
+
+    use super::PrecompiledSimple3ArithLookup;
+
+    use ark_bls12_381::{Fr as F, Bls12_381};
+    use crate::commitment::KZG10;
+
+    type PC = KZG10<Bls12_381>;
+
+    #[test]
+    fn test_simple_lookup_configuration() {
+        let a = WitnessProverOracle {
+            label: "a".to_string(),
+            poly: DensePolynomial::zero(),
+            evals: vec![],
+            evals_at_coset_of_extended_domain: None,
+            queried_rotations: BTreeSet::default(),
+            should_permute: false,
+        };
+
+        let b = WitnessProverOracle {
+            label: "b".to_string(),
+            poly: DensePolynomial::zero(),
+            evals: vec![],
+            evals_at_coset_of_extended_domain: None,
+            queried_rotations: BTreeSet::default(),
+            should_permute: false,
+        };
+
+        let c = WitnessProverOracle {
+            label: "c".to_string(),
+            poly: DensePolynomial::zero(),
+            evals: vec![],
+            evals_at_coset_of_extended_domain: None,
+            queried_rotations: BTreeSet::default(),
+            should_permute: false,
+        };
+
+        let t1 = FixedProverOracle {
+            label: "t1".to_string(),
+            poly: DensePolynomial::zero(),
+            evals: vec![],
+            evals_at_coset_of_extended_domain: None,
+            queried_rotations: BTreeSet::default(),
+        };
+
+        let t2 = FixedProverOracle {
+            label: "t2".to_string(),
+            poly: DensePolynomial::zero(),
+            evals: vec![],
+            evals_at_coset_of_extended_domain: None,
+            queried_rotations: BTreeSet::default(),
+        };
+
+        let t3 = FixedProverOracle {
+            label: "t3".to_string(),
+            poly: DensePolynomial::zero(),
+            evals: vec![],
+            evals_at_coset_of_extended_domain: None,
+            queried_rotations: BTreeSet::default(),
+        };
+
+        let mut simple_lookup_vo = GenericLookupVO::<F, PC>::init(
+            PrecompiledSimple3ArithLookup::get_expressions_and_queries()
+        );
+
+        let mut witness_oracles = vec![a, b, c];
+        let mut instance_oracles: Vec<InstanceProverOracle<F>> = vec![];
+        let mut fixed_oracles: Vec<FixedProverOracle<F>> = vec![];
+
+        let mut table_oracles = vec![t1, t2, t3];
+
+        simple_lookup_vo.configure(&mut witness_oracles, &mut instance_oracles, &mut fixed_oracles, &mut table_oracles);
+    }
+}

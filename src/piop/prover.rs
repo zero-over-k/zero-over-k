@@ -107,7 +107,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
         // if nothing to copy just return empty vector
         if state.oracles_to_copy.len() == 0 {
             state.z_polys = Some(vec![]);
-            return vec![]
+            return vec![];
         }
         let z_polys = permutation_argument.construct_agg_polys(
             &state.oracles_to_copy,
@@ -207,25 +207,24 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
             }
 
             // Permutation argument
-            // If there are no oracles to enforce copy constraints on, we just return zero 
+            // If there are no oracles to enforce copy constraints on, we just return zero
             numerator_evals[i] += if state.oracles_to_copy.len() > 0 {
-                vk
-                .index_info
-                .permutation_argument
-                .instantiate_argument_at_omega_i(
-                    &l0_coset_evals,
-                    &lu_coset_evals,
-                    &preprocessed.q_blind,
-                    &state.oracles_to_copy,
-                    &preprocessed.permutation_oracles,
-                    &z_polys,
-                    i,
-                    vk.index_info.extended_coset_domain.element(i),
-                    verifier_permutation_msg.beta,
-                    verifier_permutation_msg.gamma,
-                    &state.domain,
-                    &permutation_alphas,
-                )
+                vk.index_info
+                    .permutation_argument
+                    .instantiate_argument_at_omega_i(
+                        &l0_coset_evals,
+                        &lu_coset_evals,
+                        &preprocessed.q_blind,
+                        &state.oracles_to_copy,
+                        &preprocessed.permutation_oracles,
+                        &z_polys,
+                        i,
+                        vk.index_info.extended_coset_domain.element(i),
+                        verifier_permutation_msg.beta,
+                        verifier_permutation_msg.gamma,
+                        &state.domain,
+                        &permutation_alphas,
+                    )
             } else {
                 F::zero()
             };

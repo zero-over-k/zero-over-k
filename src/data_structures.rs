@@ -30,8 +30,8 @@ pub struct PermutationInfo<F: PrimeField> {
 impl<F: PrimeField> PermutationInfo<F> {
     pub fn dummy() -> Self {
         Self {
-            u: 0, 
-            deltas: vec![]
+            u: 0,
+            deltas: vec![],
         }
     }
 }
