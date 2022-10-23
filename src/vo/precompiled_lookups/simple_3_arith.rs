@@ -2,16 +2,25 @@ use std::marker::PhantomData;
 
 use ark_ff::PrimeField;
 
-use crate::{vo::{query::VirtualQuery, virtual_expression::VirtualExpression}, oracles::{rotation::Rotation, query::OracleType}};
+use crate::{
+    oracles::{query::OracleType, rotation::Rotation},
+    vo::{query::VirtualQuery, virtual_expression::VirtualExpression},
+};
 
 use super::PrecompiledLookupVO;
 
 pub struct PrecompiledSimple3ArithLookup<F: PrimeField> {
-    _f: PhantomData<F>
+    _f: PhantomData<F>,
 }
 
-impl<F: PrimeField> PrecompiledLookupVO<F> for PrecompiledSimple3ArithLookup<F> {
-    fn get_expressions_and_queries() -> (Vec<crate::vo::virtual_expression::VirtualExpression<F>>, Vec<crate::vo::query::VirtualQuery>, Vec<crate::vo::query::VirtualQuery>) {
+impl<F: PrimeField> PrecompiledLookupVO<F>
+    for PrecompiledSimple3ArithLookup<F>
+{
+    fn get_expressions_and_queries() -> (
+        Vec<crate::vo::virtual_expression::VirtualExpression<F>>,
+        Vec<crate::vo::query::VirtualQuery>,
+        Vec<crate::vo::query::VirtualQuery>,
+    ) {
         let q1 = VirtualQuery::new(0, Rotation::curr(), OracleType::Witness);
         let q2 = VirtualQuery::new(1, Rotation::curr(), OracleType::Witness);
         let q3 = VirtualQuery::new(2, Rotation::curr(), OracleType::Witness);
@@ -39,12 +48,21 @@ mod test {
     use ark_ff::Zero;
     use ark_poly::univariate::DensePolynomial;
 
-    use crate::{oracles::{witness::{WitnessProverOracle}, instance::{InstanceProverOracle}, fixed::FixedProverOracle}, vo::{generic_lookup_vo::GenericLookupVO, precompiled_lookups::PrecompiledLookupVO}};
+    use crate::{
+        oracles::{
+            fixed::FixedProverOracle, instance::InstanceProverOracle,
+            witness::WitnessProverOracle,
+        },
+        vo::{
+            generic_lookup_vo::GenericLookupVO,
+            precompiled_lookups::PrecompiledLookupVO,
+        },
+    };
 
     use super::PrecompiledSimple3ArithLookup;
 
-    use ark_bls12_381::{Fr as F, Bls12_381};
     use crate::commitment::KZG10;
+    use ark_bls12_381::{Bls12_381, Fr as F};
 
     type PC = KZG10<Bls12_381>;
 
@@ -102,7 +120,7 @@ mod test {
         };
 
         let mut simple_lookup_vo = GenericLookupVO::<F, PC>::init(
-            PrecompiledSimple3ArithLookup::get_expressions_and_queries()
+            PrecompiledSimple3ArithLookup::get_expressions_and_queries(),
         );
 
         let mut witness_oracles = vec![a, b, c];
@@ -111,6 +129,11 @@ mod test {
 
         let mut table_oracles = vec![t1, t2, t3];
 
-        simple_lookup_vo.configure(&mut witness_oracles, &mut instance_oracles, &mut fixed_oracles, &mut table_oracles);
+        simple_lookup_vo.configure(
+            &mut witness_oracles,
+            &mut instance_oracles,
+            &mut fixed_oracles,
+            &mut table_oracles,
+        );
     }
 }
