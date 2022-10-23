@@ -80,7 +80,10 @@ impl<F: PrimeField> LookupArgument<F> {
         let a_s_equality_check = a_prime_x - s_prime_x;
         let a_a_prev_equality_check = a_prime_x - a_prime_minus_wx;
 
-        num += alpha_powers[4] * zk_part  * a_s_equality_check * a_a_prev_equality_check;
+        num += alpha_powers[4]
+            * zk_part
+            * a_s_equality_check
+            * a_a_prev_equality_check;
 
         num
     }
@@ -137,8 +140,10 @@ impl<F: PrimeField> LookupArgument<F> {
         let a_s_equality_check = a_prime_xi - s_prime_xi;
         let a_a_prev_equality_check = a_prime_xi - a_prime_minus_wxi;
 
-        opening +=
-            alpha_powers[4] * zk_part * a_s_equality_check * a_a_prev_equality_check;
+        opening += alpha_powers[4]
+            * zk_part
+            * a_s_equality_check
+            * a_a_prev_equality_check;
 
         opening
     }
@@ -146,7 +151,7 @@ impl<F: PrimeField> LookupArgument<F> {
 
 #[cfg(test)]
 mod test {
-    use std::collections::{BTreeSet, BTreeMap};
+    use std::collections::{BTreeMap, BTreeSet};
 
     use super::LookupArgument;
     use crate::lookup::subset_equality::SubsetEqualityArgument;
@@ -161,11 +166,11 @@ mod test {
 
     use crate::commitment::KZG10;
     use ark_bls12_381::{Bls12_381, Fr as F};
-    use ark_ff::{One, UniformRand, Zero, batch_inversion, Field};
-    use ark_poly::{UVPolynomial, Polynomial};
+    use ark_ff::{batch_inversion, Field, One, UniformRand, Zero};
     use ark_poly::{
         univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
     };
+    use ark_poly::{Polynomial, UVPolynomial};
     use ark_std::test_rng;
 
     type PC = KZG10<Bls12_381>;
@@ -332,7 +337,13 @@ mod test {
         };
 
         let alpha = F::rand(&mut rng);
-        let alpha_powers = vec![F::one(), alpha, alpha * alpha, alpha * alpha * alpha, alpha * alpha * alpha * alpha];
+        let alpha_powers = vec![
+            F::one(),
+            alpha,
+            alpha * alpha,
+            alpha * alpha * alpha,
+            alpha * alpha * alpha * alpha,
+        ];
 
         let mut num_evals =
             Vec::<F>::with_capacity(extended_coset_domain.size());
@@ -355,8 +366,10 @@ mod test {
             num_evals.push(ni);
         }
 
-        let num = DensePolynomial::from_coefficients_slice(&extended_coset_domain.coset_ifft(&num_evals));
-        let zh_dense: DensePolynomial<F> = domain.vanishing_polynomial().into(); 
+        let num = DensePolynomial::from_coefficients_slice(
+            &extended_coset_domain.coset_ifft(&num_evals),
+        );
+        let zh_dense: DensePolynomial<F> = domain.vanishing_polynomial().into();
 
         let q = &num / &zh_dense;
         assert_eq!(num, &q * &zh_dense);
@@ -389,19 +402,21 @@ mod test {
             should_permute: false,
         };
 
-        let omega_minus_1 = domain.element(1).inverse().unwrap(); 
+        let omega_minus_1 = domain.element(1).inverse().unwrap();
         let negative_rotated_challenge = evaluation_challenge * omega_minus_1;
         let a_prime = WitnessVerifierOracle {
             label: "a_prime".to_string(),
             queried_rotations: BTreeSet::from([Rotation::curr()]),
-            evals_at_challenges: BTreeMap::from([(
-                evaluation_challenge,
-                a_prime_poly.evaluate(&evaluation_challenge),
-            ), 
-            (
-                negative_rotated_challenge,
-                a_prime_poly.evaluate(&negative_rotated_challenge),
-            )]),
+            evals_at_challenges: BTreeMap::from([
+                (
+                    evaluation_challenge,
+                    a_prime_poly.evaluate(&evaluation_challenge),
+                ),
+                (
+                    negative_rotated_challenge,
+                    a_prime_poly.evaluate(&negative_rotated_challenge),
+                ),
+            ]),
             commitment: None,
             should_permute: false,
         };
