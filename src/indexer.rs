@@ -14,7 +14,7 @@ use crate::{
         query::OracleType,
         traits::{FixedOracle, InstanceOracle, WitnessOracle},
     },
-    permutation::{PermutationArgument, self},
+    permutation::{self, PermutationArgument},
     util::compute_vanishing_poly_over_coset,
     vo::VirtualOracle,
 };
@@ -180,9 +180,16 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
         }
 
         let scaling_factor = extended_coset_domain.size() / domain.size();
-        let scaling_factor = max(scaling_factor, PermutationArgument::<F>::MINIMAL_SCALING_FACTOR);
+        let scaling_factor = max(
+            scaling_factor,
+            PermutationArgument::<F>::MINIMAL_SCALING_FACTOR,
+        );
 
-        let permutation_argument = PermutationArgument::new(scaling_factor, permutation_info.u, &permutation_info.deltas);
+        let permutation_argument = PermutationArgument::new(
+            scaling_factor,
+            permutation_info.u,
+            &permutation_info.deltas,
+        );
 
         let extended_coset_domain =
             GeneralEvaluationDomain::<F>::new(scaling_factor * domain.size())

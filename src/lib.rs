@@ -1,5 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet};
-use std::iter::{successors, self};
+use std::iter::{self, successors};
 use std::marker::PhantomData;
 
 use ark_ff::{to_bytes, PrimeField};
@@ -42,6 +42,7 @@ mod util;
 pub mod vo;
 
 pub mod indexer;
+pub mod lookup;
 pub mod multiproof;
 pub mod permutation;
 
@@ -144,14 +145,15 @@ where
                 &mut fs_rng,
             );
 
-        let z_polys: Vec<WitnessProverOracle<F>> = PIOPforPolyIdentity::prover_permutation_round(
-            &verifier_permutation_msg,
-            &mut prover_state,
-            &pk.vk.index_info.permutation_argument,
-            preprocessed,
-            &pk.vk.index_info.extended_coset_domain,
-            zk_rng,
-        );
+        let z_polys: Vec<WitnessProverOracle<F>> =
+            PIOPforPolyIdentity::prover_permutation_round(
+                &verifier_permutation_msg,
+                &mut prover_state,
+                &pk.vk.index_info.permutation_argument,
+                preprocessed,
+                &pk.vk.index_info.extended_coset_domain,
+                zk_rng,
+            );
 
         let z_polys_labeled: Vec<_> =
             z_polys.iter().map(|z| z.to_labeled()).collect();
@@ -261,7 +263,10 @@ where
         let z_evals = evaluate_q_set(z_polys_labeled.iter(), &z_query_set);
 
         // compute q_blind eval
-        let q_blind_eval = preprocessed.q_blind.polynomial().evaluate(&verifier_second_msg.xi);
+        let q_blind_eval = preprocessed
+            .q_blind
+            .polynomial()
+            .evaluate(&verifier_second_msg.xi);
 
         // Multiopen
         let mut oracles: Vec<&dyn Instantiable<F>> = witness_oracles
@@ -558,13 +563,17 @@ where
             sigma.register_eval_at_challenge(verifier_second_msg.xi, eval);
         }
 
-        let oracles_to_copy: Vec<&WitnessVerifierOracle<F, PC>> = witness_oracles
-        .iter()
-        .filter(|&oracle| oracle.should_permute)
-        .collect();
+        let oracles_to_copy: Vec<&WitnessVerifierOracle<F, PC>> =
+            witness_oracles
+                .iter()
+                .filter(|&oracle| oracle.should_permute)
+                .collect();
 
         // Map z permutation oracles
-        let num_of_z_polys = vk.index_info.permutation_argument.number_of_z_polys(oracles_to_copy.len());
+        let num_of_z_polys = vk
+            .index_info
+            .permutation_argument
+            .number_of_z_polys(oracles_to_copy.len());
         assert_eq!(num_of_z_polys, proof.z_commitments.len());
 
         // Each z is evaluated at: x, wx and w^ux(except the last one)
@@ -578,7 +587,10 @@ where
 
                 // if not last append w^ux
                 if i != num_of_z_polys - 1 {
-                    queried_rotations.insert(Rotation::new(vk.index_info.permutation_argument.u, Sign::Plus));
+                    queried_rotations.insert(Rotation::new(
+                        vk.index_info.permutation_argument.u,
+                        Sign::Plus,
+                    ));
                 }
 
                 WitnessVerifierOracle::<F, PC> {
@@ -616,7 +628,10 @@ where
             };
         }
 
-        preprocessed.q_blind.register_eval_at_challenge(verifier_second_msg.xi, proof.q_blind_eval.clone());
+        preprocessed.q_blind.register_eval_at_challenge(
+            verifier_second_msg.xi,
+            proof.q_blind_eval.clone(),
+        );
 
         // END CHALLENGE => EVALS MAPPING
 
@@ -626,12 +641,14 @@ where
         .take(vos.len())
         .collect();
 
-        let number_of_alphas =
-        vk.index_info.permutation_argument.number_of_alphas(z_polys.len());
+        let number_of_alphas = vk
+            .index_info
+            .permutation_argument
+            .number_of_alphas(z_polys.len());
 
         // start from next of last power of alpha
-        let begin_with = powers_of_alpha.last().unwrap().clone()
-            * verifier_first_msg.alpha;
+        let begin_with =
+            powers_of_alpha.last().unwrap().clone() * verifier_first_msg.alpha;
         let permutation_alphas: Vec<F> =
             successors(Some(begin_with), |alpha_i| {
                 Some(*alpha_i * verifier_first_msg.alpha)
@@ -642,15 +659,13 @@ where
         // TODO: ENABLE FAST LAGRANGE EVALUATION
         let mut l0_evals = vec![F::zero(); domain_size];
         l0_evals[0] = F::one();
-        let l0 = DensePolynomial::from_coefficients_slice(
-            &domain.ifft(&l0_evals),
-        );
+        let l0 =
+            DensePolynomial::from_coefficients_slice(&domain.ifft(&l0_evals));
 
         let mut lu_evals = vec![F::zero(); domain_size];
         lu_evals[vk.index_info.permutation_argument.u] = F::one();
-        let lu = DensePolynomial::from_coefficients_slice(
-            &domain.ifft(&lu_evals),
-        );
+        let lu =
+            DensePolynomial::from_coefficients_slice(&domain.ifft(&lu_evals));
 
         let l0_eval = l0.evaluate(&verifier_second_msg.xi);
         let lu_eval = lu.evaluate(&verifier_second_msg.xi);

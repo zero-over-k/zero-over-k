@@ -76,11 +76,10 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
             .map(|(i, oracle)| (oracle.get_label(), i))
             .collect();
 
-
         let oracles_to_copy: Vec<&WitnessProverOracle<F>> = witness_oracles
-        .iter()
-        .filter(|&oracle| oracle.should_permute)
-        .collect();
+            .iter()
+            .filter(|&oracle| oracle.should_permute)
+            .collect();
 
         ProverState {
             witness_oracles_mapping,
@@ -137,8 +136,10 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
 
         let z_polys = state.z_polys.as_ref().expect("Z polys are not in state");
 
-        let number_of_alphas =
-            vk.index_info.permutation_argument.number_of_alphas(z_polys.len());
+        let number_of_alphas = vk
+            .index_info
+            .permutation_argument
+            .number_of_alphas(z_polys.len());
 
         // start from next of last power of alpha
         let begin_with =
@@ -156,16 +157,14 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
         let l0 = DensePolynomial::from_coefficients_slice(
             &state.domain.ifft(&l0_evals),
         );
-        let l0_coset_evals =
-            vk.index_info.extended_coset_domain.coset_fft(&l0);
+        let l0_coset_evals = vk.index_info.extended_coset_domain.coset_fft(&l0);
 
         let mut lu_evals = vec![F::zero(); domain_size];
         lu_evals[vk.index_info.permutation_argument.u] = F::one();
         let lu = DensePolynomial::from_coefficients_slice(
             &state.domain.ifft(&lu_evals),
         );
-        let lu_coset_evals =
-            vk.index_info.extended_coset_domain.coset_fft(&lu);
+        let lu_coset_evals = vk.index_info.extended_coset_domain.coset_fft(&lu);
 
         for i in 0..vk.index_info.extended_coset_domain.size() {
             for (vo_index, vo) in state.vos.iter().enumerate() {
@@ -202,7 +201,9 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
                 numerator_evals[i] += powers_of_alpha[vo_index] * vo_evaluation;
             }
 
-            numerator_evals[i] += vk.index_info.permutation_argument
+            numerator_evals[i] += vk
+                .index_info
+                .permutation_argument
                 .instantiate_argument_at_omega_i(
                     &l0_coset_evals,
                     &lu_coset_evals,

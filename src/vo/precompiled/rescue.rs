@@ -72,7 +72,9 @@ mod test {
     use crate::indexer::Indexer;
 
     use crate::oracles::fixed::{FixedProverOracle, FixedVerifierOracle};
-    use crate::oracles::instance::{InstanceVerifierOracle, InstanceProverOracle};
+    use crate::oracles::instance::{
+        InstanceProverOracle, InstanceVerifierOracle,
+    };
 
     use crate::oracles::traits::Instantiable;
     use crate::oracles::witness::{WitnessProverOracle, WitnessVerifierOracle};

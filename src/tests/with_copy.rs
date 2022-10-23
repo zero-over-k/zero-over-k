@@ -32,14 +32,13 @@ mod copy_constraint_tests {
         util::compute_vanishing_poly_over_coset,
         vo::{
             generic_vo::GenericVO,
-            VirtualOracle, precompiled::{plonk_arith::PrecompiledPlonkArith, PrecompiledVO},
+            precompiled::{plonk_arith::PrecompiledPlonkArith, PrecompiledVO},
+            VirtualOracle,
         },
     };
     use ark_bls12_381::{Bls12_381, Fr as F};
 
     type PC = KZG10<Bls12_381>;
-
-    
 
     use crate::PIL;
     use blake2::Blake2s;

@@ -21,3 +21,4 @@ ark-serialize = { version = "^0.3.0", default-features = false, features = [ "de
 ark-bls12-381 = { version = "^0.3.0", default-features = false, features = [ "curve" ] }
 blake2 = { version = "0.9", default-features = false }
 rand_chacha = { version = "0.3.0", default-features = false }
+shuffle = "0.1.7"
