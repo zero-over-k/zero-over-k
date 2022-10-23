@@ -433,17 +433,20 @@ mod test {
 
         let z = WitnessVerifierOracle {
             label: "lookup_agg_poly".to_string(),
-            queried_rotations: BTreeSet::from([Rotation::curr(), Rotation::next()]),
-            evals_at_challenges: BTreeMap::from([(
-                evaluation_challenge,
-                z.poly.evaluate(&evaluation_challenge),
-            ), 
-            (
-                evaluation_challenge * domain.element(1), 
-                z.poly.evaluate(&(evaluation_challenge * domain.element(1))),
-            )]),
+            queried_rotations: BTreeSet::from([
+                Rotation::curr(),
+                Rotation::next(),
+            ]),
+            evals_at_challenges: BTreeMap::from([
+                (evaluation_challenge, z.poly.evaluate(&evaluation_challenge)),
+                (
+                    evaluation_challenge * domain.element(1),
+                    z.poly
+                        .evaluate(&(evaluation_challenge * domain.element(1))),
+                ),
+            ]),
             commitment: None,
-            should_permute: false
+            should_permute: false,
         };
 
         let l0_eval = l0.evaluate(&evaluation_challenge);
@@ -465,6 +468,12 @@ mod test {
             &alpha_powers,
         );
 
-        assert_eq!(opening, q.evaluate(&evaluation_challenge) * domain.vanishing_polynomial().evaluate(&evaluation_challenge))
+        assert_eq!(
+            opening,
+            q.evaluate(&evaluation_challenge)
+                * domain
+                    .vanishing_polynomial()
+                    .evaluate(&evaluation_challenge)
+        )
     }
 }
