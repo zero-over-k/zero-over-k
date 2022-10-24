@@ -820,7 +820,10 @@ mod test {
         let negative_rotated_challenge = evaluation_challenge * omega_minus_1;
         let a_prime = WitnessVerifierOracle {
             label: "a_prime".to_string(),
-            queried_rotations: BTreeSet::from([Rotation::curr(), Rotation::prev()]),
+            queried_rotations: BTreeSet::from([
+                Rotation::curr(),
+                Rotation::prev(),
+            ]),
             evals_at_challenges: BTreeMap::from([
                 (
                     evaluation_challenge,

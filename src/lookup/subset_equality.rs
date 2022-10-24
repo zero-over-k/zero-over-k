@@ -29,7 +29,7 @@ impl<F: PrimeField> SubsetEqualityArgument<F> {
         s_prime: &WitnessProverOracle<F>,
         beta: F,
         gamma: F,
-        lookup_index: usize, 
+        lookup_index: usize,
         u: usize, // allowed rows
         domain: &GeneralEvaluationDomain<F>,
         extended_coset_domain: &GeneralEvaluationDomain<F>,

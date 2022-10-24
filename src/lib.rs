@@ -169,10 +169,10 @@ where
             zk_rng,
         );
 
-        let lookup_polys_to_open = lookup_polys.iter()
-            .map(|(_, _, a_prime, s_prime)| {
-                vec![a_prime, s_prime]
-            }).flatten();
+        let lookup_polys_to_open = lookup_polys
+            .iter()
+            .map(|(_, _, a_prime, s_prime)| vec![a_prime, s_prime])
+            .flatten();
 
         let lookup_prime_labeled: Vec<
             LabeledPolynomial<F, DensePolynomial<F>>,
@@ -761,18 +761,36 @@ where
                 commitments: a', s', z
                 evaluations: a' at x, a' at w^-1x, s' at x, z at x, z at wx, each table_oracle evaluation at x
         */
-        let omega = domain.element(1); 
+        let omega = domain.element(1);
         let omega_inv = omega.inverse().unwrap();
         let evaluation_challenge = verifier_second_msg.xi;
 
-        let lookup_permuted_oracles_commitments = proof.lookup_commitments.chunks(2);
-        assert_eq!(lookup_permuted_oracles_commitments.len(), vk.index_info.lookups.len());
+        let lookup_permuted_oracles_commitments =
+            proof.lookup_commitments.chunks(2);
+        assert_eq!(
+            lookup_permuted_oracles_commitments.len(),
+            vk.index_info.lookups.len()
+        );
 
         let lookup_permuted_oracles_evals = proof.lookup_evals.chunks(3);
-        assert_eq!(lookup_permuted_oracles_evals.len(), vk.index_info.lookups.len());
+        assert_eq!(
+            lookup_permuted_oracles_evals.len(),
+            vk.index_info.lookups.len()
+        );
 
-        let lookup_polys: Vec<_> = vk.index_info.lookups.iter().zip(lookup_permuted_oracles_commitments).zip(lookup_permuted_oracles_evals).enumerate().map(|(lookup_index, ((lookup_vo, permuted_commitments), permuted_evals))| {
-            let (a, s) =
+        let lookup_polys: Vec<_> = vk
+            .index_info
+            .lookups
+            .iter()
+            .zip(lookup_permuted_oracles_commitments)
+            .zip(lookup_permuted_oracles_evals)
+            .enumerate()
+            .map(
+                |(
+                    lookup_index,
+                    ((lookup_vo, permuted_commitments), permuted_evals),
+                )| {
+                    let (a, s) =
                 LookupArgument::construct_a_and_s_unpermuted_polys_verifier(
                     &witness_oracles_mapping,
                     &instance_oracles_mapping,
@@ -790,64 +808,75 @@ where
                     &omegas,
                 );
 
-            let a_prime = WitnessVerifierOracle::<F, PC> {
-                label: format!("lookup_a_prime_{}_poly", lookup_index).to_string(),
-                queried_rotations: BTreeSet::from([Rotation::curr(), Rotation::prev()]),
-                evals_at_challenges: BTreeMap::from([
-                    (
-                        evaluation_challenge, 
-                        permuted_evals[0]
-                    ), 
-                    (
-                        evaluation_challenge * omega_inv, 
-                        permuted_evals[1]
-                    )
-                ]),
-                commitment: Some(permuted_commitments[0].clone()),
-                should_permute: false,
-            };
+                    let a_prime = WitnessVerifierOracle::<F, PC> {
+                        label: format!("lookup_a_prime_{}_poly", lookup_index)
+                            .to_string(),
+                        queried_rotations: BTreeSet::from([
+                            Rotation::curr(),
+                            Rotation::prev(),
+                        ]),
+                        evals_at_challenges: BTreeMap::from([
+                            (evaluation_challenge, permuted_evals[0]),
+                            (
+                                evaluation_challenge * omega_inv,
+                                permuted_evals[1],
+                            ),
+                        ]),
+                        commitment: Some(permuted_commitments[0].clone()),
+                        should_permute: false,
+                    };
 
-            let s_prime = WitnessVerifierOracle::<F, PC> {
-                label: format!("lookup_s_prime_{}_poly", lookup_index).to_string(),
-                queried_rotations: BTreeSet::from([Rotation::curr()]),
-                evals_at_challenges: BTreeMap::from([(
-                    evaluation_challenge, 
-                    permuted_evals[2]
-                )]),
-                commitment: Some(permuted_commitments[1].clone()),
-                should_permute: false,
-            };
-            
-            (a, s, a_prime, s_prime)
-        }).collect();
+                    let s_prime = WitnessVerifierOracle::<F, PC> {
+                        label: format!("lookup_s_prime_{}_poly", lookup_index)
+                            .to_string(),
+                        queried_rotations: BTreeSet::from([Rotation::curr()]),
+                        evals_at_challenges: BTreeMap::from([(
+                            evaluation_challenge,
+                            permuted_evals[2],
+                        )]),
+                        commitment: Some(permuted_commitments[1].clone()),
+                        should_permute: false,
+                    };
 
-        let lookup_polys_to_check_in_opening = lookup_polys.iter().map(|(_, _, a_prime, s_prime)| {
-            vec![a_prime, s_prime]
-        }).flatten();
+                    (a, s, a_prime, s_prime)
+                },
+            )
+            .collect();
 
-        
+        let lookup_polys_to_check_in_opening = lookup_polys
+            .iter()
+            .map(|(_, _, a_prime, s_prime)| vec![a_prime, s_prime])
+            .flatten();
+
         let lookup_z_evals_chunks = proof.lookup_z_evals.chunks(2);
-        assert_eq!(proof.lookup_z_commitments.len(), vk.index_info.lookups.len());
+        assert_eq!(
+            proof.lookup_z_commitments.len(),
+            vk.index_info.lookups.len()
+        );
         assert_eq!(lookup_z_evals_chunks.len(), vk.index_info.lookups.len());
 
-        let lookup_z_polys = proof.lookup_z_commitments.iter().zip(lookup_z_evals_chunks).enumerate().map(|(lookup_index, (z_commitment, evals))| {
-            WitnessVerifierOracle::<F, PC> {
-                label: format!("lookup_{}_agg_poly", lookup_index).to_string(),
-                queried_rotations: BTreeSet::from([Rotation::curr(), Rotation::next()]),
-                evals_at_challenges: BTreeMap::from([
-                (
-                    evaluation_challenge, 
-                    evals[0]
-                ),
-                (
-                    evaluation_challenge * omega, 
-                    evals[1]
-                )
-                ]),
-                commitment: Some(z_commitment.clone()),
-                should_permute: false,
-            }
-        }).collect::<Vec<WitnessVerifierOracle<F, PC>>>();
+        let lookup_z_polys = proof
+            .lookup_z_commitments
+            .iter()
+            .zip(lookup_z_evals_chunks)
+            .enumerate()
+            .map(|(lookup_index, (z_commitment, evals))| {
+                WitnessVerifierOracle::<F, PC> {
+                    label: format!("lookup_{}_agg_poly", lookup_index)
+                        .to_string(),
+                    queried_rotations: BTreeSet::from([
+                        Rotation::curr(),
+                        Rotation::next(),
+                    ]),
+                    evals_at_challenges: BTreeMap::from([
+                        (evaluation_challenge, evals[0]),
+                        (evaluation_challenge * omega, evals[1]),
+                    ]),
+                    commitment: Some(z_commitment.clone()),
+                    should_permute: false,
+                }
+            })
+            .collect::<Vec<WitnessVerifierOracle<F, PC>>>();
         // end lookups
 
         // Map z permutation oracles

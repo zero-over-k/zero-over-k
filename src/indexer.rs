@@ -10,6 +10,7 @@ use crate::{
     commitment::HomomorphicCommitment,
     data_structures::{IndexInfo, PermutationInfo, VerifierKey},
     error::Error,
+    lookup::LookupArgument,
     oracles::{
         query::OracleType,
         traits::{FixedOracle, InstanceOracle, WitnessOracle},
@@ -196,6 +197,12 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
                 scaling_factor,
                 PermutationArgument::<F>::MINIMAL_SCALING_FACTOR,
             )
+        } else {
+            scaling_factor
+        };
+
+        let scaling_factor = if lookups.len() > 0 {
+            max(scaling_factor, LookupArgument::<F>::MINIMAL_SCALING_FACTOR)
         } else {
             scaling_factor
         };

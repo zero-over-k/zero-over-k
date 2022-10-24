@@ -245,7 +245,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Proof<F, PC> {
             + self.quotient_chunk_commitments.len()
             + self.z_commitments.len()
             + 1; // + 1 for f commitment in multiopen
-        let num_of_field_elements = 
+        let num_of_field_elements =
             // witness
             self.witness_evals.len()
             //fixed
