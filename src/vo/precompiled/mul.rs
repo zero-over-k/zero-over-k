@@ -131,7 +131,7 @@ mod test {
         };
 
         let mut mul_vo =
-            GenericVO::<F, PC>::init(PrecompiledMul::get_expr_and_queries());
+            GenericVO::<F>::init(PrecompiledMul::get_expr_and_queries());
 
         let mut witness_oracles = [a, b];
         let mut instance_oracles = [c];
@@ -155,7 +155,7 @@ mod test {
             domain,
             &domain.vanishing_polynomial().into(),
             PermutationInfo::dummy(),
-            0
+            0,
         )
         .unwrap();
 
@@ -222,7 +222,7 @@ mod test {
         let mut fixed_oracles: [FixedVerifierOracle<F, PC>; 0] = [];
 
         let mut mul_vo =
-            GenericVO::<F, PC>::init(PrecompiledMul::get_expr_and_queries());
+            GenericVO::<F>::init(PrecompiledMul::get_expr_and_queries());
 
         mul_vo.configure(
             &mut ver_wtns_oracles,

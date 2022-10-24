@@ -227,7 +227,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
             extended_coset_domain,
             permutation_argument,
             lookups,
-            usable_rows
+            usable_rows,
         };
 
         let vk = VerifierKey {

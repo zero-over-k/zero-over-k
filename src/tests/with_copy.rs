@@ -1164,9 +1164,8 @@ mod copy_constraint_tests {
 
         let permutation_oracles = [sigma1, sigma2, sigma3];
 
-        let mut plonk_vo = GenericVO::<F, PC>::init(
-            PrecompiledPlonkArith::get_expr_and_queries(),
-        );
+        let mut plonk_vo =
+            GenericVO::<F>::init(PrecompiledPlonkArith::get_expr_and_queries());
 
         plonk_vo.configure(
             &mut witness_oracles,
@@ -1191,7 +1190,7 @@ mod copy_constraint_tests {
             domain,
             &domain.vanishing_polynomial().into(),
             permutation_info.clone(),
-            u
+            u,
         )
         .unwrap();
 
@@ -1304,9 +1303,8 @@ mod copy_constraint_tests {
             commitment: Some(q_blind_commitment[0].commitment().clone()),
         };
 
-        let mut plonk_vo = GenericVO::<F, PC>::init(
-            PrecompiledPlonkArith::get_expr_and_queries(),
-        );
+        let mut plonk_vo =
+            GenericVO::<F>::init(PrecompiledPlonkArith::get_expr_and_queries());
 
         plonk_vo.configure(
             &mut witness_ver_oracles,
@@ -1327,7 +1325,7 @@ mod copy_constraint_tests {
             domain,
             &domain.vanishing_polynomial().into(),
             permutation_info,
-            u
+            u,
         )
         .unwrap();
 

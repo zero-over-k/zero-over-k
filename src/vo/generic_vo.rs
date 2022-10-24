@@ -16,22 +16,20 @@ use super::{
 };
 
 #[derive(Clone)]
-pub struct GenericVO<F: PrimeField, PC: HomomorphicCommitment<F>> {
+pub struct GenericVO<F: PrimeField> {
     pub(crate) virtual_exp: VirtualExpression<F>,
     pub(crate) virtual_queries: Vec<VirtualQuery>,
     pub(crate) queries: Option<Vec<OracleQuery>>,
     pub(crate) expression: Option<NewExpression<F>>,
-    _pc: PhantomData<PC>,
 }
 
-impl<F: PrimeField, PC: HomomorphicCommitment<F>> GenericVO<F, PC> {
+impl<F: PrimeField> GenericVO<F> {
     pub fn init(cfg: (VirtualExpression<F>, Vec<VirtualQuery>)) -> Self {
         Self {
             virtual_exp: cfg.0,
             virtual_queries: cfg.1,
             queries: None,
             expression: None,
-            _pc: PhantomData,
         }
     }
 
@@ -85,9 +83,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> GenericVO<F, PC> {
     }
 }
 
-impl<F: PrimeField, PC: HomomorphicCommitment<F>> VirtualOracle<F>
-    for GenericVO<F, PC>
-{
+impl<F: PrimeField> VirtualOracle<F> for GenericVO<F> {
     // fn get_queries(&self) -> &[OracleQuery] {
     //     match &self.queries {
     //         Some(queries) => &queries,

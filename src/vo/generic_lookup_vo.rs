@@ -16,16 +16,15 @@ use super::{
 };
 
 #[derive(Clone)]
-pub struct GenericLookupVO<F: PrimeField, PC: HomomorphicCommitment<F>> {
+pub struct GenericLookupVO<F: PrimeField> {
     pub(crate) virtual_expressions: Vec<VirtualExpression<F>>,
     pub(crate) virtual_queries: Vec<VirtualQuery>,
     pub(crate) virtual_table_queries: Vec<VirtualQuery>, // for now table query is just querying of fixed oracle, later we can introduce TableOracle, TableQuery, etc...
     pub(crate) table_queries: Option<Vec<OracleQuery>>,
     pub(crate) expressions: Option<Vec<NewExpression<F>>>,
-    _pc: PhantomData<PC>,
 }
 
-impl<F: PrimeField, PC: HomomorphicCommitment<F>> GenericLookupVO<F, PC> {
+impl<F: PrimeField> GenericLookupVO<F> {
     pub fn init(
         cfg: (
             Vec<VirtualExpression<F>>,
@@ -39,7 +38,6 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> GenericLookupVO<F, PC> {
             virtual_table_queries: cfg.2,
             table_queries: None,
             expressions: None,
-            _pc: PhantomData,
         }
     }
 
@@ -101,13 +99,12 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> GenericLookupVO<F, PC> {
             })
             .collect();
 
-        self.expressions = Some(expressions)
+        self.expressions = Some(expressions);
+        self.table_queries = Some(table_queries);
     }
 }
 
-impl<F: PrimeField, PC: HomomorphicCommitment<F>> LookupVirtualOracle<F>
-    for GenericLookupVO<F, PC>
-{
+impl<F: PrimeField> LookupVirtualOracle<F> for GenericLookupVO<F> {
     fn get_expressions(&self) -> &[NewExpression<F>] {
         match &self.expressions {
             Some(expressions) => &expressions,

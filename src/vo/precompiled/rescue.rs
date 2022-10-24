@@ -180,7 +180,7 @@ mod test {
             DensePolynomial::from_coefficients_slice(&domain.ifft(&w5_evals));
 
         let mut rescue_vo =
-            GenericVO::<F, PC>::init(PrecompiledRescue::get_expr_and_queries());
+            GenericVO::<F>::init(PrecompiledRescue::get_expr_and_queries());
 
         let mut witness_oracles: Vec<_> = [
             (witness_polys[0].clone(), witness_evals[0].clone(), "a"),

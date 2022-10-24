@@ -298,9 +298,8 @@ mod test {
         })
         .collect();
 
-        let mut plonk_vo = GenericVO::<F, PC>::init(
-            PrecompiledPlonkArith::get_expr_and_queries(),
-        );
+        let mut plonk_vo =
+            GenericVO::<F>::init(PrecompiledPlonkArith::get_expr_and_queries());
 
         plonk_vo.configure(
             &mut witness_oracles,

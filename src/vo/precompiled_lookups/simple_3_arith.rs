@@ -119,7 +119,7 @@ mod test {
             queried_rotations: BTreeSet::default(),
         };
 
-        let mut simple_lookup_vo = GenericLookupVO::<F, PC>::init(
+        let mut simple_lookup_vo = GenericLookupVO::<F>::init(
             PrecompiledSimple3ArithLookup::get_expressions_and_queries(),
         );
 

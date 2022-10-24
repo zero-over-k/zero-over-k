@@ -271,11 +271,11 @@ impl<F: PrimeField> LookupArgument<F> {
 
         // We care just about usable rows, rest are used for blinding
         let (mut a_prime_evals, mut s_prime_evals) = permute_for_lookup(
-            &a.evals[..usable_rows],
-            &s.evals[..usable_rows],
+            &a.evals[..usable_rows - 1],
+            &s.evals[..usable_rows - 1],
         );
 
-        for _ in usable_rows..domain.size() {
+        for _ in usable_rows..=domain.size() {
             a_prime_evals.push(F::rand(zk_rng));
             s_prime_evals.push(F::rand(zk_rng));
         }

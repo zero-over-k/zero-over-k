@@ -158,7 +158,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
                     &state.instance_oracles,
                     &preprocessed.fixed_oracles,
                     &preprocessed.table_oracles,
-                    1, // add usable rows in index
+                    index.usable_rows,
                     lookup_index,
                     lookup_vo.get_expressions(),
                     lookup_vo.get_table_queries(),
@@ -199,7 +199,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
                     permutation_msg.beta,
                     permutation_msg.gamma,
                     lookup_index,
-                    1, //TODO: add u in index
+                    index.usable_rows,
                     &state.domain,
                     &index.extended_coset_domain,
                     zk_rng,

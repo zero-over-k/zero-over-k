@@ -45,7 +45,7 @@ pub struct IndexInfo<'a, F: PrimeField> {
     pub extended_coset_domain: GeneralEvaluationDomain<F>,
     pub permutation_argument: PermutationArgument<F>,
     pub lookups: Vec<&'a dyn LookupVirtualOracle<F>>,
-    pub usable_rows: usize, 
+    pub usable_rows: usize,
 }
 
 pub struct ProverPreprocessedInput<F: PrimeField, PC: HomomorphicCommitment<F>>
