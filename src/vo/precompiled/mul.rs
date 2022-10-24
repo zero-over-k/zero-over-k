@@ -258,7 +258,7 @@ mod test {
             fixed_oracles: vec![],
             table_oracles: vec![],
             permutation_oracles: vec![],
-            q_blind: q_blind,
+            q_blind,
         };
 
         // Since we mutate fixed oracles by adding evals at challenge for specific proof
