@@ -155,6 +155,7 @@ mod test {
             domain,
             &domain.vanishing_polynomial().into(),
             PermutationInfo::dummy(),
+            0
         )
         .unwrap();
 
@@ -242,6 +243,7 @@ mod test {
             domain,
             &domain.vanishing_polynomial().into(),
             PermutationInfo::dummy(),
+            0,
         )
         .unwrap();
 

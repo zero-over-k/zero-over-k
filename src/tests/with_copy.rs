@@ -1191,6 +1191,7 @@ mod copy_constraint_tests {
             domain,
             &domain.vanishing_polynomial().into(),
             permutation_info.clone(),
+            u
         )
         .unwrap();
 
@@ -1326,6 +1327,7 @@ mod copy_constraint_tests {
             domain,
             &domain.vanishing_polynomial().into(),
             permutation_info,
+            u
         )
         .unwrap();
 

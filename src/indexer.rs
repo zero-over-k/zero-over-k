@@ -142,6 +142,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
         domain: GeneralEvaluationDomain<F>,
         zH: &DensePolynomial<F>,
         permutation_info: PermutationInfo<F>,
+        usable_rows: usize,
     ) -> Result<VerifierKey<'a, F, PC>, Error<PC::Error>> {
         let witness_oracles_mapping: BTreeMap<String, usize> = witness_oracles
             .iter()
@@ -226,6 +227,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
             extended_coset_domain,
             permutation_argument,
             lookups,
+            usable_rows
         };
 
         let vk = VerifierKey {
