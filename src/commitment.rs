@@ -24,8 +24,6 @@ where
 
     fn zero_comm() -> Self::Commitment;
 
-    fn comm_from_constant(c: &F) -> Self::Commitment;
-
     fn is_zero(c: &Self::Commitment) -> bool;
 
     fn eq_cm(c1: &Self::Commitment, c2: &Self::Commitment) -> bool;
@@ -83,11 +81,6 @@ where
 
     fn add(c1: &Self::Commitment, c2: &Self::Commitment) -> Self::Commitment {
         ark_poly_commit::kzg10::Commitment::<E>(c1.0 + c2.0)
-    }
-
-    fn comm_from_constant(c: &E::Fr) -> Self::Commitment {
-        // let x = ark_poly_commit::kzg10::Commitment::<E>(E::G1Affine::one());
-        todo!();
     }
 
     fn zero_comm() -> Self::Commitment {
