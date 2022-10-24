@@ -33,6 +33,7 @@ impl<F: PrimeField> PrecompiledVO<F> for Delta {
 
             let q_last: VirtualExpression<F> = q_last.clone().into();
             let q_not_last = VirtualExpression::Constant(F::one()) - q_last;
+
             let const_4: VirtualExpression<F> =
                 VirtualExpression::Constant(F::from(4u32));
             let delta = |e: VirtualExpression<F>| -> VirtualExpression<F> {
@@ -50,7 +51,7 @@ impl<F: PrimeField> PrecompiledVO<F> for Delta {
             q_not_last * delta(a_next - const_4 * a)
         };
 
-        (expr, vec![a])
+        (expr, vec![q_last, a, a_next])
     }
 }
 
@@ -167,7 +168,7 @@ mod test {
     use crate::PIL;
     use blake2::Blake2s;
 
-    use crate::commitment::KZG10;
+    use crate::commitment::{HomomorphicCommitment, KZG10};
     use crate::vo::VirtualOracle;
 
     use itertools::izip;
@@ -178,7 +179,6 @@ mod test {
 
     type PilInstance = PIL<F, PC, FS>;
 
-    // TODO Delta needs selector to avoid challenging the row beyound the last one
     #[test]
     fn test_delta() {
         let domain_size = 16;
@@ -205,16 +205,24 @@ mod test {
         .take(domain_size)
         .collect();
 
-        // check
+        let mut q_last_evals = vec![F::zero(); 16];
+        q_last_evals[15] = F::one();
 
+        // check
         let delta =
-            |&v| v * (v - F::one()) * (v - F::from(2u32)) * (v - F::from(3u32));
-        for (i, v) in a_evals.iter().enumerate() {
-            assert_eq!(F::zero(), delta(v))
+            |v| v * (v - F::one()) * (v - F::from(2u32)) * (v - F::from(3u32));
+        for (i, &v) in a_evals.iter().enumerate() {
+            if i < 15 {
+                assert_eq!(F::zero(), delta(a_evals[i + 1] - F::from(4u32) * v))
+            }
         }
 
         let a_poly =
             DensePolynomial::from_coefficients_slice(&domain.ifft(&a_evals));
+
+        let q_last_poly = DensePolynomial::from_coefficients_slice(
+            &domain.ifft(&q_last_evals),
+        );
 
         let a = WitnessProverOracle {
             label: "a".to_string(),
@@ -225,9 +233,17 @@ mod test {
             evals: a_evals.clone(),
         };
 
+        let q_last = FixedProverOracle {
+            label: "q_last".to_string(),
+            poly: q_last_poly.clone(),
+            evals: q_last_evals,
+            evals_at_coset_of_extended_domain: None,
+            queried_rotations: BTreeSet::new(),
+        };
+
         let mut witness_oracles = [a];
         let mut instance_oracles: Vec<InstanceProverOracle<F>> = vec![];
-        let mut fixed_oracles: Vec<FixedProverOracle<F>> = vec![];
+        let mut fixed_oracles: Vec<FixedProverOracle<F>> = vec![q_last];
 
         let mut delta_vo =
             GenericVO::<F, PC>::init(Delta::get_expr_and_queries());
@@ -243,23 +259,35 @@ mod test {
         let vk = Indexer::index(
             &verifier_key,
             &vos,
+            vec![],
             &witness_oracles,
             &instance_oracles,
             &fixed_oracles,
             domain,
             &domain.vanishing_polynomial().into(),
             PermutationInfo::empty(),
+            0,
         )
         .unwrap();
 
         let pk = ProverKey::from_ck_and_vk(&ck, &vk);
 
+        let q_blind = FixedProverOracle {
+            label: "q_blind".to_string(),
+            poly: DensePolynomial::zero(),
+            evals: vec![],
+            evals_at_coset_of_extended_domain: None,
+            queried_rotations: BTreeSet::default(),
+        };
+
         let preprocessed = ProverPreprocessedInput::new(
             &fixed_oracles,
             &vec![],
-            None,
+            &vec![],
+            &q_blind,
             &vk.index_info,
         );
+
         let proof = PilInstance::prove(
             &pk,
             &preprocessed,
@@ -292,7 +320,12 @@ mod test {
 
         let mut instance_oracles: Vec<InstanceVerifierOracle<F>> = vec![];
         let labeled_fixed: Vec<LabeledPolynomial<F, DensePolynomial<F>>> =
-            vec![];
+            vec![LabeledPolynomial::new(
+                "q_last".to_string(),
+                q_last_poly,
+                None,
+                None,
+            )];
 
         let (fixed_comm, _) =
             PC::commit(&ck, labeled_fixed.iter(), None).unwrap();
@@ -321,19 +354,29 @@ mod test {
         let mut vk = Indexer::index(
             &verifier_key,
             &vos,
+            vec![],
             &witness_ver_oracles,
             &instance_oracles,
             &fixed_oracles,
             domain,
             &domain.vanishing_polynomial().into(),
-            None,
+            PermutationInfo::empty(),
+            0,
         )
         .unwrap();
 
+        let q_blind = FixedVerifierOracle {
+            label: "q_blind".to_string(),
+            queried_rotations: BTreeSet::default(),
+            evals_at_challenges: BTreeMap::default(),
+            commitment: Some(PC::zero_comm()),
+        };
+
         let verifier_pp = VerifierPreprocessedInput {
             fixed_oracles: fixed_oracles.clone(),
+            table_oracles: vec![],
             permutation_oracles: vec![],
-            q_blind: None,
+            q_blind,
         };
         // We clone because fixed oracles must be mutable in order to add evals at challenge
         // Another option is to create reset method which will just reset challenge to eval mapping
