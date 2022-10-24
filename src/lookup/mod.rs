@@ -84,14 +84,13 @@ impl<F: PrimeField> LookupArgument<F> {
         let mut a_original_domain_evals =
             Vec::<F>::with_capacity(domain.size());
         let mut a_extended_coset_domain_evals =
-            Vec::<F>::with_capacity(domain.size());
+            Vec::<F>::with_capacity(extended_coset_domain.size());
 
         for i in 0..domain.size() {
             let expressions_at_i = lookup_expressions.iter().map(|lookup_expr| {
                 lookup_expr.evaluate(
                     &|x: F| x,
                     &|query| {
-                        // let point = 
                         match query.oracle_type {
                             OracleType::Witness => {
                                 match witness_oracles_mapping.get(&query.label) {
@@ -186,12 +185,18 @@ impl<F: PrimeField> LookupArgument<F> {
             should_permute: false,
         };
 
+        // sanity check
+        assert_eq!(
+            a.evals_at_coset_of_extended_domain.clone().unwrap(),
+            extended_coset_domain.coset_fft(&a.poly)
+        );
+
         // For now we are supporting just fixed table queries, easily we can extend it to table expressions and
         // we will just repeat what is done for A
         let mut s_original_domain_evals =
             Vec::<F>::with_capacity(domain.size());
         let mut s_extended_coset_domain_evals =
-            Vec::<F>::with_capacity(domain.size());
+            Vec::<F>::with_capacity(extended_coset_domain.size());
 
         for i in 0..domain.size() {
             let table_evals_at_i = table_queries.iter().map(|table_query| {
@@ -269,13 +274,19 @@ impl<F: PrimeField> LookupArgument<F> {
             should_permute: false,
         };
 
-        // We care just about usable rows, rest are used for blinding
-        let (mut a_prime_evals, mut s_prime_evals) = permute_for_lookup(
-            &a.evals[..usable_rows - 1],
-            &s.evals[..usable_rows - 1],
+        // sanity check
+        assert_eq!(
+            s.evals_at_coset_of_extended_domain.clone().unwrap(),
+            extended_coset_domain.coset_fft(&s.poly)
         );
 
-        for _ in usable_rows..=domain.size() {
+        // We care just about usable rows, rest are used for blinding
+        let (mut a_prime_evals, mut s_prime_evals) = permute_for_lookup(
+            &a.evals[..usable_rows],
+            &s.evals[..usable_rows],
+        );
+
+        for _ in usable_rows..domain.size() {
             a_prime_evals.push(F::rand(zk_rng));
             s_prime_evals.push(F::rand(zk_rng));
         }
@@ -283,14 +294,15 @@ impl<F: PrimeField> LookupArgument<F> {
         assert_eq!(a_prime_evals.len(), domain.size());
         assert_eq!(s_prime_evals.len(), domain.size());
 
+        let a_prime_poly = DensePolynomial::from_coefficients_slice(
+            &domain.ifft(&a_prime_evals),
+        );
         let a_prime = WitnessProverOracle {
             label: format!("lookup_a_prime_{}_poly", lookup_index).to_string(),
-            poly: DensePolynomial::from_coefficients_slice(
-                &domain.ifft(&a_prime_evals),
-            ),
             evals_at_coset_of_extended_domain: Some(
-                extended_coset_domain.coset_fft(&a_prime_evals),
+                extended_coset_domain.coset_fft(&a_prime_poly),
             ),
+            poly: a_prime_poly,
             evals: a_prime_evals,
             queried_rotations: BTreeSet::from([
                 Rotation::curr(),
@@ -299,14 +311,15 @@ impl<F: PrimeField> LookupArgument<F> {
             should_permute: false,
         };
 
+        let s_prime_poly = DensePolynomial::from_coefficients_slice(
+            &domain.ifft(&s_prime_evals),
+        );
         let s_prime = WitnessProverOracle {
             label: format!("lookup_s_prime_{}_poly", lookup_index).to_string(),
-            poly: DensePolynomial::from_coefficients_slice(
-                &domain.ifft(&s_prime_evals),
-            ),
             evals_at_coset_of_extended_domain: Some(
-                extended_coset_domain.coset_fft(&s_prime_evals),
+                extended_coset_domain.coset_fft(&s_prime_poly),
             ),
+            poly: s_prime_poly,
             evals: s_prime_evals,
             queried_rotations: BTreeSet::from([Rotation::curr()]),
             should_permute: false,

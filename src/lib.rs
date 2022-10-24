@@ -1056,27 +1056,8 @@ where
         } else {
             F::zero()
         };
-        
-        // Lookup contribution to quotient
-        // let x = lookup_polys.iter().zip(lookup_z_polys.iter()).zip(lookup_alpha_chunks.iter()).map(|((lookup_oracles, z), &alpha_powers)| {
-        //     let (a, s, a_prime, s_prime) = lookup_oracles;
-        //     LookupArgument::open_argument(
-        //         &l0_eval,
-        //         lu_eval,
-        //         &preprocessed.q_blind,
-        //         a,
-        //         s,
-        //         a_prime,
-        //         s_prime,
-        //         z,
-        //         verifier_permutation_msg.beta,
-        //         verifier_permutation_msg.gamma,
-        //         &verifier_second_msg.xi,
-        //         &domain,
-        //         alpha_powers,
-        //     )
-        // });
 
+        // Lookup contribution to quotient
         for ((lookup_oracles, z), &alpha_powers) in lookup_polys.iter().zip(lookup_z_polys.iter()).zip(lookup_alpha_chunks.iter()) {
             let (a, s, a_prime, s_prime) = lookup_oracles;
                 quotient_eval += LookupArgument::open_argument(

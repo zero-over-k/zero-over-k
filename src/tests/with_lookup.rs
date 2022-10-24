@@ -20,6 +20,7 @@ mod test {
     use crate::oracles::instance::InstanceVerifierOracle;
     use crate::oracles::query::{OracleQuery, OracleType};
     use crate::oracles::rotation::Rotation;
+    use crate::oracles::traits::Instantiable;
     use crate::oracles::witness::WitnessVerifierOracle;
     use crate::oracles::{
         instance::InstanceProverOracle, witness::WitnessProverOracle,
@@ -78,7 +79,7 @@ mod test {
     }
 
     #[test]
-    fn test_simple_lookup() {
+    fn test_full_circuit_simple_lookup() {
         let convert_to_field = |x: &[usize]| -> Vec<F> {
             x.iter().map(|&xi| F::from(xi as u64)).collect()
         };
@@ -93,6 +94,12 @@ mod test {
         let (ck, verifier_key) = PilInstance::prepare_keys(&srs).unwrap();
 
         let domain = GeneralEvaluationDomain::<F>::new(domain_size).unwrap();
+
+        let scaling_factor = 4;
+
+        let extended_coset_domain =
+            GeneralEvaluationDomain::<F>::new(scaling_factor * domain_size)
+                .unwrap();
 
         let usable_rows = 10;
         let dummy_table = 999;
@@ -116,11 +123,23 @@ mod test {
         ];
         let table_evals = convert_to_field(&table_evals);
 
-        let a_evals = [1, 1, 2, 3, 4, 4, dummy_table, dummy_table, dummy_table];
+        let a_evals = [
+            1,
+            1,
+            2,
+            3,
+            4,
+            4,
+            dummy_table,
+            dummy_table,
+            dummy_table,
+            dummy_table,
+        ];
         let mut a_evals = convert_to_field(&a_evals);
 
         let b_evals = [
             // actual values but they can be random
+            F::rand(&mut rng),
             F::rand(&mut rng),
             F::rand(&mut rng),
             F::rand(&mut rng),
@@ -137,26 +156,27 @@ mod test {
             F::rand(&mut rng),
             F::rand(&mut rng),
             F::rand(&mut rng),
-            F::rand(&mut rng),
         ];
 
         let mut c_evals: Vec<F> = a_evals
             .iter()
-            .take(usable_rows - 1)
-            .zip(b_evals.iter().take(usable_rows - 1))
+            .take(usable_rows)
+            .zip(b_evals.iter().take(usable_rows))
             .map(|(&a, &b)| a * b)
             .collect();
 
-        for _ in usable_rows..=domain_size {
+        for _ in usable_rows..domain_size {
             c_evals.push(F::rand(&mut rng));
             a_evals.push(F::rand(&mut rng));
         }
 
         assert_eq!(c_evals.len(), domain_size);
 
-        let selector_evals = [1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0];
+        let selector_evals = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0];
+        let q_blind_evals = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1];
 
         let selector_evals = convert_to_field(&selector_evals);
+        let q_blind_evals = convert_to_field(&q_blind_evals);
 
         // sanity check
         for i in 0..domain_size {
@@ -208,6 +228,20 @@ mod test {
             evals_at_coset_of_extended_domain: None,
             queried_rotations: BTreeSet::new(),
             evals: selector_evals,
+        };
+
+        let q_blind_poly = DensePolynomial::from_coefficients_slice(
+            &domain.ifft(&q_blind_evals),
+        );
+
+        let q_blind = FixedProverOracle {
+            label: "q_blind".to_string(),
+            poly: q_blind_poly.clone(),
+            evals_at_coset_of_extended_domain: Some(
+                extended_coset_domain.coset_fft(&q_blind_poly),
+            ),
+            evals: q_blind_evals.to_vec(),
+            queried_rotations: BTreeSet::from([Rotation::curr()]),
         };
 
         let table_poly = DensePolynomial::from_coefficients_slice(
@@ -262,14 +296,6 @@ mod test {
         .unwrap();
 
         let pk = ProverKey::from_ck_and_vk(&ck, &vk);
-
-        let q_blind = FixedProverOracle {
-            label: "q_blind".to_string(),
-            poly: DensePolynomial::zero(),
-            evals: vec![],
-            evals_at_coset_of_extended_domain: None,
-            queried_rotations: BTreeSet::default(),
-        };
 
         let preprocessed = ProverPreprocessedInput::new(
             &fixed_oracles.to_vec(),
@@ -372,6 +398,17 @@ mod test {
             })
             .collect();
 
+        let q_blind_labeled = q_blind.to_labeled();
+        let (q_blind_commitment, _) =
+            PC::commit(&ck, &[q_blind_labeled], None).unwrap();
+
+        let q_blind = FixedVerifierOracle::<F, PC> {
+            label: "q_blind".into(),
+            queried_rotations: BTreeSet::from([Rotation::curr()]),
+            evals_at_challenges: BTreeMap::default(),
+            commitment: Some(q_blind_commitment[0].commitment().clone()),
+        };
+
         let mut ver_wtns_oracles = [a_ver, b_ver, c_ver];
         let mut instance_oracles: [InstanceVerifierOracle<F>; 0] = [];
 
@@ -409,13 +446,6 @@ mod test {
             0,
         )
         .unwrap();
-
-        let q_blind = FixedVerifierOracle::<F, PC> {
-            label: "q_blind".to_string(),
-            queried_rotations: BTreeSet::default(),
-            evals_at_challenges: BTreeMap::default(),
-            commitment: Some(PC::zero_comm()),
-        };
 
         let preprocessed = VerifierPreprocessedInput {
             fixed_oracles: fixed_oracles,

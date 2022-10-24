@@ -47,6 +47,7 @@ impl<F: PrimeField> SubsetEqualityArgument<F> {
             z_evals.push(z_prev);
         }
 
+        assert_eq!(z_evals[u], F::one());
         // allowed rows is: u = domain_size - t - 1
         // t = domain_size - 1 - u
         // so blind with t evals
