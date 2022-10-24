@@ -453,7 +453,7 @@ impl<F: PrimeField> LookupArgument<F> {
         beta: F,
         gamma: F,
         omega_index: usize,
-        alpha_powers: &Vec<F>,
+        alpha_powers: &[F],
     ) -> F {
         // we need 3 alphas for subset equality check
         // + 1 to check that A'(w^0) = S'(w^0)
@@ -514,7 +514,7 @@ impl<F: PrimeField> LookupArgument<F> {
         gamma: F,
         evaluation_challenge: &F,
         domain: &GeneralEvaluationDomain<F>,
-        alpha_powers: &Vec<F>,
+        alpha_powers: &[F],
     ) -> F {
         assert_eq!(alpha_powers.len(), 5);
 

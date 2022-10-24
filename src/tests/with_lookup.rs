@@ -292,7 +292,7 @@ mod test {
         .unwrap();
 
         // println!("{}", proof.info());
-        // println!("{}", proof.cumulative_info());
+        println!("{}", proof.cumulative_info());
 
         //Verifier
         let a_ver = WitnessVerifierOracle::<F, PC> {

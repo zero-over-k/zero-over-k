@@ -163,7 +163,7 @@ where
 
         let lookup_polys = PIOPforPolyIdentity::prover_lookup_round(
             &verifier_lookup_aggregation_msg,
-            &prover_state,
+            &mut prover_state,
             preprocessed,
             &pk.vk.index_info,
             zk_rng,
@@ -231,7 +231,7 @@ where
             PIOPforPolyIdentity::<F, PC>::prover_lookup_subset_equality_round(
                 &verifier_permutation_msg,
                 &lookup_polys,
-                &prover_state,
+                &mut prover_state,
                 &pk.vk.index_info,
                 zk_rng,
             );
@@ -957,14 +957,32 @@ where
             .number_of_alphas(z_polys.len());
 
         // start from next of last power of alpha
-        let begin_with =
+        let permutation_begin_with =
             powers_of_alpha.last().unwrap().clone() * verifier_first_msg.alpha;
         let permutation_alphas: Vec<F> =
-            successors(Some(begin_with), |alpha_i| {
+            successors(Some(permutation_begin_with), |alpha_i| {
                 Some(*alpha_i * verifier_first_msg.alpha)
             })
             .take(number_of_alphas)
             .collect();
+
+        // For each lookup argument we need 5 alphas
+        // Again begin with last alpha after permutation argument
+        let lookups_begin_with = if let Some(alpha) = permutation_alphas.last()
+        {
+            alpha.clone()
+        } else {
+            powers_of_alpha.last().unwrap().clone()
+        };
+
+        let lookup_alphas: Vec<F> =
+            successors(Some(lookups_begin_with), |alpha_i| {
+                Some(*alpha_i * verifier_first_msg.alpha)
+            })
+            .take(5 * vk.index_info.lookups.len())
+            .collect();
+
+        let lookup_alpha_chunks: Vec<&[F]> = lookup_alphas.chunks(5).collect();
 
         // TODO: ENABLE FAST LAGRANGE EVALUATION
         let mut l0_evals = vec![F::zero(); domain_size];
@@ -1017,26 +1035,65 @@ where
             );
 
             quotient_eval += powers_of_alpha[vo_index] * vo_evaluation;
+        }
 
-            // Permutation argument
-            // If there are no oracles to enforce copy constraints on, we just return zero
-            quotient_eval += if oracles_to_copy.len() > 0 {
-                vk.index_info.permutation_argument.open_argument(
-                    l0_eval,
-                    lu_eval,
-                    &preprocessed.q_blind,
-                    &z_polys,
-                    &preprocessed.permutation_oracles,
-                    oracles_to_copy.as_slice(),
-                    verifier_permutation_msg.beta,
-                    verifier_permutation_msg.gamma,
-                    &domain,
-                    verifier_second_msg.xi,
-                    &permutation_alphas,
-                )
-            } else {
-                F::zero()
-            }
+        // Permutation argument
+        // If there are no oracles to enforce copy constraints on, we just return zero
+        quotient_eval += if oracles_to_copy.len() > 0 {
+            vk.index_info.permutation_argument.open_argument(
+                l0_eval,
+                lu_eval,
+                &preprocessed.q_blind,
+                &z_polys,
+                &preprocessed.permutation_oracles,
+                oracles_to_copy.as_slice(),
+                verifier_permutation_msg.beta,
+                verifier_permutation_msg.gamma,
+                &domain,
+                verifier_second_msg.xi,
+                &permutation_alphas,
+            )
+        } else {
+            F::zero()
+        };
+        
+        // Lookup contribution to quotient
+        // let x = lookup_polys.iter().zip(lookup_z_polys.iter()).zip(lookup_alpha_chunks.iter()).map(|((lookup_oracles, z), &alpha_powers)| {
+        //     let (a, s, a_prime, s_prime) = lookup_oracles;
+        //     LookupArgument::open_argument(
+        //         &l0_eval,
+        //         lu_eval,
+        //         &preprocessed.q_blind,
+        //         a,
+        //         s,
+        //         a_prime,
+        //         s_prime,
+        //         z,
+        //         verifier_permutation_msg.beta,
+        //         verifier_permutation_msg.gamma,
+        //         &verifier_second_msg.xi,
+        //         &domain,
+        //         alpha_powers,
+        //     )
+        // });
+
+        for ((lookup_oracles, z), &alpha_powers) in lookup_polys.iter().zip(lookup_z_polys.iter()).zip(lookup_alpha_chunks.iter()) {
+            let (a, s, a_prime, s_prime) = lookup_oracles;
+                quotient_eval += LookupArgument::open_argument(
+                &l0_eval,
+                lu_eval,
+                &preprocessed.q_blind,
+                a,
+                s,
+                a_prime,
+                s_prime,
+                z,
+                verifier_permutation_msg.beta,
+                verifier_permutation_msg.gamma,
+                &verifier_second_msg.xi,
+                &domain,
+                alpha_powers,
+            )
         }
 
         let x_n = verifier_second_msg.xi.pow([domain_size as u64, 0, 0, 0]);
