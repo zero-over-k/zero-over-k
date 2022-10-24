@@ -29,6 +29,7 @@ impl<F: PrimeField> SubsetEqualityArgument<F> {
         s_prime: &WitnessProverOracle<F>,
         beta: F,
         gamma: F,
+        lookup_index: usize, 
         u: usize, // allowed rows
         domain: &GeneralEvaluationDomain<F>,
         extended_coset_domain: &GeneralEvaluationDomain<F>,
@@ -58,7 +59,7 @@ impl<F: PrimeField> SubsetEqualityArgument<F> {
             DensePolynomial::from_coefficients_slice(&domain.ifft(&z_evals));
 
         WitnessProverOracle {
-            label: "lookup_agg_poly".to_string(),
+            label: format!("lookup_{}_agg_poly", lookup_index).to_string(),
             evals_at_coset_of_extended_domain: Some(
                 extended_coset_domain.coset_fft(&poly),
             ),
@@ -176,7 +177,7 @@ mod test {
     use std::collections::{BTreeMap, BTreeSet};
 
     use ark_bls12_381::{Bls12_381, Fr as F};
-    use ark_ff::{batch_inversion, Field, FromBytes, One, UniformRand, Zero};
+    use ark_ff::{batch_inversion, One, UniformRand, Zero};
     use ark_poly::univariate::DensePolynomial;
     use ark_poly::{
         EvaluationDomain, GeneralEvaluationDomain, Polynomial, UVPolynomial,
@@ -296,6 +297,7 @@ mod test {
             &s_prime,
             beta,
             gamma,
+            0,
             u,
             &domain,
             &extended_coset_domain,

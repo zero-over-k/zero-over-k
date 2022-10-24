@@ -254,6 +254,7 @@ mod test {
 
         let preprocessed = VerifierPreprocessedInput {
             fixed_oracles: vec![],
+            table_oracles: vec![],
             permutation_oracles: vec![],
             q_blind: q_blind,
         };

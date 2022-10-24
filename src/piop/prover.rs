@@ -12,7 +12,8 @@ use ark_std::rand::Rng;
 
 use crate::{
     commitment::HomomorphicCommitment,
-    data_structures::{ProverPreprocessedInput, VerifierKey},
+    data_structures::{IndexInfo, ProverPreprocessedInput, VerifierKey},
+    lookup::{subset_equality::SubsetEqualityArgument, LookupArgument},
     oracles::{
         fixed::FixedProverOracle,
         instance::InstanceProverOracle,
@@ -27,7 +28,7 @@ use crate::{
     vo::VirtualOracle,
 };
 
-use super::verifier::VerifierPermutationMsg;
+use super::verifier::{VerifierLookupAggregationRound, VerifierPermutationMsg};
 
 // Note: To keep flexible vanishing polynomial should not be strictly domain.vanishing_polynomial
 // For example consider https://hackmd.io/1DaroFVfQwySwZPHMoMdBg?view where we remove some roots from Zh
@@ -38,6 +39,7 @@ pub struct ProverState<'a, F: PrimeField> {
     pub(crate) witness_oracles_mapping: BTreeMap<String, usize>, // TODO: introduce &str here maybe
     pub(crate) instance_oracles_mapping: BTreeMap<String, usize>,
     pub(crate) fixed_oracles_mapping: BTreeMap<String, usize>,
+    pub(crate) table_oracles_mapping: BTreeMap<String, usize>,
     pub(crate) witness_oracles: &'a [WitnessProverOracle<F>],
     pub(crate) instance_oracles: &'a [InstanceProverOracle<F>],
     pub(crate) z_polys: Option<Vec<WitnessProverOracle<F>>>,
@@ -75,6 +77,12 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
             .enumerate()
             .map(|(i, oracle)| (oracle.get_label(), i))
             .collect();
+        let table_oracles_mapping = preprocessed
+            .table_oracles
+            .iter()
+            .enumerate()
+            .map(|(i, oracle)| (oracle.get_label(), i))
+            .collect();
 
         let oracles_to_copy: Vec<&WitnessProverOracle<F>> = witness_oracles
             .iter()
@@ -85,6 +93,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
             witness_oracles_mapping,
             instance_oracles_mapping,
             fixed_oracles_mapping,
+            table_oracles_mapping,
             witness_oracles,
             instance_oracles,
             z_polys: None,
@@ -121,6 +130,83 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
 
         state.z_polys = Some(z_polys.clone());
         z_polys
+    }
+
+    pub fn prover_lookup_round<R: Rng>(
+        lookup_aggregation_msg: &VerifierLookupAggregationRound<F>,
+        state: &ProverState<F>,
+        preprocessed: &ProverPreprocessedInput<F, PC>,
+        index: &IndexInfo<F>,
+        zk_rng: &mut R,
+    ) -> Vec<(
+        WitnessProverOracle<F>,
+        WitnessProverOracle<F>,
+        WitnessProverOracle<F>,
+        WitnessProverOracle<F>,
+    )> {
+        let lookup_polys = index
+            .lookups
+            .iter()
+            .enumerate()
+            .map(|(lookup_index, lookup_vo)| {
+                LookupArgument::construct_a_and_s_polys_prover(
+                    &state.witness_oracles_mapping,
+                    &state.instance_oracles_mapping,
+                    &state.fixed_oracles_mapping,
+                    &state.table_oracles_mapping,
+                    &state.witness_oracles,
+                    &state.instance_oracles,
+                    &preprocessed.fixed_oracles,
+                    &preprocessed.table_oracles,
+                    1, // add usable rows in index
+                    lookup_index,
+                    lookup_vo.get_expressions(),
+                    lookup_vo.get_table_queries(),
+                    lookup_aggregation_msg.theta,
+                    &state.domain,
+                    &index.extended_coset_domain,
+                    zk_rng,
+                )
+            })
+            .collect();
+
+        // In order: (a, s, a_prime, s_prime)
+        lookup_polys
+    }
+
+    pub fn prover_lookup_subset_equality_round<R: Rng>(
+        permutation_msg: &VerifierPermutationMsg<F>,
+        // In order: (a, s, a_prime, s_prime)
+        lookup_polys: &Vec<(
+            WitnessProverOracle<F>,
+            WitnessProverOracle<F>,
+            WitnessProverOracle<F>,
+            WitnessProverOracle<F>,
+        )>,
+        state: &ProverState<F>,
+        index: &IndexInfo<F>,
+        zk_rng: &mut R,
+    ) -> Vec<WitnessProverOracle<F>> {
+        let lookup_z_polys = lookup_polys
+            .iter()
+            .enumerate()
+            .map(|(lookup_index, (a, s, a_prime, s_prime))| {
+                SubsetEqualityArgument::construct_agg_poly(
+                    a,
+                    s,
+                    a_prime,
+                    s_prime,
+                    permutation_msg.beta,
+                    permutation_msg.gamma,
+                    lookup_index,
+                    1, //TODO: add u in index
+                    &state.domain,
+                    &index.extended_coset_domain,
+                    zk_rng,
+                )
+            })
+            .collect();
+        lookup_z_polys
     }
 
     pub fn prover_quotient_round(

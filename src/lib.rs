@@ -25,12 +25,13 @@ use piop::PIOPforPolyIdentity;
 use rng::FiatShamirRng;
 use vo::VirtualOracle;
 
+use crate::lookup::LookupArgument;
 use crate::oracles::fixed::FixedVerifierOracle;
 use crate::oracles::query::OracleType;
 use crate::oracles::rotation::{Rotation, Sign};
 use crate::oracles::traits::CommittedOracle;
 
-use crate::util::evaluate_q_set;
+use crate::util::evaluate_query_set;
 
 pub mod commitment;
 pub mod data_structures;
@@ -86,7 +87,7 @@ where
         preprocessed: &ProverPreprocessedInput<F, PC>,
         witness_oracles: &'a mut [WitnessProverOracle<F>],
         instance_oracles: &'a mut [InstanceProverOracle<F>],
-        vos: &[&'a dyn VirtualOracle<F>],
+        vos: &[&'a dyn VirtualOracle<F>], // TODO: this should be in index
         domain_size: usize,
         vanishing_polynomial: &DensePolynomial<F>,
         zk_rng: &mut R,
@@ -139,12 +140,69 @@ where
             vanishing_polynomial,
         );
 
-        let (verifier_permutation_msg, verifier_state) =
-            PIOPforPolyIdentity::<F, PC>::verifier_permutation_round(
+        let (verifier_lookup_aggregation_msg, verifier_state) =
+            PIOPforPolyIdentity::<F, PC>::verifier_lookup_aggregation_round(
                 verifier_init_state,
                 &mut fs_rng,
             );
 
+        // --------------------------------------------------------------------
+        // Lookup round
+
+        /*
+            Each lookup is consisted of: a, a', s, s' and z
+            a and s evaluations are derived on verifier side because of homomorphic property
+            So for each lookup provide:
+                commitments: a', s', z
+                evaluations: a' at x, a' at w^-1x, s' at x, z at x, z at wx, each table_oracle evaluation at x
+
+
+            First compute a, s, a' and s', commit and derive theta. Then start permutation round to derive beta and gamma and then derive
+            subset equality checks with beta and gamma
+        */
+
+        let lookup_polys = PIOPforPolyIdentity::prover_lookup_round(
+            &verifier_lookup_aggregation_msg,
+            &prover_state,
+            preprocessed,
+            &pk.vk.index_info,
+            zk_rng,
+        );
+
+        let lookup_polys_to_open = lookup_polys.iter()
+            .map(|(_, _, a_prime, s_prime)| {
+                vec![a_prime, s_prime]
+            }).flatten();
+
+        let lookup_prime_labeled: Vec<
+            LabeledPolynomial<F, DensePolynomial<F>>,
+        > = lookup_polys
+            .iter()
+            .map(|(_, _, a_prime, s_prime)| {
+                vec![a_prime.to_labeled(), s_prime.to_labeled()]
+            })
+            .flatten()
+            .collect();
+
+        // commit to a_prime and s_prime for each lookup
+        let (lookup_commitments, lookup_rands) =
+            PC::commit(&pk.committer_key, &lookup_prime_labeled, Some(zk_rng))
+                .map_err(Error::from_pc_err)?;
+
+        fs_rng.absorb(&to_bytes![lookup_commitments].unwrap());
+
+        // --------------------------------------------------------------------
+
+        // --------------------------------------------------------------------
+        // Permutation round
+
+        let (verifier_permutation_msg, verifier_state) =
+            PIOPforPolyIdentity::<F, PC>::verifier_permutation_round(
+                verifier_state,
+                &mut fs_rng,
+            );
+
+        // TODO: rename z_polys to permutation_aggregation_polys
         let z_polys: Vec<WitnessProverOracle<F>> =
             PIOPforPolyIdentity::prover_permutation_round(
                 &verifier_permutation_msg,
@@ -164,14 +222,48 @@ where
 
         fs_rng.absorb(&to_bytes![z_commitments].unwrap());
 
+        // --------------------------------------------------------------------
+
+        // --------------------------------------------------------------------
+        // Lookup subset equality round
+
+        let lookup_z_polys =
+            PIOPforPolyIdentity::<F, PC>::prover_lookup_subset_equality_round(
+                &verifier_permutation_msg,
+                &lookup_polys,
+                &prover_state,
+                &pk.vk.index_info,
+                zk_rng,
+            );
+
+        // get labeled polys of witness oracles
+        let lookup_z_polys_labeled: Vec<
+            LabeledPolynomial<F, DensePolynomial<F>>,
+        > = lookup_z_polys
+            .iter()
+            .map(|oracle| oracle.to_labeled())
+            .collect();
+
+        // commit to witness oracles
+        let (lookup_z_commitments, lookup_z_rands) = PC::commit(
+            &pk.committer_key,
+            &lookup_z_polys_labeled,
+            Some(zk_rng),
+        )
+        .map_err(Error::from_pc_err)?;
+
+        fs_rng.absorb(&to_bytes![lookup_z_commitments].unwrap());
+
+        // --------------------------------------------------------------------
+
+        // --------------------------------------------------------------------
+        // Quotient round
+
         let (verifier_first_msg, verifier_state) =
             PIOPforPolyIdentity::<F, PC>::verifier_first_round(
                 verifier_state,
                 &mut fs_rng,
             );
-
-        // --------------------------------------------------------------------
-        // First round
 
         let quotient_chunk_oracles =
             PIOPforPolyIdentity::prover_quotient_round(
@@ -219,14 +311,9 @@ where
         );
 
         let witness_evals: Vec<F> =
-            evaluate_q_set(witness_oracles_labeled.iter(), &witness_query_set);
+            evaluate_query_set(witness_oracles, &witness_query_set);
 
         // Compute fixed evals
-        let fixed_oracles_labeled: Vec<_> = preprocessed
-            .fixed_oracles
-            .iter()
-            .map(|o| o.to_labeled())
-            .collect();
 
         let fixed_query_set = PIOPforPolyIdentity::<F, PC>::get_query_set(
             &preprocessed.fixed_oracles,
@@ -236,7 +323,48 @@ where
         );
 
         let fixed_oracle_evals: Vec<F> =
-            evaluate_q_set(&fixed_oracles_labeled, &fixed_query_set);
+            evaluate_query_set(&preprocessed.fixed_oracles, &fixed_query_set);
+
+        // Compute table evals
+        let table_query_set = PIOPforPolyIdentity::<F, PC>::get_query_set(
+            &preprocessed.table_oracles,
+            verifier_second_msg.label,
+            verifier_second_msg.xi,
+            &omegas,
+        );
+
+        let table_oracle_evals: Vec<F> =
+            evaluate_query_set(&preprocessed.table_oracles, &table_query_set);
+
+        // Compute lookup evals
+        // For each lookup argument we will always put it in same order:
+        // a' at x, a' at w^-1x, s' at x and z at x, a at wx
+        let omega = domain.element(1);
+        let omega_inv = omega.inverse().unwrap();
+        let lookup_evals: Vec<F> = lookup_polys
+            .iter()
+            .map(|(_, _, a_prime, s_prime)| {
+                let a_prime_at_x = a_prime.query(&verifier_second_msg.xi);
+                let a_prime_at_minus_w_x =
+                    a_prime.query(&(verifier_second_msg.xi * omega_inv));
+
+                let s_prime_at_x = s_prime.query(&verifier_second_msg.xi);
+
+                vec![a_prime_at_x, a_prime_at_minus_w_x, s_prime_at_x]
+            })
+            .flatten()
+            .collect();
+
+        let lookup_z_evals: Vec<F> = lookup_z_polys
+            .iter()
+            .map(|z| {
+                let z_at_x = z.query(&verifier_second_msg.xi);
+                let z_at_omega_x = z.query(&(verifier_second_msg.xi * omega));
+
+                vec![z_at_x, z_at_omega_x]
+            })
+            .flatten()
+            .collect();
 
         // Compute quotient chunk evals
         // There are no rotations for q_i-s so we can just query at evaluation point
@@ -261,7 +389,7 @@ where
             &omegas,
         );
 
-        let z_evals = evaluate_q_set(z_polys_labeled.iter(), &z_query_set);
+        let z_evals = evaluate_query_set(&z_polys, &z_query_set);
 
         // compute q_blind eval
         let q_blind_eval = preprocessed
@@ -272,6 +400,8 @@ where
         // Multiopen
         let mut oracles: Vec<&dyn Instantiable<F>> = witness_oracles
             .iter()
+            .chain(lookup_polys_to_open)
+            .chain(lookup_z_polys.iter())
             .chain(quotient_chunk_oracles.iter())
             .chain(z_polys.iter())
             .map(|o| o as &dyn Instantiable<F>)
@@ -279,6 +409,7 @@ where
         let preprocessed_oracles: Vec<&dyn Instantiable<F>> = preprocessed
             .fixed_oracles
             .iter()
+            .chain(preprocessed.table_oracles.iter())
             .chain(preprocessed.permutation_oracles.iter())
             .chain(iter::once(&preprocessed.q_blind))
             .map(|o| o as &dyn Instantiable<F>)
@@ -288,6 +419,8 @@ where
 
         let oracle_rands: Vec<PC::Randomness> = wtns_rands
             .iter()
+            .chain(lookup_rands.iter())
+            .chain(lookup_z_rands.iter())
             .chain(quotient_rands.iter())
             .chain(z_rands.iter())
             .chain(preprocessed.empty_rands_for_fixed.iter())
@@ -308,24 +441,44 @@ where
         .map_err(Error::from_multiproof_err)?;
 
         let proof = Proof {
+            // witness oracles
             witness_commitments: witness_commitments
                 .iter()
                 .map(|c| c.commitment().clone())
                 .collect(),
             witness_evals,
-            quotient_chunk_commitments: quotient_chunk_commitments
+
+            // fixed
+            fixed_oracle_evals,
+            table_oracle_evals,
+            permutation_oracle_evals,
+            q_blind_eval,
+
+            // lookups part
+            lookup_commitments: lookup_commitments
                 .iter()
                 .map(|c| c.commitment().clone())
                 .collect(),
-            quotient_chunks_evals,
-            fixed_oracle_evals,
+            lookup_evals,
+            lookup_z_commitments: lookup_z_commitments
+                .iter()
+                .map(|c| c.commitment().clone())
+                .collect(),
+            lookup_z_evals,
+
+            // permutation aggregation
             z_commitments: z_commitments
                 .iter()
                 .map(|c| c.commitment().clone())
                 .collect(),
             z_evals,
-            permutation_oracle_evals,
-            q_blind_eval,
+            // quotient part
+            quotient_chunk_commitments: quotient_chunk_commitments
+                .iter()
+                .map(|c| c.commitment().clone())
+                .collect(),
+            quotient_chunks_evals,
+            // multiopen
             multiopen_proof,
         };
 
@@ -434,6 +587,12 @@ where
             .enumerate()
             .map(|(i, oracle)| (oracle.get_label(), i))
             .collect();
+        let table_oracles_mapping: BTreeMap<String, usize> = preprocessed
+            .table_oracles
+            .iter()
+            .enumerate()
+            .map(|(i, oracle)| (oracle.get_label(), i))
+            .collect();
 
         let num_of_quotient_chunks = proof.quotient_chunk_commitments.len();
         // SKIP FOR NOW
@@ -456,24 +615,29 @@ where
 
         fs_rng.absorb(&to_bytes![&proof.witness_commitments].unwrap());
 
-        let (verifier_permutation_msg, verifier_state) =
-            PIOPforPolyIdentity::<F, PC>::verifier_permutation_round(
+        let (verifier_lookup_aggregation_msg, verifier_state) =
+            PIOPforPolyIdentity::<F, PC>::verifier_lookup_aggregation_round(
                 verifier_init_state,
                 &mut fs_rng,
             );
 
+        fs_rng.absorb(&to_bytes![&proof.lookup_commitments].unwrap());
+
+        let (verifier_permutation_msg, verifier_state) =
+            PIOPforPolyIdentity::<F, PC>::verifier_permutation_round(
+                verifier_state,
+                &mut fs_rng,
+            );
+
         fs_rng.absorb(&to_bytes![&proof.z_commitments].unwrap());
+
+        fs_rng.absorb(&to_bytes![&proof.lookup_z_commitments].unwrap());
 
         let (verifier_first_msg, verifier_state) =
             PIOPforPolyIdentity::<F, PC>::verifier_first_round(
                 verifier_state,
                 &mut fs_rng,
             );
-
-        // --------------------------------------------------------------------
-
-        // --------------------------------------------------------------------
-        // Second round
 
         fs_rng.absorb(&to_bytes![&proof.quotient_chunk_commitments].unwrap());
 
@@ -483,8 +647,7 @@ where
                 &mut fs_rng,
             );
 
-        // --------------------------------------------------------------------
-
+        // Map evals to each oracle
         for (witness_oracle, commitment) in witness_oracles
             .iter_mut()
             .zip(proof.witness_commitments.iter())
@@ -550,6 +713,26 @@ where
             };
         }
 
+        // Map table oracles evaluations
+        let table_query_set = PIOPforPolyIdentity::<F, PC>::get_query_set(
+            &preprocessed.table_oracles,
+            verifier_second_msg.label,
+            verifier_second_msg.xi,
+            &omegas,
+        );
+
+        assert_eq!(table_query_set.len(), proof.table_oracle_evals.len());
+
+        for ((poly_label, (_, point)), &evaluation) in
+            table_query_set.iter().zip(proof.table_oracle_evals.iter())
+        {
+            match table_oracles_mapping.get(poly_label) {
+                Some(index) => preprocessed.table_oracles[*index]
+                    .register_eval_at_challenge(*point, evaluation),
+                None => panic!("Missing poly: {}", poly_label),
+            };
+        }
+
         // Map permutation evals
         // Permutation oracles are opened just in evaluation challenge
         assert_eq!(
@@ -569,6 +752,103 @@ where
                 .iter()
                 .filter(|&oracle| oracle.should_permute)
                 .collect();
+
+        // Lookups parts
+        /*
+            Each lookup is consisted of: a, a', s, s' and z
+            a and s evaluations are derived on verifier side because of homomorphic property
+            So for each lookup provide:
+                commitments: a', s', z
+                evaluations: a' at x, a' at w^-1x, s' at x, z at x, z at wx, each table_oracle evaluation at x
+        */
+        let omega = domain.element(1); 
+        let omega_inv = omega.inverse().unwrap();
+        let evaluation_challenge = verifier_second_msg.xi;
+
+        let lookup_permuted_oracles_commitments = proof.lookup_commitments.chunks(2);
+        assert_eq!(lookup_permuted_oracles_commitments.len(), vk.index_info.lookups.len());
+
+        let lookup_permuted_oracles_evals = proof.lookup_evals.chunks(3);
+        assert_eq!(lookup_permuted_oracles_evals.len(), vk.index_info.lookups.len());
+
+        let lookup_polys: Vec<_> = vk.index_info.lookups.iter().zip(lookup_permuted_oracles_commitments).zip(lookup_permuted_oracles_evals).enumerate().map(|(lookup_index, ((lookup_vo, permuted_commitments), permuted_evals))| {
+            let (a, s) =
+                LookupArgument::construct_a_and_s_unpermuted_polys_verifier(
+                    &witness_oracles_mapping,
+                    &instance_oracles_mapping,
+                    &fixed_oracles_mapping,
+                    &table_oracles_mapping,
+                    witness_oracles,
+                    instance_oracles,
+                    &preprocessed.fixed_oracles,
+                    &preprocessed.table_oracles,
+                    lookup_index,
+                    lookup_vo.get_expressions(),
+                    lookup_vo.get_table_queries(),
+                    verifier_lookup_aggregation_msg.theta,
+                    verifier_second_msg.xi,
+                    &omegas,
+                );
+
+            let a_prime = WitnessVerifierOracle::<F, PC> {
+                label: format!("lookup_a_prime_{}_poly", lookup_index).to_string(),
+                queried_rotations: BTreeSet::from([Rotation::curr(), Rotation::prev()]),
+                evals_at_challenges: BTreeMap::from([
+                    (
+                        evaluation_challenge, 
+                        permuted_evals[0]
+                    ), 
+                    (
+                        evaluation_challenge * omega_inv, 
+                        permuted_evals[1]
+                    )
+                ]),
+                commitment: Some(permuted_commitments[0].clone()),
+                should_permute: false,
+            };
+
+            let s_prime = WitnessVerifierOracle::<F, PC> {
+                label: format!("lookup_s_prime_{}_poly", lookup_index).to_string(),
+                queried_rotations: BTreeSet::from([Rotation::curr()]),
+                evals_at_challenges: BTreeMap::from([(
+                    evaluation_challenge, 
+                    permuted_evals[2]
+                )]),
+                commitment: Some(permuted_commitments[1].clone()),
+                should_permute: false,
+            };
+            
+            (a, s, a_prime, s_prime)
+        }).collect();
+
+        let lookup_polys_to_check_in_opening = lookup_polys.iter().map(|(_, _, a_prime, s_prime)| {
+            vec![a_prime, s_prime]
+        }).flatten();
+
+        
+        let lookup_z_evals_chunks = proof.lookup_z_evals.chunks(2);
+        assert_eq!(proof.lookup_z_commitments.len(), vk.index_info.lookups.len());
+        assert_eq!(lookup_z_evals_chunks.len(), vk.index_info.lookups.len());
+
+        let lookup_z_polys = proof.lookup_z_commitments.iter().zip(lookup_z_evals_chunks).enumerate().map(|(lookup_index, (z_commitment, evals))| {
+            WitnessVerifierOracle::<F, PC> {
+                label: format!("lookup_{}_agg_poly", lookup_index).to_string(),
+                queried_rotations: BTreeSet::from([Rotation::curr(), Rotation::next()]),
+                evals_at_challenges: BTreeMap::from([
+                (
+                    evaluation_challenge, 
+                    evals[0]
+                ),
+                (
+                    evaluation_challenge * omega, 
+                    evals[1]
+                )
+                ]),
+                commitment: Some(z_commitment.clone()),
+                should_permute: false,
+            }
+        }).collect::<Vec<WitnessVerifierOracle<F, PC>>>();
+        // end lookups
 
         // Map z permutation oracles
         let num_of_z_polys = vk
@@ -753,6 +1033,8 @@ where
 
         let mut oracles: Vec<&dyn CommittedOracle<F, PC>> = witness_oracles
             .iter()
+            .chain(lookup_polys_to_check_in_opening)
+            .chain(lookup_z_polys.iter())
             .chain(quotient_chunk_oracles.iter())
             .chain(z_polys.iter())
             .map(|a| a as &dyn CommittedOracle<F, PC>)
@@ -761,6 +1043,7 @@ where
             preprocessed
                 .fixed_oracles
                 .iter()
+                .chain(preprocessed.table_oracles.iter())
                 .chain(preprocessed.permutation_oracles.iter())
                 .chain(iter::once(&preprocessed.q_blind))
                 .map(|o| o as &dyn CommittedOracle<F, PC>)

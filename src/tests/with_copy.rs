@@ -1331,6 +1331,7 @@ mod copy_constraint_tests {
 
         let verifier_pp = VerifierPreprocessedInput {
             fixed_oracles: selector_oracles.clone(),
+            table_oracles: vec![],
             permutation_oracles: sigma_oracles.clone(),
             q_blind: q_blind,
         };
