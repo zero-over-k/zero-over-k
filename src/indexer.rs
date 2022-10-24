@@ -185,7 +185,6 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
             return Err(Error::QuotientTooSmall);
         }
 
-<<<<<<< HEAD
         // it is possible that there are no oracles to permute
         let num_of_oracles_to_permute =
             witness_oracles.iter().fold(0usize, |sum, oracle| {
@@ -213,21 +212,8 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
         };
 
         // Even if there are no oracles to permute we construct permutation argument to omit Option handling on many places
-        let permutation_argument = PermutationArgument::new(
-            scaling_factor,
-            permutation_info.u,
-            &permutation_info.deltas,
-        );
-=======
-        let scaling_factor = extended_coset_domain.size() / domain.size();
-        let scaling_factor = max(
-            scaling_factor,
-            PermutationArgument::<F>::MINIMAL_SCALING_FACTOR,
-        );
-
         let permutation_argument =
             PermutationArgument::new(scaling_factor, &permutation_info);
->>>>>>> 331294e (Modify `PermutationArgument::new(..)`)
 
         let extended_coset_domain =
             GeneralEvaluationDomain::<F>::new(scaling_factor * domain.size())
