@@ -83,7 +83,7 @@ impl<F: PrimeField> PrecompiledVO<F> for DeltaXorAnd {
         let a = VirtualQuery::new(0, Rotation::curr(), OracleType::Witness);
         let b = VirtualQuery::new(1, Rotation::curr(), OracleType::Witness);
         let c = VirtualQuery::new(2, Rotation::curr(), OracleType::Witness);
-        let d = VirtualQuery::new(2, Rotation::curr(), OracleType::Witness);
+        let d = VirtualQuery::new(3, Rotation::curr(), OracleType::Witness);
         // Selector
         let qc = VirtualQuery::new(0, Rotation::curr(), OracleType::Fixed);
 
@@ -163,6 +163,7 @@ mod test {
     };
 
     use crate::oracles::witness::{WitnessProverOracle, WitnessVerifierOracle};
+    use crate::piop::verifier::VerifierPermutationMsg;
     use crate::rng::SimpleHashFiatShamirRng;
     use crate::vo::generic_vo::GenericVO;
     use crate::PIL;
@@ -294,18 +295,12 @@ mod test {
 
         let mut witness_ver_oracles: Vec<_> = ["a"]
             .into_iter()
-            .map(|label| WitnessVerifierOracle {
-                label: label.to_string(),
-                queried_rotations: BTreeSet::new(),
-                should_permute: false,
-                evals_at_challenges: BTreeMap::default(),
-                commitment: None,
-            })
+            .map(|label| WitnessVerifierOracle::new(label, false))
             .collect();
 
         let mut instance_oracles: Vec<InstanceVerifierOracle<F>> = vec![];
-        let labeled_fixed: Vec<LabeledPolynomial<F, DensePolynomial<F>>> =
-            vec![LabeledPolynomial::new(
+        let labeled_fixed =
+            vec![LabeledPolynomial::<F, DensePolynomial<F>>::new(
                 "q_last".to_string(),
                 q_last_poly,
                 None,
@@ -317,12 +312,7 @@ mod test {
 
         let mut fixed_oracles: Vec<_> = fixed_comm
             .into_iter()
-            .map(|comm| FixedVerifierOracle::<F, PC> {
-                label: comm.label().to_string(),
-                queried_rotations: BTreeSet::default(),
-                evals_at_challenges: BTreeMap::default(),
-                commitment: Some(comm.commitment().clone()),
-            })
+            .map(|comm| FixedVerifierOracle::from_commitment(comm))
             .collect();
 
         let mut delta_vo = GenericVO::<F>::init(Delta::get_expr_and_queries());
@@ -507,13 +497,8 @@ mod test {
             (witness_polys[3].clone(), d_evals, "logic"),
         ]
         .into_iter()
-        .map(|(poly, evals, label)| WitnessProverOracle::<F> {
-            label: label.to_string(),
-            poly,
-            evals_at_coset_of_extended_domain: None,
-            queried_rotations: BTreeSet::new(),
-            should_permute: false,
-            evals,
+        .map(|(poly, evals, label)| {
+            WitnessProverOracle::new(label, poly, &evals, false)
         })
         .collect();
 
@@ -521,12 +506,8 @@ mod test {
 
         let mut fixed_oracles: Vec<_> = [(q_c_poly.clone(), q_c_evals, "qc")]
             .into_iter()
-            .map(|(poly, evals, label)| FixedProverOracle::<F> {
-                label: label.to_string(),
-                evals: evals.to_vec(),
-                poly,
-                evals_at_coset_of_extended_domain: None,
-                queried_rotations: BTreeSet::new(),
+            .map(|(poly, evals, label)| {
+                FixedProverOracle::new(label, poly, &evals)
             })
             .collect();
 
@@ -554,13 +535,8 @@ mod test {
 
         let pk = ProverKey::from_ck_and_vk(&ck, &vk);
 
-        let q_blind = FixedProverOracle {
-            label: "q_blind".to_string(),
-            poly: DensePolynomial::zero(),
-            evals: vec![],
-            evals_at_coset_of_extended_domain: None,
-            queried_rotations: BTreeSet::default(),
-        };
+        let q_blind =
+            FixedProverOracle::new("q_blind", DensePolynomial::zero(), &[]);
 
         let preprocessed = ProverPreprocessedInput::new(
             &fixed_oracles,
@@ -590,13 +566,7 @@ mod test {
 
         let mut witness_ver_oracles: Vec<_> = ["a", "b", "product", "logic"]
             .into_iter()
-            .map(|label| WitnessVerifierOracle {
-                label: label.to_string(),
-                queried_rotations: BTreeSet::new(),
-                should_permute: false,
-                evals_at_challenges: BTreeMap::default(),
-                commitment: None,
-            })
+            .map(|label| WitnessVerifierOracle::new(label, false))
             .collect();
 
         let mut instance_oracles: Vec<InstanceVerifierOracle<F>> = vec![];
@@ -613,17 +583,13 @@ mod test {
                     )
                 })
                 .collect();
+
         let (fixed_comm, _) =
             PC::commit(&ck, labeled_fixed.iter(), None).unwrap();
 
         let mut fixed_oracles: Vec<_> = fixed_comm
             .into_iter()
-            .map(|comm| FixedVerifierOracle::<F, PC> {
-                label: comm.label().to_string(),
-                queried_rotations: BTreeSet::default(),
-                evals_at_challenges: BTreeMap::default(),
-                commitment: Some(comm.commitment().clone()),
-            })
+            .map(|comm| FixedVerifierOracle::from_commitment(comm))
             .collect();
 
         let mut and_xor_vo =
@@ -651,19 +617,11 @@ mod test {
         )
         .unwrap();
 
-        let q_blind = FixedVerifierOracle {
-            label: "q_blind".to_string(),
-            queried_rotations: BTreeSet::default(),
-            evals_at_challenges: BTreeMap::default(),
-            commitment: Some(PC::zero_comm()),
-        };
-
-        let verifier_pp = VerifierPreprocessedInput {
-            fixed_oracles: fixed_oracles.clone(),
-            table_oracles: vec![],
-            permutation_oracles: vec![],
-            q_blind,
-        };
+        let verifier_pp = VerifierPreprocessedInput::new_wo_blind(
+            fixed_oracles.clone(),
+            vec![],
+            vec![],
+        );
         // We clone because fixed oracles must be mutable in order to add evals at challenge
         // Another option is to create reset method which will just reset challenge to eval mapping
         // This is anyway just mockup of frontend
