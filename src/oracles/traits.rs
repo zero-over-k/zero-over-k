@@ -17,6 +17,8 @@ pub trait ConcreteOracle<F: FftField> {
     fn register_rotation(&mut self, rotation: Rotation);
     fn query(&self, challenge: &F) -> F;
 
+    // NOTE: We always want degree to be calculated same for all types of oracles consider example
+    // when some witness poly is just 0, P side will derive different quotient degree then V
     fn get_degree(&self, domain_size: usize) -> usize {
         domain_size - 1
     }

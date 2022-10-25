@@ -262,13 +262,8 @@ mod test {
 
         let pk = ProverKey::from_ck_and_vk(&ck, &vk);
 
-        let q_blind = FixedProverOracle {
-            label: "q_blind".to_string(),
-            poly: DensePolynomial::zero(),
-            evals: vec![],
-            evals_at_coset_of_extended_domain: None,
-            queried_rotations: BTreeSet::default(),
-        };
+        let q_blind =
+            FixedProverOracle::new("q_blind", DensePolynomial::zero(), &[]);
 
         let preprocessed = ProverPreprocessedInput::new(
             &fixed_oracles,
@@ -354,19 +349,11 @@ mod test {
         )
         .unwrap();
 
-        let q_blind = FixedVerifierOracle {
-            label: "q_blind".to_string(),
-            queried_rotations: BTreeSet::default(),
-            evals_at_challenges: BTreeMap::default(),
-            commitment: Some(PC::zero_comm()),
-        };
-
-        let verifier_pp = VerifierPreprocessedInput {
-            fixed_oracles: fixed_oracles.clone(),
-            table_oracles: vec![],
-            permutation_oracles: vec![],
-            q_blind,
-        };
+        let verifier_pp = VerifierPreprocessedInput::new_wo_blind(
+            fixed_oracles,
+            vec![],
+            vec![],
+        );
         // We clone because fixed oracles must be mutable in order to add evals at challenge
         // Another option is to create reset method which will just reset challenge to eval mapping
         // This is anyway just mockup of frontend

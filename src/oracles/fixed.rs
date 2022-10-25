@@ -163,6 +163,21 @@ pub struct FixedVerifierOracle<F: PrimeField, PC: HomomorphicCommitment<F>> {
     pub(crate) commitment: Option<PC::Commitment>,
 }
 
+impl<F: PrimeField, PC: HomomorphicCommitment<F>> FixedVerifierOracle<F, PC> {
+    /// Creates a new FixedVerifierOracle
+    pub(crate) fn new(
+        label: impl Into<String>,
+        commitment: Option<PC::Commitment>,
+    ) -> Self {
+        Self {
+            label: label.into(),
+            queried_rotations: BTreeSet::new(),
+            evals_at_challenges: BTreeMap::new(),
+            commitment,
+        }
+    }
+}
+
 impl<F: PrimeField, PC: HomomorphicCommitment<F>> Clone
     for FixedVerifierOracle<F, PC>
 {

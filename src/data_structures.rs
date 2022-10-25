@@ -124,6 +124,41 @@ pub struct VerifierPreprocessedInput<
     pub q_blind: FixedVerifierOracle<F, PC>,
 }
 
+impl<F: PrimeField, PC: HomomorphicCommitment<F>>
+    VerifierPreprocessedInput<F, PC>
+{
+    /// Creates a new VerifierPreprocessedInput
+    pub fn new(
+        fixed_oracles: Vec<FixedVerifierOracle<F, PC>>,
+        table_oracles: Vec<FixedVerifierOracle<F, PC>>,
+        permutation_oracles: Vec<FixedVerifierOracle<F, PC>>,
+        q_blind: FixedVerifierOracle<F, PC>,
+    ) -> Self {
+        Self {
+            fixed_oracles,
+            table_oracles,
+            permutation_oracles,
+            q_blind,
+        }
+    }
+
+    /// Creates a new VerifierPreprocessedInput without blinders
+    pub fn new_wo_blind(
+        fixed_oracles: Vec<FixedVerifierOracle<F, PC>>,
+        table_oracles: Vec<FixedVerifierOracle<F, PC>>,
+        permutation_oracles: Vec<FixedVerifierOracle<F, PC>>,
+    ) -> Self {
+        let q_blind =
+            FixedVerifierOracle::new("q_blind", Some(PC::zero_comm()));
+        Self {
+            fixed_oracles,
+            table_oracles,
+            permutation_oracles,
+            q_blind,
+        }
+    }
+}
+
 impl<F: PrimeField, PC: HomomorphicCommitment<F>> Clone
     for VerifierPreprocessedInput<F, PC>
 {
@@ -136,6 +171,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Clone
         }
     }
 }
+
 pub struct VerifierKey<'a, F: PrimeField, PC: HomomorphicCommitment<F>> {
     pub verifier_key: PC::VerifierKey,
     pub index_info: IndexInfo<'a, F>,
