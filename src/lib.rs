@@ -484,84 +484,84 @@ where
 
         // TODO: include permutation checks
         /* BEGIN SANITY CHECK BEFORE INVOKING VERIFIER */
-        let powers_of_alpha: Vec<F> = successors(Some(F::one()), |alpha_i| {
-            Some(*alpha_i * verifier_first_msg.alpha)
-        })
-        .take(vos.len())
-        .collect();
+        // let powers_of_alpha: Vec<F> = successors(Some(F::one()), |alpha_i| {
+        //     Some(*alpha_i * verifier_first_msg.alpha)
+        // })
+        // .take(vos.len())
+        // .collect();
 
-        let mut quotient_eval = F::zero();
-        let evaluate_vo = |vo: &&dyn VirtualOracle<F>, c: F| {
-            let vo_evaluation = vo.get_expression().evaluate(
-                &|x: F| x,
-                &|query| {
-                    let challenge = query.rotation.compute_evaluation_point(
-                        c,
-                        &omegas,
-                    );
-                    match query.oracle_type {
-                        OracleType::Witness => {
-                            match prover_state.witness_oracles_mapping.get(&query.label) {
-                                Some(index) => prover_state.witness_oracles[*index].query(&challenge),
-                                None => panic!("Witness oracle with label add_label not found") //TODO: Introduce new Error here,
-                            }
-                        },
-                        OracleType::Instance => {
-                            match prover_state.instance_oracles_mapping.get(&query.label) {
-                                Some(index) => prover_state.instance_oracles[*index].query(&challenge),
-                                None => panic!("Instance oracle with label {} not found", query.label) //TODO: Introduce new Error here,
-                            }
-                        },
-                        OracleType::Fixed => {
-                            match prover_state.fixed_oracles_mapping.get(&query.label) {
-                                Some(index) => preprocessed.fixed_oracles[*index].query(&challenge),
-                                None => panic!("Fixed oracle with label add_label not found") //TODO: Introduce new Error here,
-                            }
-                        },
-                    }
-                },
-                &|x: F| -x,
-                &|x: F, y: F| x + y,
-                &|x: F, y: F| x * y,
-                &|x: F, y: F| x * y,
-            );
-            vo_evaluation
-        };
-        // Check all VOs expressions are 0 in ALL the domain. If some other vanishing poly is being
-        // used this check may fail and the proof could still be valid!
-        for (row_n, omega) in omegas.iter().enumerate() {
-            for (vo_index, vo) in vos.iter().enumerate() {
-                let vo_evaluation = evaluate_vo(vo, *omega);
+        // let mut quotient_eval = F::zero();
+        // let evaluate_vo = |vo: &&dyn VirtualOracle<F>, c: F| {
+        //     let vo_evaluation = vo.get_expression().evaluate(
+        //         &|x: F| x,
+        //         &|query| {
+        //             let challenge = query.rotation.compute_evaluation_point(
+        //                 c,
+        //                 &omegas,
+        //             );
+        //             match query.oracle_type {
+        //                 OracleType::Witness => {
+        //                     match prover_state.witness_oracles_mapping.get(&query.label) {
+        //                         Some(index) => prover_state.witness_oracles[*index].query(&challenge),
+        //                         None => panic!("Witness oracle with label add_label not found") //TODO: Introduce new Error here,
+        //                     }
+        //                 },
+        //                 OracleType::Instance => {
+        //                     match prover_state.instance_oracles_mapping.get(&query.label) {
+        //                         Some(index) => prover_state.instance_oracles[*index].query(&challenge),
+        //                         None => panic!("Instance oracle with label {} not found", query.label) //TODO: Introduce new Error here,
+        //                     }
+        //                 },
+        //                 OracleType::Fixed => {
+        //                     match prover_state.fixed_oracles_mapping.get(&query.label) {
+        //                         Some(index) => preprocessed.fixed_oracles[*index].query(&challenge),
+        //                         None => panic!("Fixed oracle with label add_label not found") //TODO: Introduce new Error here,
+        //                     }
+        //                 },
+        //             }
+        //         },
+        //         &|x: F| -x,
+        //         &|x: F, y: F| x + y,
+        //         &|x: F, y: F| x * y,
+        //         &|x: F, y: F| x * y,
+        //     );
+        //     vo_evaluation
+        // };
+        // // Check all VOs expressions are 0 in ALL the domain. If some other vanishing poly is being
+        // // used this check may fail and the proof could still be valid!
+        // for (row_n, omega) in omegas.iter().enumerate() {
+        //     for (vo_index, vo) in vos.iter().enumerate() {
+        //         let vo_evaluation = evaluate_vo(vo, *omega);
 
-                if vo_evaluation != F::zero() {
-                    panic!("VO number {} failed at row {}", vo_index, row_n);
-                }
-            }
-        }
+        //         if vo_evaluation != F::zero() {
+        //             panic!("VO number {} failed at row {}", vo_index, row_n);
+        //         }
+        //     }
+        // }
 
-        for (vo_index, vo) in vos.iter().enumerate() {
-            let vo_evaluation = evaluate_vo(vo, verifier_second_msg.xi);
+        // for (vo_index, vo) in vos.iter().enumerate() {
+        //     let vo_evaluation = evaluate_vo(vo, verifier_second_msg.xi);
 
-            quotient_eval += powers_of_alpha[vo_index] * vo_evaluation;
-        }
+        //     quotient_eval += powers_of_alpha[vo_index] * vo_evaluation;
+        // }
 
-        let x_n = verifier_second_msg.xi.pow([domain_size as u64, 0, 0, 0]);
-        let powers_of_x: Vec<F> =
-            successors(Some(F::one()), |x_i| Some(*x_i * x_n))
-                .take(quotient_chunk_oracles.len())
-                .collect();
+        // let x_n = verifier_second_msg.xi.pow([domain_size as u64, 0, 0, 0]);
+        // let powers_of_x: Vec<F> =
+        //     successors(Some(F::one()), |x_i| Some(*x_i * x_n))
+        //         .take(quotient_chunk_oracles.len())
+        //         .collect();
 
-        let mut t_part = F::zero();
-        for (&x_i, t_i) in
-            powers_of_x.iter().zip(quotient_chunk_oracles.clone())
-        {
-            t_part += x_i * t_i.query(&verifier_second_msg.xi);
-        }
+        // let mut t_part = F::zero();
+        // for (&x_i, t_i) in
+        //     powers_of_x.iter().zip(quotient_chunk_oracles.clone())
+        // {
+        //     t_part += x_i * t_i.query(&verifier_second_msg.xi);
+        // }
 
-        t_part *= vanishing_polynomial.evaluate(&verifier_second_msg.xi);
+        // t_part *= vanishing_polynomial.evaluate(&verifier_second_msg.xi);
 
-        quotient_eval -= t_part;
-        assert_eq!(quotient_eval, F::zero());
+        // quotient_eval -= t_part;
+        // assert_eq!(quotient_eval, F::zero());
         /* END SANITY CHECK BEFORE INVOKING VERIFIER */
 
         Ok(proof)
