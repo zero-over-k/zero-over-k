@@ -51,7 +51,7 @@ where
 #[cfg(test)]
 mod test {
     use super::*;
-    use std::collections::{BTreeMap, BTreeSet};
+    use std::collections::BTreeSet;
 
     use ark_bls12_381::{Bls12_381, Fr};
     use ark_ff::Zero;
@@ -61,23 +61,14 @@ mod test {
         UVPolynomial,
     };
 
-    use ark_poly_commit::{LabeledPolynomial, PolynomialCommitment};
-    use ark_serialize::CanonicalSerialize;
     use ark_std::test_rng;
     use rand_chacha::ChaChaRng;
 
-    use crate::data_structures::{
-        ProverKey, ProverPreprocessedInput, VerifierPreprocessedInput,
-    };
-    use crate::indexer::Indexer;
-
-    use crate::oracles::fixed::{FixedProverOracle, FixedVerifierOracle};
-    use crate::oracles::instance::{
-        InstanceProverOracle, InstanceVerifierOracle,
-    };
+    use crate::oracles::fixed::FixedProverOracle;
+    use crate::oracles::instance::InstanceProverOracle;
 
     use crate::oracles::traits::Instantiable;
-    use crate::oracles::witness::{WitnessProverOracle, WitnessVerifierOracle};
+    use crate::oracles::witness::WitnessProverOracle;
     use crate::rng::SimpleHashFiatShamirRng;
     use crate::vo::generic_vo::GenericVO;
     use crate::PIL;
@@ -138,7 +129,7 @@ mod test {
 
         let srs = PilInstance::universal_setup(max_degree, &mut rng).unwrap();
 
-        let (ck, verifier_key) = PilInstance::prepare_keys(&srs).unwrap();
+        let (_ck, _verifier_key) = PilInstance::prepare_keys(&srs).unwrap();
 
         let domain_size = 16;
         let poly_degree = domain_size - 1;
@@ -250,7 +241,7 @@ mod test {
             assert_eq!(rescue, F::zero())
         }
 
-        let vos: Vec<&dyn VirtualOracle<F>> = vec![&rescue_vo];
+        let _vos: Vec<&dyn VirtualOracle<F>> = vec![&rescue_vo];
 
         // let vk = Indexer::index(
         //     &verifier_key,

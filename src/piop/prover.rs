@@ -13,7 +13,7 @@ use ark_std::rand::Rng;
 use crate::{
     commitment::HomomorphicCommitment,
     data_structures::{IndexInfo, ProverPreprocessedInput, VerifierKey},
-    lookup::{self, subset_equality::SubsetEqualityArgument, LookupArgument},
+    lookup::{subset_equality::SubsetEqualityArgument, LookupArgument},
     oracles::{
         instance::InstanceProverOracle,
         query::OracleType,
@@ -238,7 +238,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
         let mut numerator_evals =
             vec![F::zero(); vk.index_info.extended_coset_domain.size()];
 
-        let mut lookup_evals =
+        let _lookup_evals =
             vec![F::zero(); vk.index_info.extended_coset_domain.size()];
 
         let z_polys = state.z_polys.as_ref().expect("Z polys are not in state");

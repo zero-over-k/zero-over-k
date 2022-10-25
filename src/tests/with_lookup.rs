@@ -5,12 +5,12 @@ mod test {
     use ark_bls12_381::{Bls12_381, Fr as F};
     use ark_ff::{UniformRand, Zero};
     use ark_poly::{univariate::DensePolynomial, GeneralEvaluationDomain};
-    use ark_poly::{EvaluationDomain, Polynomial, UVPolynomial};
+    use ark_poly::{EvaluationDomain, UVPolynomial};
     use ark_poly_commit::{LabeledPolynomial, PolynomialCommitment};
     use ark_std::test_rng;
     use rand_chacha::ChaChaRng;
 
-    use crate::commitment::{HomomorphicCommitment, KZG10};
+    use crate::commitment::KZG10;
     use crate::data_structures::{
         PermutationInfo, ProverKey, ProverPreprocessedInput,
         VerifierPreprocessedInput,
@@ -18,7 +18,7 @@ mod test {
     use crate::indexer::Indexer;
     use crate::oracles::fixed::{FixedProverOracle, FixedVerifierOracle};
     use crate::oracles::instance::InstanceVerifierOracle;
-    use crate::oracles::query::{OracleQuery, OracleType};
+    use crate::oracles::query::OracleType;
     use crate::oracles::rotation::Rotation;
     use crate::oracles::traits::Instantiable;
     use crate::oracles::witness::WitnessVerifierOracle;
@@ -28,7 +28,7 @@ mod test {
     use crate::rng::SimpleHashFiatShamirRng;
     use crate::vo::generic_lookup_vo::GenericLookupVO;
     use crate::vo::generic_vo::GenericVO;
-    use crate::vo::new_expression::NewExpression;
+
     use crate::vo::query::VirtualQuery;
     use crate::vo::virtual_expression::VirtualExpression;
     use crate::vo::{LookupVirtualOracle, VirtualOracle};

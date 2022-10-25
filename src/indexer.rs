@@ -15,7 +15,7 @@ use crate::{
         query::OracleType,
         traits::{FixedOracle, InstanceOracle, WitnessOracle},
     },
-    permutation::{self, PermutationArgument},
+    permutation::PermutationArgument,
     util::compute_vanishing_poly_over_coset,
     vo::{LookupVirtualOracle, VirtualOracle},
 };

@@ -138,7 +138,7 @@ mod test {
     use std::iter::successors;
 
     use ark_bls12_381::{Bls12_381, Fr};
-    use ark_ff::{One, UniformRand, Zero};
+    use ark_ff::{One, Zero};
 
     use ark_poly::{
         univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,

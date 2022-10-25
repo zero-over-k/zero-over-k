@@ -26,7 +26,7 @@ use rng::FiatShamirRng;
 use vo::VirtualOracle;
 
 use crate::lookup::LookupArgument;
-use crate::oracles::fixed::FixedVerifierOracle;
+
 use crate::oracles::query::OracleType;
 use crate::oracles::rotation::{Rotation, Sign};
 use crate::oracles::traits::CommittedOracle;
@@ -1058,9 +1058,13 @@ where
         };
 
         // Lookup contribution to quotient
-        for ((lookup_oracles, z), &alpha_powers) in lookup_polys.iter().zip(lookup_z_polys.iter()).zip(lookup_alpha_chunks.iter()) {
+        for ((lookup_oracles, z), &alpha_powers) in lookup_polys
+            .iter()
+            .zip(lookup_z_polys.iter())
+            .zip(lookup_alpha_chunks.iter())
+        {
             let (a, s, a_prime, s_prime) = lookup_oracles;
-                quotient_eval += LookupArgument::open_argument(
+            quotient_eval += LookupArgument::open_argument(
                 &l0_eval,
                 lu_eval,
                 &preprocessed.q_blind,

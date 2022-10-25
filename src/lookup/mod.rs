@@ -21,7 +21,7 @@ use crate::{
         instance::{InstanceProverOracle, InstanceVerifierOracle},
         query::{OracleQuery, OracleType},
         rotation::Rotation,
-        traits::{CommittedOracle, ConcreteOracle, Instantiable},
+        traits::{ConcreteOracle, Instantiable},
         witness::{WitnessProverOracle, WitnessVerifierOracle},
     },
     vo::new_expression::NewExpression,
@@ -608,7 +608,7 @@ mod test {
         };
 
         let domain_size = 16;
-        let poly_degree = domain_size - 1;
+        let _poly_degree = domain_size - 1;
         let mut rng = test_rng();
 
         let domain = GeneralEvaluationDomain::<F>::new(domain_size).unwrap();
