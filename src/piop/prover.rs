@@ -12,7 +12,7 @@ use ark_std::rand::Rng;
 
 use crate::{
     commitment::HomomorphicCommitment,
-    data_structures::{IndexInfo, ProverPreprocessedInput, VerifierKey},
+    data_structures::{Index, ProverPreprocessedInput, VerifierKey},
     lookup::{subset_equality::SubsetEqualityArgument, LookupArgument},
     oracles::{
         instance::InstanceProverOracle,
@@ -146,7 +146,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
         lookup_aggregation_msg: &VerifierLookupAggregationRound<F>,
         state: &mut ProverState<F>,
         preprocessed: &ProverPreprocessedInput<F, PC>,
-        index: &IndexInfo<F>,
+        index: &Index<F>,
         zk_rng: &mut R,
     ) -> Vec<(
         WitnessProverOracle<F>,
@@ -195,7 +195,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
             WitnessProverOracle<F>,
         )>,
         state: &mut ProverState<F>,
-        index: &IndexInfo<F>,
+        index: &Index<F>,
         zk_rng: &mut R,
     ) -> Vec<WitnessProverOracle<F>> {
         let lookup_z_polys: Vec<_> = lookup_polys

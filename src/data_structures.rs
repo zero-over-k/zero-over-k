@@ -52,7 +52,7 @@ impl<F: PrimeField> PermutationInfo<F> {
 // TODO: rename from IndexInfo -> Index
 // TODO: move u in index instead of permutation info
 #[derive(Clone)]
-pub struct IndexInfo<'a, F: PrimeField> {
+pub struct Index<'a, F: PrimeField> {
     pub quotient_degree: usize,
     pub extended_coset_domain: GeneralEvaluationDomain<F>,
     pub permutation_argument: PermutationArgument<F>,
@@ -77,7 +77,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>>
         permutation_oracles: &Vec<FixedProverOracle<F>>,
         table_oracles: &Vec<FixedProverOracle<F>>,
         q_blind: &FixedProverOracle<F>,
-        index_info: &IndexInfo<F>,
+        index_info: &Index<F>,
     ) -> Self {
         let mut fixed_oracles = fixed_oracles.clone();
         let mut permutation_oracles = permutation_oracles.clone();
@@ -174,7 +174,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Clone
 
 pub struct VerifierKey<'a, F: PrimeField, PC: HomomorphicCommitment<F>> {
     pub verifier_key: PC::VerifierKey,
-    pub index_info: IndexInfo<'a, F>,
+    pub index_info: Index<'a, F>,
     pub zh_inverses_over_coset: Vec<F>,
 }
 
