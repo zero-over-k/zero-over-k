@@ -176,6 +176,13 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> FixedVerifierOracle<F, PC> {
             commitment,
         }
     }
+
+    /// Creates a new FixedVerifierOracle from a LabeledCommitment
+    pub(crate) fn from_commitment(
+        comm: LabeledCommitment<PC::Commitment>,
+    ) -> Self {
+        Self::new(comm.label(), Some(comm.commitment().clone()))
+    }
 }
 
 impl<F: PrimeField, PC: HomomorphicCommitment<F>> Clone
