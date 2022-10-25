@@ -245,8 +245,7 @@ mod test {
         let mut instance_oracles: Vec<InstanceProverOracle<F>> = vec![];
         let mut fixed_oracles: Vec<FixedProverOracle<F>> = vec![q_last];
 
-        let mut delta_vo =
-            GenericVO::<F, PC>::init(Delta::get_expr_and_queries());
+        let mut delta_vo = GenericVO::<F>::init(Delta::get_expr_and_queries());
 
         delta_vo.configure(
             &mut witness_oracles,
@@ -340,8 +339,7 @@ mod test {
             })
             .collect();
 
-        let mut delta_vo =
-            GenericVO::<F, PC>::init(Delta::get_expr_and_queries());
+        let mut delta_vo = GenericVO::<F>::init(Delta::get_expr_and_queries());
 
         delta_vo.configure(
             &mut witness_ver_oracles,
@@ -522,7 +520,7 @@ mod test {
         .collect();
 
         let mut and_xor_vo =
-            GenericVO::<F, PC>::init(DeltaXorAnd::get_expr_and_queries());
+            GenericVO::<F>::init(DeltaXorAnd::get_expr_and_queries());
 
         let mut witness_oracles: Vec<_> = [
             (witness_polys[0].clone(), a_evals, "a"),
@@ -651,7 +649,7 @@ mod test {
             .collect();
 
         let mut and_xor_vo =
-            GenericVO::<F, PC>::init(DeltaXorAnd::get_expr_and_queries());
+            GenericVO::<F>::init(DeltaXorAnd::get_expr_and_queries());
 
         and_xor_vo.configure(
             &mut witness_ver_oracles,
