@@ -224,22 +224,13 @@ mod test {
             &domain.ifft(&q_last_evals),
         );
 
-        let a = WitnessProverOracle {
-            label: "a".to_string(),
-            poly: a_poly,
-            evals_at_coset_of_extended_domain: None,
-            queried_rotations: BTreeSet::new(),
-            should_permute: false,
-            evals: a_evals.clone(),
-        };
+        let a = WitnessProverOracle::new("a", a_poly, &a_evals, false);
 
-        let q_last = FixedProverOracle {
-            label: "q_last".to_string(),
-            poly: q_last_poly.clone(),
-            evals: q_last_evals,
-            evals_at_coset_of_extended_domain: None,
-            queried_rotations: BTreeSet::new(),
-        };
+        let q_last = FixedProverOracle::new(
+            "q_last",
+            q_last_poly.clone(),
+            &q_last_evals,
+        );
 
         let mut witness_oracles = [a];
         let mut instance_oracles: Vec<InstanceProverOracle<F>> = vec![];

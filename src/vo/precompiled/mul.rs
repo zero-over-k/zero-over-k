@@ -104,31 +104,9 @@ mod test {
             );
         }
 
-        let a = WitnessProverOracle {
-            label: "a".to_string(),
-            poly: a_poly,
-            evals_at_coset_of_extended_domain: None,
-            queried_rotations: BTreeSet::new(),
-            should_permute: false,
-            evals: a_evals,
-        };
-
-        let b = WitnessProverOracle {
-            label: "b".to_string(),
-            poly: b_poly,
-            evals_at_coset_of_extended_domain: None,
-            queried_rotations: BTreeSet::new(),
-            should_permute: false,
-            evals: b_evals,
-        };
-
-        let c = InstanceProverOracle {
-            label: "c".to_string(),
-            poly: c_poly.clone(),
-            evals_at_coset_of_extended_domain: None,
-            queried_rotations: BTreeSet::new(),
-            evals: c_evals.clone(),
-        };
+        let a = WitnessProverOracle::new("a", a_poly, &a_evals, false);
+        let b = WitnessProverOracle::new("b", b_poly, &b_evals, false);
+        let c = InstanceProverOracle::new("c", c_poly.clone(), &c_evals);
 
         let mut mul_vo =
             GenericVO::<F>::init(PrecompiledMul::get_expr_and_queries());
@@ -194,28 +172,9 @@ mod test {
 
         // Verifier
         // Repeat just to make sure some change from prover does not affect this
-        let a_ver = WitnessVerifierOracle {
-            label: "a".to_string(),
-            queried_rotations: BTreeSet::default(),
-            should_permute: false,
-            evals_at_challenges: BTreeMap::default(),
-            commitment: None,
-        };
-
-        let b_ver = WitnessVerifierOracle {
-            label: "b".to_string(),
-            queried_rotations: BTreeSet::default(),
-            should_permute: false,
-            evals_at_challenges: BTreeMap::default(),
-            commitment: None,
-        };
-
-        let c = InstanceVerifierOracle {
-            label: "c".to_string(),
-            poly: c_poly.clone(),
-            evals: c_evals.clone(),
-            queried_rotations: BTreeSet::new(),
-        };
+        let a_ver = WitnessVerifierOracle::<F, PC>::new("a", false);
+        let b_ver = WitnessVerifierOracle::<F, PC>::new("b", false);
+        let c = InstanceVerifierOracle::new("c", c_poly.clone(), &c_evals);
 
         let mut ver_wtns_oracles = [a_ver, b_ver];
         let mut instance_oracles = [c];

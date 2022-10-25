@@ -28,6 +28,21 @@ pub struct FixedProverOracle<F: PrimeField> {
 }
 
 impl<F: PrimeField> FixedProverOracle<F> {
+    /// Creates a new FixedProverOracle
+    pub(crate) fn new(
+        label: impl Into<String>,
+        poly: DensePolynomial<F>,
+        evals: &[F],
+    ) -> Self {
+        Self {
+            label: label.into(),
+            poly,
+            evals: evals.to_vec(),
+            evals_at_coset_of_extended_domain: None,
+            queried_rotations: BTreeSet::new(),
+        }
+    }
+    /// Creates new FixedProverOracle from evaluations over a domain
     pub fn from_evals_and_domains(
         label: String,
         evals: &Vec<F>,
@@ -42,7 +57,7 @@ impl<F: PrimeField> FixedProverOracle<F> {
             evals_at_coset_of_extended_domain: Some(
                 extended_coset_domain.coset_fft(&poly),
             ),
-            poly: poly,
+            poly,
             queried_rotations: BTreeSet::default(),
         }
     }
@@ -75,10 +90,6 @@ impl<F: PrimeField> Clone for FixedProverOracle<F> {
 impl<F: PrimeField> ConcreteOracle<F> for FixedProverOracle<F> {
     fn register_rotation(&mut self, rotation: Rotation) {
         self.queried_rotations.insert(rotation);
-    }
-
-    fn get_degree(&self, domain_size: usize) -> usize {
-        domain_size - 1
     }
 
     fn query(&self, challenge: &F) -> F {
@@ -191,10 +202,6 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> ConcreteOracle<F>
 {
     fn register_rotation(&mut self, rotation: Rotation) {
         self.queried_rotations.insert(rotation);
-    }
-
-    fn get_degree(&self, domain_size: usize) -> usize {
-        domain_size - 1
     }
 
     fn query(&self, challenge: &F) -> F {
