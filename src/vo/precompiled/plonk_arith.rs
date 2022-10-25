@@ -102,7 +102,7 @@ impl<F: PrimeField> PrecompiledVO<F> for PlonkArith4 {
 mod test {
     use super::*;
 
-    use std::collections::{BTreeMap, BTreeSet};
+    use std::collections::BTreeSet;
 
     use ark_bls12_381::{Bls12_381, Fr};
     use ark_ff::{One, UniformRand, Zero};
@@ -112,22 +112,13 @@ mod test {
         UVPolynomial,
     };
 
-    use ark_poly_commit::{LabeledPolynomial, PolynomialCommitment};
-
     use ark_std::test_rng;
     use rand_chacha::ChaChaRng;
 
-    use crate::data_structures::{
-        ProverKey, ProverPreprocessedInput, VerifierPreprocessedInput,
-    };
-    use crate::indexer::Indexer;
+    use crate::oracles::fixed::FixedProverOracle;
+    use crate::oracles::instance::InstanceProverOracle;
 
-    use crate::oracles::fixed::{FixedProverOracle, FixedVerifierOracle};
-    use crate::oracles::instance::{
-        InstanceProverOracle, InstanceVerifierOracle,
-    };
-
-    use crate::oracles::witness::{WitnessProverOracle, WitnessVerifierOracle};
+    use crate::oracles::witness::WitnessProverOracle;
     use crate::rng::SimpleHashFiatShamirRng;
     use crate::vo::generic_vo::GenericVO;
     use crate::vo::VirtualOracle;
@@ -151,7 +142,7 @@ mod test {
 
         let srs = PilInstance::universal_setup(max_degree, &mut rng).unwrap();
 
-        let (ck, verifier_key) = PilInstance::prepare_keys(&srs).unwrap();
+        let (_ck, _verifier_key) = PilInstance::prepare_keys(&srs).unwrap();
 
         let domain = GeneralEvaluationDomain::<F>::new(domain_size).unwrap();
 
@@ -307,7 +298,7 @@ mod test {
             &mut selector_oracles,
         );
 
-        let vos: Vec<&dyn VirtualOracle<F>> = vec![&plonk_vo];
+        let _vos: Vec<&dyn VirtualOracle<F>> = vec![&plonk_vo];
 
         // let vk = Indexer::index(
         //     &verifier_key,

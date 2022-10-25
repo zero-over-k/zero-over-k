@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
 
 use ark_ff::PrimeField;
-use ark_poly::{univariate::DensePolynomial, EvaluationDomain, Polynomial};
-use ark_poly_commit::{LabeledPolynomial, QuerySet};
+use ark_poly::EvaluationDomain;
+use ark_poly_commit::QuerySet;
 
 use crate::oracles::traits::Instantiable;
 

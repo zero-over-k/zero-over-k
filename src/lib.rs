@@ -26,7 +26,7 @@ use rng::FiatShamirRng;
 use vo::VirtualOracle;
 
 use crate::lookup::LookupArgument;
-use crate::oracles::fixed::FixedVerifierOracle;
+
 use crate::oracles::query::OracleType;
 use crate::oracles::rotation::{Rotation, Sign};
 use crate::oracles::traits::CommittedOracle;
@@ -898,7 +898,7 @@ where
                 // if not last append w^ux
                 if i != num_of_z_polys - 1 {
                     queried_rotations.insert(Rotation::new(
-                        vk.index_info.permutation_argument.u,
+                        vk.index_info.permutation_argument.usable_rows,
                         Sign::Plus,
                     ));
                 }
@@ -991,7 +991,7 @@ where
             DensePolynomial::from_coefficients_slice(&domain.ifft(&l0_evals));
 
         let mut lu_evals = vec![F::zero(); domain_size];
-        lu_evals[vk.index_info.permutation_argument.u] = F::one();
+        lu_evals[vk.index_info.permutation_argument.usable_rows] = F::one();
         let lu =
             DensePolynomial::from_coefficients_slice(&domain.ifft(&lu_evals));
 
@@ -1058,9 +1058,13 @@ where
         };
 
         // Lookup contribution to quotient
-        for ((lookup_oracles, z), &alpha_powers) in lookup_polys.iter().zip(lookup_z_polys.iter()).zip(lookup_alpha_chunks.iter()) {
+        for ((lookup_oracles, z), &alpha_powers) in lookup_polys
+            .iter()
+            .zip(lookup_z_polys.iter())
+            .zip(lookup_alpha_chunks.iter())
+        {
             let (a, s, a_prime, s_prime) = lookup_oracles;
-                quotient_eval += LookupArgument::open_argument(
+            quotient_eval += LookupArgument::open_argument(
                 &l0_eval,
                 lu_eval,
                 &preprocessed.q_blind,

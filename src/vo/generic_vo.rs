@@ -1,13 +1,8 @@
-use std::marker::PhantomData;
-
 use ark_ff::PrimeField;
 
-use crate::{
-    commitment::HomomorphicCommitment,
-    oracles::{
-        query::{OracleQuery, OracleType},
-        traits::{FixedOracle, InstanceOracle, WitnessOracle},
-    },
+use crate::oracles::{
+    query::{OracleQuery, OracleType},
+    traits::{FixedOracle, InstanceOracle, WitnessOracle},
 };
 
 use super::{

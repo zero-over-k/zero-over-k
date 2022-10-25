@@ -201,7 +201,7 @@ mod test {
     #[test]
     fn test_subset_equality_argument() {
         let domain_size = 16;
-        let poly_degree = domain_size - 1;
+        let _poly_degree = domain_size - 1;
         let mut rng = test_rng();
 
         let domain = GeneralEvaluationDomain::new(domain_size).unwrap();

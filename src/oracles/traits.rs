@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 
 use ark_ff::{FftField, PrimeField};
-use ark_poly::{domain, univariate::DensePolynomial, GeneralEvaluationDomain};
+use ark_poly::{univariate::DensePolynomial, GeneralEvaluationDomain};
 use ark_poly_commit::{LabeledPolynomial, QuerySet};
 
 use crate::commitment::HomomorphicCommitment;
