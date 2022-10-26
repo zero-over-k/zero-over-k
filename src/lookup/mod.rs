@@ -1,16 +1,3 @@
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    iter::successors,
-    marker::PhantomData,
-};
-
-use ark_ff::PrimeField;
-use ark_poly::{
-    univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
-    UVPolynomial,
-};
-use ark_std::rand::Rng;
-
 use crate::{
     commitment::HomomorphicCommitment,
     lookup::{
@@ -25,6 +12,17 @@ use crate::{
         witness::{WitnessProverOracle, WitnessVerifierOracle},
     },
     vo::expression::Expression,
+};
+use ark_ff::PrimeField;
+use ark_poly::{
+    univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
+    UVPolynomial,
+};
+use ark_std::rand::Rng;
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    iter::successors,
+    marker::PhantomData,
 };
 
 pub mod permute;

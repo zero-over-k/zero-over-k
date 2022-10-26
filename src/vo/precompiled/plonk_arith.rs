@@ -217,7 +217,8 @@ mod test {
         let qpi_poly =
             DensePolynomial::from_coefficients_slice(&domain.ifft(&qpi_evals));
 
-        for (_i, elem) in domain.elements().enumerate() {
+        // check
+        for elem in domain.elements() {
             let a = a_poly.evaluate(&elem);
             let b = b_poly.evaluate(&elem);
             let c = c_poly.evaluate(&elem);
@@ -234,40 +235,11 @@ mod test {
             assert_eq!(plonk_arith, F::zero());
         }
 
-        let a = WitnessProverOracle {
-            label: "a".to_string(),
-            poly: a_poly,
-            evals_at_coset_of_extended_domain: None,
-            queried_rotations: BTreeSet::new(),
-            should_permute: false,
-            evals: a_evals.clone(),
-        };
+        let a = WitnessProverOracle::new("a", a_poly, &a_evals, false);
+        let b = WitnessProverOracle::new("b", b_poly, &b_evals, false);
+        let c = WitnessProverOracle::new("c", c_poly, &c_evals, false);
 
-        let b = WitnessProverOracle {
-            label: "b".to_string(),
-            poly: b_poly,
-            evals_at_coset_of_extended_domain: None,
-            queried_rotations: BTreeSet::new(),
-            should_permute: false,
-            evals: b_evals.clone(),
-        };
-
-        let c = WitnessProverOracle {
-            label: "c".to_string(),
-            poly: c_poly,
-            evals_at_coset_of_extended_domain: None,
-            queried_rotations: BTreeSet::new(),
-            should_permute: false,
-            evals: c_evals.clone(),
-        };
-
-        let pi = InstanceProverOracle {
-            label: "pi".to_string(),
-            poly: pi_poly.clone(),
-            evals_at_coset_of_extended_domain: None,
-            queried_rotations: BTreeSet::new(),
-            evals: pi_evals.clone(),
-        };
+        let pi = InstanceProverOracle::new("pi", pi_poly, &pi_evals);
 
         let mut witness_oracles = [a, b, c];
         let mut instance_oracles = [pi];
@@ -280,12 +252,8 @@ mod test {
             (qpi_poly.clone(), "qpi"),
         ]
         .into_iter()
-        .map(|(poly, label)| FixedProverOracle::<F> {
-            label: label.to_string(),
-            evals: domain.fft(&poly),
-            poly,
-            evals_at_coset_of_extended_domain: None,
-            queried_rotations: BTreeSet::new(),
+        .map(|(poly, label)| {
+            FixedProverOracle::new(label, poly.clone(), &domain.fft(&poly))
         })
         .collect();
 
