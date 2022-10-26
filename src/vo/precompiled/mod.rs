@@ -9,3 +9,6 @@ pub mod logic;
 pub mod mul;
 pub mod plonk_arith;
 pub mod rescue;
+
+#[cfg(test)]
+mod tests;
