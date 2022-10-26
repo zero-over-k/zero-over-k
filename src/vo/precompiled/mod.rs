@@ -11,4 +11,4 @@ pub mod plonk_arith;
 pub mod rescue;
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;
