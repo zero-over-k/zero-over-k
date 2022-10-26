@@ -203,6 +203,7 @@ mod test {
             ("qpi", &qpi_evals),
         ];
         let instance: Vec<(_, &[F])> = vec![("pi", &pi_evals)];
+
         // Run prover
         let plonk_vo =
             GenericVO::<F>::init(PrecompiledPlonkArith::get_expr_and_queries());
@@ -217,6 +218,7 @@ mod test {
             &mut rng,
         );
 
+        // Run verifier
         let res = run_verifier(
             domain,
             cs_keys.0,

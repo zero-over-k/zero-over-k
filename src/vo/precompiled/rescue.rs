@@ -51,40 +51,17 @@ where
 #[cfg(test)]
 mod test {
     use super::*;
-    use std::collections::BTreeSet;
 
-    use ark_bls12_381::{Bls12_381, Fr};
-    use ark_ff::{UniformRand, Zero};
-    use ark_poly::Polynomial;
-    use ark_poly::{
-        univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
-        UVPolynomial,
-    };
+    use ark_bls12_381::Fr;
+    use ark_ff::UniformRand;
+    use ark_poly::EvaluationDomain;
 
-    use ark_std::test_rng;
-    use rand_chacha::ChaChaRng;
-
-    use crate::oracles::fixed::FixedProverOracle;
-    use crate::oracles::instance::InstanceProverOracle;
-
-    use crate::oracles::traits::Instantiable;
-    use crate::oracles::witness::WitnessProverOracle;
-    use crate::rng::SimpleHashFiatShamirRng;
     use crate::vo::generic_vo::GenericVO;
     use crate::vo::precompiled::tests::{run_prover, run_verifier, test_init};
-    use crate::PIL;
-    use blake2::Blake2s;
-
-    use crate::commitment::KZG10;
-    use crate::vo::VirtualOracle;
 
     use itertools::izip;
 
     type F = Fr;
-    type FS = SimpleHashFiatShamirRng<Blake2s, ChaChaRng>;
-    type PC = KZG10<Bls12_381>;
-
-    type PilInstance = PIL<F, PC, FS>;
 
     #[test]
     fn test_rescue_gate() {
