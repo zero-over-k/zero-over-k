@@ -1,13 +1,10 @@
-use std::ops::{Add, Mul, Neg, Sub};
-
-use ark_ff::PrimeField;
-
+use super::{expression::Expression, query::VirtualQuery};
 use crate::oracles::{
     query::{OracleQuery, OracleType},
     traits::ConcreteOracle,
 };
-
-use super::{new_expression::NewExpression, query::VirtualQuery};
+use ark_ff::PrimeField;
+use std::ops::{Add, Mul, Neg, Sub};
 
 #[derive(Clone)]
 pub enum VirtualExpression<F> {
@@ -25,9 +22,9 @@ impl<F: PrimeField> VirtualExpression<F> {
         witness_oracles: &[impl ConcreteOracle<F>],
         instance_oracles: &[impl ConcreteOracle<F>],
         fixed_oracles: &[impl ConcreteOracle<F>],
-    ) -> NewExpression<F> {
+    ) -> Expression<F> {
         match self {
-            VirtualExpression::Constant(f) => NewExpression::Constant(*f),
+            VirtualExpression::Constant(f) => Expression::Constant(*f),
             VirtualExpression::Oracle(query) => {
                 let oracle_query = match query.oracle_type {
                     crate::oracles::query::OracleType::Witness => OracleQuery {
@@ -49,7 +46,7 @@ impl<F: PrimeField> VirtualExpression<F> {
                     },
                 };
 
-                NewExpression::Oracle(oracle_query)
+                Expression::Oracle(oracle_query)
             }
             VirtualExpression::Negated(expr) => {
                 let expr = expr.to_expression(
@@ -57,7 +54,7 @@ impl<F: PrimeField> VirtualExpression<F> {
                     instance_oracles,
                     fixed_oracles,
                 );
-                NewExpression::Negated(Box::new(expr))
+                Expression::Negated(Box::new(expr))
             }
             VirtualExpression::Sum(lhs_expr, rhs_expr) => {
                 let lhs_expr = lhs_expr.to_expression(
@@ -70,7 +67,7 @@ impl<F: PrimeField> VirtualExpression<F> {
                     instance_oracles,
                     fixed_oracles,
                 );
-                NewExpression::Sum(Box::new(lhs_expr), Box::new(rhs_expr))
+                Expression::Sum(Box::new(lhs_expr), Box::new(rhs_expr))
             }
             VirtualExpression::Product(lhs_expr, rhs_expr) => {
                 let lhs_expr = lhs_expr.to_expression(
@@ -83,7 +80,7 @@ impl<F: PrimeField> VirtualExpression<F> {
                     instance_oracles,
                     fixed_oracles,
                 );
-                NewExpression::Product(Box::new(lhs_expr), Box::new(rhs_expr))
+                Expression::Product(Box::new(lhs_expr), Box::new(rhs_expr))
             }
             VirtualExpression::Scaled(expr, f) => {
                 let expr = expr.to_expression(
@@ -91,7 +88,7 @@ impl<F: PrimeField> VirtualExpression<F> {
                     instance_oracles,
                     fixed_oracles,
                 );
-                NewExpression::Scaled(Box::new(expr), *f)
+                Expression::Scaled(Box::new(expr), *f)
             }
         }
     }

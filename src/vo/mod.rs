@@ -1,14 +1,11 @@
+use self::expression::Expression;
+use crate::oracles::query::OracleQuery;
 use ark_ff::PrimeField;
 
-use crate::oracles::query::OracleQuery;
-
-use self::new_expression::NewExpression;
-
 pub mod error;
-// pub mod expression;
+pub mod expression;
 pub mod generic_lookup_vo;
 pub mod generic_vo;
-pub mod new_expression;
 pub mod precompiled;
 pub mod precompiled_lookups;
 pub mod query;
@@ -23,7 +20,7 @@ pub trait VirtualOracle<F: PrimeField> {
     // fn get_queries(&self) -> &[OracleQuery];
 
     /// Returns expression that combines concrete oracles
-    fn get_expression(&self) -> &NewExpression<F>;
+    fn get_expression(&self) -> &Expression<F>;
 }
 
 // Note: LookupVirtualOracle is very lightweight such that different use-cases
@@ -33,7 +30,7 @@ pub trait VirtualOracle<F: PrimeField> {
 /// side is querying just fixed oracle, for more information see:
 /// https://github.com/zcash/halo2/issues/534
 pub trait LookupVirtualOracle<F: PrimeField> {
-    fn get_expressions(&self) -> &[NewExpression<F>];
+    fn get_expressions(&self) -> &[Expression<F>];
 
     fn get_table_queries(&self) -> &[OracleQuery];
 }

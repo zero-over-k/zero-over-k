@@ -313,6 +313,7 @@ where
         let witness_evals: Vec<F> =
             evaluate_query_set(witness_oracles, &witness_query_set);
 
+        // fs_rng.absorb(&to_bytes![witness_evals].unwrap());
         // Compute fixed evals
 
         let fixed_query_set = PIOPforPolyIdentity::<F, PC>::get_query_set(

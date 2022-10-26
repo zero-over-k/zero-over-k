@@ -1,21 +1,19 @@
-use ark_ff::PrimeField;
-
+use super::{
+    expression::Expression, query::VirtualQuery,
+    virtual_expression::VirtualExpression, VirtualOracle,
+};
 use crate::oracles::{
     query::{OracleQuery, OracleType},
     traits::{FixedOracle, InstanceOracle, WitnessOracle},
 };
-
-use super::{
-    new_expression::NewExpression, query::VirtualQuery,
-    virtual_expression::VirtualExpression, VirtualOracle,
-};
+use ark_ff::PrimeField;
 
 #[derive(Clone)]
 pub struct GenericVO<F: PrimeField> {
     pub(crate) virtual_exp: VirtualExpression<F>,
     pub(crate) virtual_queries: Vec<VirtualQuery>,
     pub(crate) queries: Option<Vec<OracleQuery>>,
-    pub(crate) expression: Option<NewExpression<F>>,
+    pub(crate) expression: Option<Expression<F>>,
 }
 
 impl<F: PrimeField> GenericVO<F> {
@@ -86,7 +84,7 @@ impl<F: PrimeField> VirtualOracle<F> for GenericVO<F> {
     //     }
     // }
 
-    fn get_expression(&self) -> &NewExpression<F> {
+    fn get_expression(&self) -> &Expression<F> {
         match &self.expression {
             Some(expr) => &expr,
             None => panic!("Expression are not initialized"),
