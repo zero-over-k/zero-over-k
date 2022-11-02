@@ -27,6 +27,25 @@ pub struct WitnessProverOracle<F: PrimeField> {
     pub(crate) should_permute: bool,
 }
 
+impl<F: PrimeField> WitnessProverOracle<F> {
+    /// Creates a new WitnessProverOracle
+    pub(crate) fn new(
+        label: impl Into<String>,
+        poly: DensePolynomial<F>,
+        evals: &[F],
+        should_permute: bool,
+    ) -> Self {
+        Self {
+            label: label.into(),
+            poly,
+            evals: evals.to_vec(),
+            evals_at_coset_of_extended_domain: None,
+            queried_rotations: BTreeSet::new(),
+            should_permute,
+        }
+    }
+}
+
 impl<F: PrimeField> WitnessOracle<F> for WitnessProverOracle<F> {
     fn should_include_in_copy(&self) -> bool {
         self.should_permute
@@ -36,12 +55,6 @@ impl<F: PrimeField> WitnessOracle<F> for WitnessProverOracle<F> {
 impl<F: PrimeField> ConcreteOracle<F> for WitnessProverOracle<F> {
     fn register_rotation(&mut self, rotation: Rotation) {
         self.queried_rotations.insert(rotation);
-    }
-
-    // NOTE: We always want degree to be calculated same for all types of oracles
-    // consider example when some witness poly is just 0, P side will derive different quotient degree then V
-    fn get_degree(&self, domain_size: usize) -> usize {
-        domain_size - 1
     }
 
     fn query(&self, challenge: &F) -> F {
@@ -102,6 +115,19 @@ pub struct WitnessVerifierOracle<F: PrimeField, PC: HomomorphicCommitment<F>> {
 }
 
 impl<F: PrimeField, PC: HomomorphicCommitment<F>> WitnessVerifierOracle<F, PC> {
+    /// Create a new WitnessVerifierOracle
+    pub(crate) fn new(label: impl Into<String>, should_permute: bool) -> Self {
+        Self {
+            label: label.into(),
+            evals_at_challenges: BTreeMap::new(),
+            queried_rotations: BTreeSet::new(),
+            commitment: None,
+            should_permute,
+        }
+    }
+}
+
+impl<F: PrimeField, PC: HomomorphicCommitment<F>> WitnessVerifierOracle<F, PC> {
     pub fn register_eval_at_challenge(&mut self, challenge: F, eval: F) {
         let _ = self.evals_at_challenges.insert(challenge, eval);
     }
@@ -134,10 +160,6 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> ConcreteOracle<F>
 {
     fn register_rotation(&mut self, rotation: Rotation) {
         self.queried_rotations.insert(rotation);
-    }
-
-    fn get_degree(&self, domain_size: usize) -> usize {
-        domain_size - 1
     }
 
     fn query(&self, challenge: &F) -> F {

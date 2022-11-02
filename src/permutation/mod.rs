@@ -15,7 +15,6 @@ use crate::{
 };
 
 pub mod grand_product;
-mod playground;
 
 #[derive(Clone)]
 pub struct PermutationArgument<F: PrimeField> {

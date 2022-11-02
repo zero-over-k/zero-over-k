@@ -1,16 +1,3 @@
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    iter::successors,
-    marker::PhantomData,
-};
-
-use ark_ff::PrimeField;
-use ark_poly::{
-    univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
-    UVPolynomial,
-};
-use ark_std::rand::Rng;
-
 use crate::{
     commitment::HomomorphicCommitment,
     lookup::{
@@ -24,7 +11,18 @@ use crate::{
         traits::{ConcreteOracle, Instantiable},
         witness::{WitnessProverOracle, WitnessVerifierOracle},
     },
-    vo::new_expression::NewExpression,
+    vo::expression::Expression,
+};
+use ark_ff::PrimeField;
+use ark_poly::{
+    univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
+    UVPolynomial,
+};
+use ark_std::rand::Rng;
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    iter::successors,
+    marker::PhantomData,
 };
 
 pub mod permute;
@@ -52,7 +50,7 @@ impl<F: PrimeField> LookupArgument<F> {
         table_oracles: &'a [FixedProverOracle<F>],
         usable_rows: usize,
         lookup_index: usize,
-        lookup_expressions: &[NewExpression<F>],
+        lookup_expressions: &[Expression<F>],
         table_queries: &[OracleQuery],
         theta: F, // lookup aggregation expression
         domain: &GeneralEvaluationDomain<F>,
@@ -341,7 +339,7 @@ impl<F: PrimeField> LookupArgument<F> {
         fixed_oracles: &'a [FixedVerifierOracle<F, PC>],
         table_oracles: &'a [FixedVerifierOracle<F, PC>],
         lookup_index: usize,
-        lookup_expressions: &[NewExpression<F>],
+        lookup_expressions: &[Expression<F>],
         table_queries: &[OracleQuery],
         theta: F,                // lookup aggregation expression,
         evaluation_challenge: F, // evaluation_challenge

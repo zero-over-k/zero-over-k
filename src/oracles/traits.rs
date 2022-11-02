@@ -8,12 +8,20 @@ use crate::commitment::HomomorphicCommitment;
 
 use super::rotation::{Rotation, Sign};
 
+// NOTE: The implementations of all these traits is exactly the same
+// for Fixed, Witness and Instance oracles. We should consider adding
+// a macro that implements the trait for all structs to reduce dup code.
 pub trait ConcreteOracle<F: FftField> {
     fn get_label(&self) -> String;
-    fn get_degree(&self, domain_size: usize) -> usize;
     fn get_queried_rotations(&self) -> &BTreeSet<Rotation>;
     fn register_rotation(&mut self, rotation: Rotation);
     fn query(&self, challenge: &F) -> F;
+
+    // NOTE: We always want degree to be calculated same for all types of oracles consider example
+    // when some witness poly is just 0, P side will derive different quotient degree then V
+    fn get_degree(&self, domain_size: usize) -> usize {
+        domain_size - 1
+    }
 }
 
 pub trait Instantiable<F: FftField>: ConcreteOracle<F> {

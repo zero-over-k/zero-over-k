@@ -1,14 +1,12 @@
-use ark_ff::PrimeField;
-
+use super::{
+    expression::Expression, query::VirtualQuery,
+    virtual_expression::VirtualExpression, LookupVirtualOracle,
+};
 use crate::oracles::{
     query::{OracleQuery, OracleType},
     traits::{FixedOracle, InstanceOracle, WitnessOracle},
 };
-
-use super::{
-    new_expression::NewExpression, query::VirtualQuery,
-    virtual_expression::VirtualExpression, LookupVirtualOracle,
-};
+use ark_ff::PrimeField;
 
 #[derive(Clone)]
 pub struct GenericLookupVO<F: PrimeField> {
@@ -16,7 +14,7 @@ pub struct GenericLookupVO<F: PrimeField> {
     pub(crate) virtual_queries: Vec<VirtualQuery>,
     pub(crate) virtual_table_queries: Vec<VirtualQuery>, // for now table query is just querying of fixed oracle, later we can introduce TableOracle, TableQuery, etc...
     pub(crate) table_queries: Option<Vec<OracleQuery>>,
-    pub(crate) expressions: Option<Vec<NewExpression<F>>>,
+    pub(crate) expressions: Option<Vec<Expression<F>>>,
 }
 
 impl<F: PrimeField> GenericLookupVO<F> {
@@ -82,7 +80,7 @@ impl<F: PrimeField> GenericLookupVO<F> {
             }
         }
 
-        let expressions: Vec<NewExpression<F>> = self
+        let expressions: Vec<Expression<F>> = self
             .virtual_expressions
             .iter()
             .map(|v_exp| {
@@ -100,7 +98,7 @@ impl<F: PrimeField> GenericLookupVO<F> {
 }
 
 impl<F: PrimeField> LookupVirtualOracle<F> for GenericLookupVO<F> {
-    fn get_expressions(&self) -> &[NewExpression<F>] {
+    fn get_expressions(&self) -> &[Expression<F>] {
         match &self.expressions {
             Some(expressions) => &expressions,
             None => panic!("table queries are not defined"),

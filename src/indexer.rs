@@ -8,7 +8,7 @@ use ark_poly::{
 
 use crate::{
     commitment::HomomorphicCommitment,
-    data_structures::{IndexInfo, PermutationInfo, VerifierKey},
+    data_structures::{Index, PermutationInfo, VerifierKey},
     error::Error,
     lookup::LookupArgument,
     oracles::{
@@ -222,7 +222,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
         let zh_inverses_over_coset =
             Self::compute_zh_evals(&domain, &extended_coset_domain, zH.clone());
 
-        let index_info = IndexInfo {
+        let index_info = Index {
             quotient_degree,
             extended_coset_domain,
             permutation_argument,

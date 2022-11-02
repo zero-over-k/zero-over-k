@@ -1,5 +1,3 @@
-use ark_ff::PrimeField;
-
 use crate::{
     concrete_oracle::OracleType,
     vo::{
@@ -8,6 +6,7 @@ use crate::{
         VirtualOracle,
     },
 };
+use ark_ff::PrimeField;
 
 // NOTE: Fixed columns are modeled as witness at the moment
 /// Virtual Oracle for the arithmetization proposed in the original Plonk paper:
