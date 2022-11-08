@@ -194,7 +194,6 @@ pub(crate) fn run_verifier(
         })
         .collect();
 
-    // FIX: weird that commitment to fixed is done in verifier's side
     let (fixed_comm, _) = PC::commit(&ck, labeled_fixed.iter(), None).unwrap();
 
     let mut fixed_oracles: Vec<_> = fixed_comm
