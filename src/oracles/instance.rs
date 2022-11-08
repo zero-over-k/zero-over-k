@@ -23,7 +23,7 @@ pub struct InstanceProverOracle<F: PrimeField> {
 
 impl<F: PrimeField> InstanceProverOracle<F> {
     /// Creates a new InstanceProverOracle
-    pub(crate) fn new(
+    pub fn new(
         label: impl Into<String>,
         poly: DensePolynomial<F>,
         evals: &[F],
@@ -101,7 +101,7 @@ pub struct InstanceVerifierOracle<F: PrimeField> {
 
 impl<F: PrimeField> InstanceVerifierOracle<F> {
     /// Creates a new InstanceVerifierOracle
-    pub(crate) fn new(
+    pub fn new(
         label: impl Into<String>,
         poly: DensePolynomial<F>,
         evals: &[F],

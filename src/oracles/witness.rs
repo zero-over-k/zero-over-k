@@ -29,7 +29,7 @@ pub struct WitnessProverOracle<F: PrimeField> {
 
 impl<F: PrimeField> WitnessProverOracle<F> {
     /// Creates a new WitnessProverOracle
-    pub(crate) fn new(
+    pub fn new(
         label: impl Into<String>,
         poly: DensePolynomial<F>,
         evals: &[F],
@@ -116,7 +116,7 @@ pub struct WitnessVerifierOracle<F: PrimeField, PC: HomomorphicCommitment<F>> {
 
 impl<F: PrimeField, PC: HomomorphicCommitment<F>> WitnessVerifierOracle<F, PC> {
     /// Create a new WitnessVerifierOracle
-    pub(crate) fn new(label: impl Into<String>, should_permute: bool) -> Self {
+    pub fn new(label: impl Into<String>, should_permute: bool) -> Self {
         Self {
             label: label.into(),
             evals_at_challenges: BTreeMap::new(),

@@ -29,7 +29,7 @@ pub struct FixedProverOracle<F: PrimeField> {
 
 impl<F: PrimeField> FixedProverOracle<F> {
     /// Creates a new FixedProverOracle
-    pub(crate) fn new(
+    pub fn new(
         label: impl Into<String>,
         poly: DensePolynomial<F>,
         evals: &[F],
@@ -165,7 +165,7 @@ pub struct FixedVerifierOracle<F: PrimeField, PC: HomomorphicCommitment<F>> {
 
 impl<F: PrimeField, PC: HomomorphicCommitment<F>> FixedVerifierOracle<F, PC> {
     /// Creates a new FixedVerifierOracle
-    pub(crate) fn new(
+    pub fn new(
         label: impl Into<String>,
         commitment: Option<PC::Commitment>,
     ) -> Self {
