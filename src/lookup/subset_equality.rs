@@ -9,6 +9,7 @@ use ark_std::rand::Rng;
 
 use crate::{
     commitment::HomomorphicCommitment,
+    error::Error,
     oracles::{
         fixed::{FixedProverOracle, FixedVerifierOracle},
         rotation::Rotation,
@@ -64,7 +65,7 @@ impl<F: PrimeField> SubsetEqualityArgument<F> {
             evals_at_coset_of_extended_domain: Some(
                 extended_coset_domain.coset_fft(&poly),
             ),
-            poly: poly,
+            poly,
             evals: z_evals,
             queried_rotations: BTreeSet::from([
                 Rotation::curr(),
@@ -142,26 +143,26 @@ impl<F: PrimeField> SubsetEqualityArgument<F> {
         evaluation_challenge: &F,
         domain: &GeneralEvaluationDomain<F>,
         alpha_powers: &Vec<F>,
-    ) -> F {
+    ) -> Result<F, Error<PC::Error>> {
         assert_eq!(alpha_powers.len(), 3);
         let shifted_evaluation_challenge =
             domain.element(1) * evaluation_challenge;
 
         let mut opening = F::zero();
 
-        let a_xi = a.query(&evaluation_challenge);
-        let a_prime_xi = a_prime.query(&evaluation_challenge);
+        let a_xi = a.query(&evaluation_challenge)?;
+        let a_prime_xi = a_prime.query(&evaluation_challenge)?;
 
-        let s_xi = s.query(&evaluation_challenge);
-        let s_prime_xi = s_prime.query(&evaluation_challenge);
+        let s_xi = s.query(&evaluation_challenge)?;
+        let s_prime_xi = s_prime.query(&evaluation_challenge)?;
 
-        let z_xi = z.query(&evaluation_challenge);
-        let z_wxi = z.query(&shifted_evaluation_challenge);
+        let z_xi = z.query(&evaluation_challenge)?;
+        let z_wxi = z.query(&shifted_evaluation_challenge)?;
 
         opening += alpha_powers[0] * l0_eval * (F::one() - z_xi);
 
         let zk_part =
-            F::one() - (q_last_eval + q_blind.query(evaluation_challenge));
+            F::one() - (q_last_eval + q_blind.query(evaluation_challenge)?);
         let lhs = z_wxi * (a_prime_xi + beta) * (s_prime_xi + gamma);
         let rhs = z_xi * (a_xi + beta) * (s_xi + gamma);
 
@@ -169,7 +170,7 @@ impl<F: PrimeField> SubsetEqualityArgument<F> {
 
         opening += alpha_powers[2] * q_last_eval * (z_xi * z_xi - z_xi);
 
-        opening
+        Ok(opening)
     }
 }
 
@@ -469,7 +470,8 @@ mod test {
             &evaluation_challenge,
             &domain,
             &alpha_powers,
-        );
+        )
+        .unwrap();
 
         assert_eq!(
             opening,
