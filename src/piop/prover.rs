@@ -3,10 +3,12 @@ use std::{
     iter::successors,
 };
 
-use ark_ff::{PrimeField, Zero};
+use ark_ff::PrimeField;
 use ark_poly::{
-    univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
-    Polynomial, UVPolynomial,
+    univariate::DensePolynomial,
+    EvaluationDomain,
+    GeneralEvaluationDomain,
+    UVPolynomial,
 };
 use ark_std::rand::Rng;
 
