@@ -8,8 +8,7 @@ use ark_poly::{
 use ark_poly_commit::LabeledPolynomial;
 
 use super::{
-    query::QueryContext,
-    rotation::{Rotation, Sign},
+    rotation::Rotation,
     traits::{ConcreteOracle, InstanceOracle, Instantiable},
 };
 
@@ -22,15 +21,28 @@ pub struct InstanceProverOracle<F: PrimeField> {
     pub(crate) queried_rotations: BTreeSet<Rotation>,
 }
 
+impl<F: PrimeField> InstanceProverOracle<F> {
+    /// Creates a new InstanceProverOracle
+    pub fn new(
+        label: impl Into<String>,
+        poly: DensePolynomial<F>,
+        evals: &[F],
+    ) -> Self {
+        Self {
+            label: label.into(),
+            poly,
+            evals: evals.to_vec(),
+            evals_at_coset_of_extended_domain: None,
+            queried_rotations: BTreeSet::new(),
+        }
+    }
+}
+
 impl<F: PrimeField> InstanceOracle<F> for InstanceProverOracle<F> {}
 
 impl<F: PrimeField> ConcreteOracle<F> for InstanceProverOracle<F> {
     fn register_rotation(&mut self, rotation: Rotation) {
         self.queried_rotations.insert(rotation);
-    }
-
-    fn get_degree(&self, domain_size: usize) -> usize {
-        domain_size - 1
     }
 
     fn query(&self, challenge: &F) -> F {
@@ -87,6 +99,22 @@ pub struct InstanceVerifierOracle<F: PrimeField> {
     pub(crate) queried_rotations: BTreeSet<Rotation>,
 }
 
+impl<F: PrimeField> InstanceVerifierOracle<F> {
+    /// Creates a new InstanceVerifierOracle
+    pub fn new(
+        label: impl Into<String>,
+        poly: DensePolynomial<F>,
+        evals: &[F],
+    ) -> Self {
+        Self {
+            label: label.into(),
+            poly,
+            evals: evals.to_vec(),
+            queried_rotations: BTreeSet::new(),
+        }
+    }
+}
+
 impl<F: PrimeField> InstanceOracle<F> for InstanceVerifierOracle<F> {}
 
 impl<F: PrimeField> ConcreteOracle<F> for InstanceVerifierOracle<F> {
@@ -99,7 +127,7 @@ impl<F: PrimeField> ConcreteOracle<F> for InstanceVerifierOracle<F> {
     }
 
     fn query(&self, challenge: &F) -> F {
-        self.poly.evaluate(challenge)
+        self.poly.evaluate(&challenge)
     }
 
     fn get_label(&self) -> String {

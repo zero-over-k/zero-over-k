@@ -1,9 +1,4 @@
-use std::{
-    cmp::{max, min},
-    collections::BTreeMap,
-    iter,
-    marker::PhantomData,
-};
+use std::{cmp::max, collections::BTreeMap, iter, marker::PhantomData};
 
 use ark_ff::PrimeField;
 use ark_poly::{
@@ -13,32 +8,31 @@ use ark_poly::{
 
 use crate::{
     commitment::HomomorphicCommitment,
-    data_structures::{IndexInfo, PermutationInfo, VerifierKey},
+    data_structures::{Index, PermutationInfo, VerifierKey},
     error::Error,
+    lookup::LookupArgument,
     oracles::{
         query::OracleType,
-        traits::{
-            ConcreteOracle, FixedOracle, InstanceOracle, Instantiable,
-            WitnessOracle,
-        },
-        witness::WitnessProverOracle,
+        traits::{FixedOracle, InstanceOracle, WitnessOracle},
     },
-    permutation::{self, PermutationArgument},
+    permutation::PermutationArgument,
     util::compute_vanishing_poly_over_coset,
-    vo::VirtualOracle,
+    vo::{LookupVirtualOracle, VirtualOracle},
 };
 
 /*
-    We want to support both Plonkish like zero over K checks, where each gate is separated with selector, ex: (q_1, gate_1), (q_2, gate_2),
-    and also arbitrary polynomial constraints, (ex. https://eprint.iacr.org/2021/1342.pdf look at proof of functional relation)
+    We want to support both Plonkish like zero over K checks, where each gate is separated with
+    selector, ex: (q_1, gate_1), (q_2, gate_2), and also arbitrary polynomial constraints,
+    (ex. https://eprint.iacr.org/2021/1342.pdf look at proof of functional relation)
     where there is no concept of selector.
 
     There are multiple ways of how to blind some oracles.
 
-    1. In Plonkish like style we can reserve some t rows for blinding and simply when constructing vanishing argument all selectors
-    are zero at that t rows.
+    1. In Plonkish like style we can reserve some t rows for blinding and simply when constructing
+    vanishing argument all selectors are zero at that t rows.
 
-    2. When there are no selectors we can still use some t rows for blinding, but now instead of checking that something vanishes on
+    2. When there are no selectors we can still use some t rows for blinding, but now instead of
+    checking that something vanishes on
 
     zH = X^n - 1, we can check that it vanishes on zH = (X^n - 1) / prod{i in last [t]} (x - w_i)
 */
@@ -51,10 +45,10 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
     fn compute_quotient_degree(
         witness_oracles: &[impl WitnessOracle<F>],
         instance_oracles: &[impl InstanceOracle<F>],
-        selector_oracles: &[impl FixedOracle<F>],
+        fixed_oracles: &[impl FixedOracle<F>],
         witness_oracles_mapping: &BTreeMap<String, usize>,
         instance_oracles_mapping: &BTreeMap<String, usize>,
-        selector_oracles_mapping: &BTreeMap<String, usize>,
+        fixed_oracles_mapping: &BTreeMap<String, usize>,
         vos: &[&dyn VirtualOracle<F>],
         domain_size: usize,
         z_h_degree: usize,
@@ -85,8 +79,8 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
                             }
                         }
                         OracleType::Fixed => {
-                            match selector_oracles_mapping.get(&query.label) {
-                                Some(index) => selector_oracles[*index]
+                            match fixed_oracles_mapping.get(&query.label) {
+                                Some(index) => fixed_oracles[*index]
                                     .get_degree(domain_size),
                                 None => panic!(
                                     "Fixed oracle with label {} not found",
@@ -109,8 +103,8 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
     ) -> Vec<F> {
         assert!(domain.size() <= extended_coset_domain.size());
         /*
-            Consider case when simple mul over whole domain is being checked: a * b - c = 0 and zH = X^n - 1,
-            extended_coset_domain will be exactly domain and zH.coset_fft() will not work since zH.degree() = 16 > 15
+        Consider case when simple mul over whole domain is being checked: a * b - c = 0 and zH = X^n - 1,
+        extended_coset_domain will be exactly domain and zH.coset_fft() will not work since zH.degree() = 16 > 15
         */
         let domain_size = domain.size();
         let vanish_dense: DensePolynomial<F> =
@@ -140,21 +134,24 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
         zh_inverses_over_coset
     }
 
-    pub fn index(
+    pub fn index<'a>(
         vk: &PC::VerifierKey,
         vos: &[&dyn VirtualOracle<F>],
+        lookups: Vec<&'a dyn LookupVirtualOracle<F>>,
         witness_oracles: &[impl WitnessOracle<F>],
         instance_oracles: &[impl InstanceOracle<F>],
         fixed_oracles: &[impl FixedOracle<F>],
         domain: GeneralEvaluationDomain<F>,
         zH: &DensePolynomial<F>,
-        permutation_info: Option<PermutationInfo<F>>,
-    ) -> Result<VerifierKey<F, PC>, Error<PC::Error>> {
+        permutation_info: PermutationInfo<F>,
+        usable_rows: usize,
+    ) -> Result<VerifierKey<'a, F, PC>, Error<PC::Error>> {
         let witness_oracles_mapping: BTreeMap<String, usize> = witness_oracles
             .iter()
             .enumerate()
             .map(|(i, oracle)| (oracle.get_label(), i))
             .collect();
+
         let instance_oracles_mapping: BTreeMap<String, usize> =
             instance_oracles
                 .iter()
@@ -180,7 +177,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
             zH.degree(),
         );
 
-        // TODO: we can introduce next power of 2 check here
+        // TODO: we can introduce next power of 2 check here instead of creating domain and then dividing
         let extended_coset_domain =
             GeneralEvaluationDomain::<F>::new(quotient_degree).unwrap();
 
@@ -188,22 +185,35 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
             return Err(Error::QuotientTooSmall);
         }
 
+        // it is possible that there are no oracles to permute
+        let num_of_oracles_to_permute =
+            witness_oracles.iter().fold(0usize, |sum, oracle| {
+                if oracle.should_include_in_copy() {
+                    sum + 1
+                } else {
+                    sum
+                }
+            });
+
         let scaling_factor = extended_coset_domain.size() / domain.size();
-        let (scaling_factor, permutation_argument) =
-            if let Some(permutation_info) = permutation_info {
-                let scaling_factor = max(
-                    scaling_factor,
-                    PermutationArgument::<F>::MINIMAL_SCALING_FACTOR,
-                );
-                let permutation_argument = Some(PermutationArgument::<F>::new(
-                    scaling_factor,
-                    permutation_info.u,
-                    &permutation_info.deltas,
-                ));
-                (scaling_factor, permutation_argument)
-            } else {
-                (scaling_factor, None)
-            };
+        let scaling_factor = if num_of_oracles_to_permute > 0 {
+            max(
+                scaling_factor,
+                PermutationArgument::<F>::MINIMAL_SCALING_FACTOR,
+            )
+        } else {
+            scaling_factor
+        };
+
+        let scaling_factor = if lookups.len() > 0 {
+            max(scaling_factor, LookupArgument::<F>::MINIMAL_SCALING_FACTOR)
+        } else {
+            scaling_factor
+        };
+
+        // Even if there are no oracles to permute we construct permutation argument to omit Option handling on many places
+        let permutation_argument =
+            PermutationArgument::new(scaling_factor, &permutation_info);
 
         let extended_coset_domain =
             GeneralEvaluationDomain::<F>::new(scaling_factor * domain.size())
@@ -212,10 +222,12 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
         let zh_inverses_over_coset =
             Self::compute_zh_evals(&domain, &extended_coset_domain, zH.clone());
 
-        let index_info = IndexInfo {
+        let index_info = Index {
             quotient_degree,
             extended_coset_domain,
             permutation_argument,
+            lookups,
+            usable_rows,
         };
 
         let vk = VerifierKey {

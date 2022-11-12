@@ -1,8 +1,6 @@
-use ark_ff::PrimeField;
-
-use crate::oracles::{query::OracleType, rotation::Rotation};
-
 use super::virtual_expression::VirtualExpression;
+use crate::oracles::{query::OracleType, rotation::Rotation};
+use ark_ff::PrimeField;
 
 /// Virtual query is defined over relative oracle index that is being resolved
 /// for concrete assignment

@@ -1,29 +1,28 @@
-use std::marker::PhantomData;
-
 use ark_ff::PrimeField;
 use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
 use ark_std::rand::RngCore;
-use itertools::Itertools;
 
 use crate::{
     commitment::HomomorphicCommitment,
+    data_structures::PermutationInfo,
     oracles::{
         fixed::{FixedProverOracle, FixedVerifierOracle},
-        query::QueryContext,
         rotation::{Rotation, Sign},
-        traits::{ConcreteOracle, Instantiable, WitnessOracle},
+        traits::{ConcreteOracle, Instantiable},
         witness::{WitnessProverOracle, WitnessVerifierOracle},
     },
     permutation::grand_product::GrandProductArgument,
 };
 
 pub mod grand_product;
-mod playground;
 
 #[derive(Clone)]
 pub struct PermutationArgument<F: PrimeField> {
-    pub(crate) m: usize, // max number of columns that can be included per single grand product argument such that it does not exceed quotient degree
-    pub(crate) u: usize, // number of usable rows
+    /// Max number of columns that can be included per single grand product argument such that it does not exceed quotient degree
+    pub(crate) max_cols: usize,
+    /// Number of usable rows
+    pub(crate) usable_rows: usize,
+    /// Separators for different wires
     pub(crate) deltas: Vec<F>,
 }
 
@@ -42,14 +41,17 @@ impl<F: PrimeField> PermutationArgument<F> {
 
     pub const MINIMAL_SCALING_FACTOR: usize = 2;
 
-    pub fn new(scaling_factor: usize, u: usize, deltas: &[F]) -> Self {
+    pub fn new(
+        scaling_factor: usize,
+        perm_params: &PermutationInfo<F>,
+    ) -> Self {
         // extended coset domain is defined as Domain of size original_domain_size * scaling_factor, where minimal scaling factor,
         // as noted above, is 2
-        let m = scaling_factor - 1; // smallest scaling factor is 2, so 2 - 1 will give us one permutation per chunk
+        let max_cols = scaling_factor - 1; // smallest scaling factor is 2, so 2 - 1 will give us one permutation per chunk
         Self {
-            m,
-            u,
-            deltas: deltas.to_vec(),
+            max_cols,
+            usable_rows: perm_params.u,
+            deltas: perm_params.deltas.to_vec(),
         }
     }
 
@@ -58,8 +60,8 @@ impl<F: PrimeField> PermutationArgument<F> {
             return 0;
         }
 
-        let mut number_of_z_polys = num_of_polys_to_copy / self.m;
-        if num_of_polys_to_copy % self.m != 0 {
+        let mut number_of_z_polys = num_of_polys_to_copy / self.max_cols;
+        if num_of_polys_to_copy % self.max_cols != 0 {
             number_of_z_polys += 1;
         }
 
@@ -90,9 +92,9 @@ impl<F: PrimeField> PermutationArgument<F> {
         assert_eq!(witness_oracles.len(), permutation_oracles.len());
         assert_eq!(witness_oracles.len(), self.deltas.len());
 
-        let oracle_chunks = witness_oracles.chunks(self.m);
-        let sigma_chunks = permutation_oracles.chunks(self.m);
-        let delta_chunks = self.deltas.chunks(self.m);
+        let oracle_chunks = witness_oracles.chunks(self.max_cols);
+        let sigma_chunks = permutation_oracles.chunks(self.max_cols);
+        let delta_chunks = self.deltas.chunks(self.max_cols);
 
         let num_of_chunks = oracle_chunks.len();
 
@@ -107,7 +109,7 @@ impl<F: PrimeField> PermutationArgument<F> {
             let init_value = if i == 0 {
                 F::one()
             } else {
-                agg_polys[i - 1].evals()[self.u]
+                agg_polys[i - 1].evals()[self.usable_rows]
             };
 
             let is_last = if i == num_of_chunks - 1 { true } else { false };
@@ -121,7 +123,7 @@ impl<F: PrimeField> PermutationArgument<F> {
                 ds,
                 beta,
                 gamma,
-                self.u,
+                self.usable_rows,
                 domain,
                 extended_coset_domain,
                 zk_rng,
@@ -131,7 +133,7 @@ impl<F: PrimeField> PermutationArgument<F> {
         }
 
         // sanity
-        assert_eq!(agg_polys.last().unwrap().evals[self.u], F::one());
+        assert_eq!(agg_polys.last().unwrap().evals[self.usable_rows], F::one());
 
         agg_polys
     }
@@ -161,9 +163,9 @@ impl<F: PrimeField> PermutationArgument<F> {
         assert_eq!(witness_oracles.len(), permutation_oracles.len());
         assert_eq!(witness_oracles.len(), self.deltas.len());
 
-        let oracle_chunks = witness_oracles.chunks(self.m);
-        let sigma_chunks = permutation_oracles.chunks(self.m);
-        let delta_chunks = self.deltas.chunks(self.m);
+        let oracle_chunks = witness_oracles.chunks(self.max_cols);
+        let sigma_chunks = permutation_oracles.chunks(self.max_cols);
+        let delta_chunks = self.deltas.chunks(self.max_cols);
 
         assert_eq!(oracle_chunks.len(), sigma_chunks.len());
         assert_eq!(oracle_chunks.len(), delta_chunks.len());
@@ -217,7 +219,7 @@ impl<F: PrimeField> PermutationArgument<F> {
                     .query_in_coset(omega_index, Rotation::curr())
                     - agg_polys[i].query_in_coset(
                         omega_index,
-                        Rotation::new(self.u, Sign::Plus),
+                        Rotation::new(self.usable_rows, Sign::Plus),
                     ));
         }
 
@@ -239,8 +241,7 @@ impl<F: PrimeField> PermutationArgument<F> {
         q_blind: &FixedVerifierOracle<F, PC>,
         agg_polys: &[WitnessVerifierOracle<F, PC>],
         permutation_oracles: &[FixedVerifierOracle<F, PC>],
-        witness_oracles: &[WitnessVerifierOracle<F, PC>],
-        deltas: &[F],
+        witness_oracles: &[&WitnessVerifierOracle<F, PC>],
         beta: F,
         gamma: F,
         domain: &GeneralEvaluationDomain<F>,
@@ -248,11 +249,11 @@ impl<F: PrimeField> PermutationArgument<F> {
         alpha_powers: &[F], // quotient separation challenges
     ) -> F {
         assert_eq!(witness_oracles.len(), permutation_oracles.len());
-        assert_eq!(witness_oracles.len(), deltas.len());
+        assert_eq!(witness_oracles.len(), self.deltas.len());
 
-        let oracle_chunks = witness_oracles.chunks(self.m);
-        let sigma_chunks = permutation_oracles.chunks(self.m);
-        let delta_chunks = deltas.chunks(self.m);
+        let oracle_chunks = witness_oracles.chunks(self.max_cols);
+        let sigma_chunks = permutation_oracles.chunks(self.max_cols);
+        let delta_chunks = self.deltas.chunks(self.max_cols);
 
         assert_eq!(oracle_chunks.len(), sigma_chunks.len());
         assert_eq!(oracle_chunks.len(), delta_chunks.len());
@@ -301,7 +302,8 @@ impl<F: PrimeField> PermutationArgument<F> {
                 * l_0_eval
                 * (agg_polys[i + 1].query(&evaluation_challenge)
                     - agg_polys[i].query(
-                        &(domain.element(self.u) * evaluation_challenge),
+                        &(domain.element(self.usable_rows)
+                            * evaluation_challenge),
                     ));
         }
 
@@ -326,6 +328,7 @@ mod test {
 
     use crate::{
         commitment::KZG10,
+        data_structures::PermutationInfo,
         oracles::{
             fixed::{FixedProverOracle, FixedVerifierOracle},
             rotation::{Rotation, Sign},
@@ -378,7 +381,8 @@ mod test {
         let domain = GeneralEvaluationDomain::<F>::new(domain_size).unwrap();
 
         let t = 2;
-        let u = domain_size - t - 1;
+        // usable rows in permutation argument
+        let usable_rows = domain_size - t - 1;
 
         let q_blind_evals = [
             F::zero(),
@@ -540,12 +544,16 @@ mod test {
         let permutation_oracles = [sigma_1, sigma_2];
 
         let deltas = [F::one(), F::from(13u64)];
+        let perm_params = PermutationInfo {
+            u: usable_rows,
+            deltas: deltas.to_vec(),
+        };
 
         let beta = F::rand(&mut rng);
         let gamma = F::rand(&mut rng);
 
         let permutation_argument =
-            PermutationArgument::<F>::new(scaling_factor, u, &deltas);
+            PermutationArgument::<F>::new(scaling_factor, &perm_params);
 
         let z_polys = permutation_argument.construct_agg_polys(
             &witness_oracles,
@@ -679,7 +687,7 @@ mod test {
             queried_rotations: BTreeSet::from([
                 Rotation::curr(),
                 Rotation::next(),
-                Rotation::new(u, Sign::Plus),
+                Rotation::new(usable_rows, Sign::Plus),
             ]),
             evals_at_challenges: BTreeMap::from([
                 (
@@ -693,10 +701,10 @@ mod test {
                         .evaluate(&(domain.element(1) * evaluation_challenge)),
                 ),
                 (
-                    evaluation_challenge * domain.element(u),
-                    z_polys[0]
-                        .polynomial()
-                        .evaluate(&(domain.element(u) * evaluation_challenge)),
+                    evaluation_challenge * domain.element(usable_rows),
+                    z_polys[0].polynomial().evaluate(
+                        &(domain.element(usable_rows) * evaluation_challenge),
+                    ),
                 ),
             ]),
             commitment: None,
@@ -725,7 +733,7 @@ mod test {
             should_permute: false,
         };
 
-        let witness_oracles = [a, b];
+        let witness_oracles = [&a, &b];
         let permutation_oracles = [sigma_1, sigma_2];
         let z_polys = [z_poly_0, z_poly_1];
 
@@ -735,8 +743,8 @@ mod test {
             &q_blind,
             &z_polys,
             &permutation_oracles,
-            &witness_oracles,
-            &deltas,
+            witness_oracles.as_slice(),
+            // &deltas,
             beta,
             gamma,
             &domain,

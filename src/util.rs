@@ -1,8 +1,10 @@
 use std::collections::BTreeMap;
 
-use ark_ff::{Field, PrimeField};
-use ark_poly::{univariate::DensePolynomial, EvaluationDomain, Polynomial};
-use ark_poly_commit::{LabeledPolynomial, QuerySet};
+use ark_ff::PrimeField;
+use ark_poly::EvaluationDomain;
+use ark_poly_commit::QuerySet;
+
+use crate::oracles::traits::Instantiable;
 
 pub fn compute_vanishing_poly_over_coset<F, D>(
     domain: D,        // domain to evaluate over
@@ -31,23 +33,22 @@ where
 
 /// Evaluate the given polynomials at `query_set`.
 /// We can't use arkworks evaluate_query_set because iterating throw evaluations and collecting it into just evals is reordering array
-pub fn evaluate_q_set<'a, F: PrimeField>(
-    polys: impl IntoIterator<Item = &'a LabeledPolynomial<F, DensePolynomial<F>>>,
+pub fn evaluate_query_set<'a, F: PrimeField>(
+    polys: &[impl Instantiable<F>],
     query_set: &QuerySet<F>,
 ) -> Vec<F> {
-    let polys = BTreeMap::from_iter(polys.into_iter().map(|p| (p.label(), p)));
+    let oracles =
+        BTreeMap::from_iter(polys.into_iter().map(|p| (p.get_label(), p)));
     let mut evaluations = vec![];
-    for (label, (point_label, point)) in query_set {
-        let poly = polys
-            .get(label)
-            .expect("polynomial in evaluated lc is not found");
-        let eval = poly.evaluate(&point);
-        // evaluations.insert((label.clone(), point.clone()), eval);
-        println!(
-            "poly: {} in point: {} evaluates to: {}",
-            label, point_label, eval
+    for (label, (_, point)) in query_set {
+        let oracle = oracles.get(label).expect(
+            format!(
+                "Evaluating Query Set: oracle with label {} not found",
+                label
+            )
+            .as_str(),
         );
-        evaluations.push(eval);
+        evaluations.push(oracle.query(&point));
     }
     evaluations
 }

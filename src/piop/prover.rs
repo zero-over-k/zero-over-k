@@ -3,7 +3,7 @@ use std::{
     iter::successors,
 };
 
-use ark_ff::PrimeField;
+use ark_ff::{PrimeField, Zero};
 use ark_poly::{
     univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
     Polynomial, UVPolynomial,
@@ -12,13 +12,14 @@ use ark_std::rand::Rng;
 
 use crate::{
     commitment::HomomorphicCommitment,
-    data_structures::{IndexInfo, ProverPreprocessedInput, VerifierKey},
+    data_structures::{Index, ProverPreprocessedInput, VerifierKey},
+    lookup::{subset_equality::SubsetEqualityArgument, LookupArgument},
     oracles::{
         instance::InstanceProverOracle,
-        query::{OracleType, QueryContext},
+        query::OracleType,
         rotation::Rotation,
         traits::{ConcreteOracle, Instantiable},
-        witness::WitnessProverOracle, fixed::FixedProverOracle,
+        witness::WitnessProverOracle,
     },
     permutation::PermutationArgument,
     piop::error::Error,
@@ -26,7 +27,7 @@ use crate::{
     vo::VirtualOracle,
 };
 
-use super::verifier::VerifierPermutationMsg;
+use super::verifier::{VerifierLookupAggregationRound, VerifierPermutationMsg};
 
 // Note: To keep flexible vanishing polynomial should not be strictly domain.vanishing_polynomial
 // For example consider https://hackmd.io/1DaroFVfQwySwZPHMoMdBg?view where we remove some roots from Zh
@@ -37,10 +38,21 @@ pub struct ProverState<'a, F: PrimeField> {
     pub(crate) witness_oracles_mapping: BTreeMap<String, usize>, // TODO: introduce &str here maybe
     pub(crate) instance_oracles_mapping: BTreeMap<String, usize>,
     pub(crate) fixed_oracles_mapping: BTreeMap<String, usize>,
+    pub(crate) table_oracles_mapping: BTreeMap<String, usize>,
     pub(crate) witness_oracles: &'a [WitnessProverOracle<F>],
     pub(crate) instance_oracles: &'a [InstanceProverOracle<F>],
     pub(crate) z_polys: Option<Vec<WitnessProverOracle<F>>>,
-    vos: &'a [&'a dyn VirtualOracle<F>],
+    pub(crate) lookup_polys: Option<
+        Vec<(
+            WitnessProverOracle<F>,
+            WitnessProverOracle<F>,
+            WitnessProverOracle<F>,
+            WitnessProverOracle<F>,
+        )>,
+    >,
+    pub(crate) lookup_z_polys: Option<Vec<WitnessProverOracle<F>>>,
+    pub(crate) oracles_to_copy: Vec<&'a WitnessProverOracle<F>>,
+    pub(crate) vos: &'a [&'a dyn VirtualOracle<F>],
     pub(crate) domain: GeneralEvaluationDomain<F>,
     pub(crate) vanishing_polynomial: DensePolynomial<F>,
     pub(crate) quotient_chunks: Option<Vec<WitnessProverOracle<F>>>,
@@ -73,14 +85,29 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
             .enumerate()
             .map(|(i, oracle)| (oracle.get_label(), i))
             .collect();
+        let table_oracles_mapping = preprocessed
+            .table_oracles
+            .iter()
+            .enumerate()
+            .map(|(i, oracle)| (oracle.get_label(), i))
+            .collect();
+
+        let oracles_to_copy: Vec<&WitnessProverOracle<F>> = witness_oracles
+            .iter()
+            .filter(|&oracle| oracle.should_permute)
+            .collect();
 
         ProverState {
             witness_oracles_mapping,
             instance_oracles_mapping,
             fixed_oracles_mapping,
+            table_oracles_mapping,
             witness_oracles,
             instance_oracles,
             z_polys: None,
+            lookup_polys: None,
+            lookup_z_polys: None,
+            oracles_to_copy,
             vos,
             domain,
             vanishing_polynomial: vanishing_polynomial.clone(),
@@ -96,14 +123,13 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
         extended_coset_domain: &GeneralEvaluationDomain<F>,
         zk_rng: &mut R,
     ) -> Vec<WitnessProverOracle<F>> {
-        let oracles_to_copy: Vec<&WitnessProverOracle<F>> = state
-            .witness_oracles
-            .iter()
-            .filter(|&oracle| oracle.should_permute)
-            .collect();
-
+        // if nothing to copy just return empty vector
+        if state.oracles_to_copy.len() == 0 {
+            state.z_polys = Some(vec![]);
+            return vec![];
+        }
         let z_polys = permutation_argument.construct_agg_polys(
-            &oracles_to_copy,
+            &state.oracles_to_copy,
             &preprocessed.permutation_oracles,
             permutation_msg.beta,
             permutation_msg.gamma,
@@ -116,7 +142,87 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
         z_polys
     }
 
-    pub fn prover_first_round(
+    pub fn prover_lookup_round<R: Rng>(
+        lookup_aggregation_msg: &VerifierLookupAggregationRound<F>,
+        state: &mut ProverState<F>,
+        preprocessed: &ProverPreprocessedInput<F, PC>,
+        index: &Index<F>,
+        zk_rng: &mut R,
+    ) -> Vec<(
+        WitnessProverOracle<F>,
+        WitnessProverOracle<F>,
+        WitnessProverOracle<F>,
+        WitnessProverOracle<F>,
+    )> {
+        let lookup_polys: Vec<_> = index
+            .lookups
+            .iter()
+            .enumerate()
+            .map(|(lookup_index, lookup_vo)| {
+                LookupArgument::construct_a_and_s_polys_prover(
+                    &state.witness_oracles_mapping,
+                    &state.instance_oracles_mapping,
+                    &state.fixed_oracles_mapping,
+                    &state.table_oracles_mapping,
+                    &state.witness_oracles,
+                    &state.instance_oracles,
+                    &preprocessed.fixed_oracles,
+                    &preprocessed.table_oracles,
+                    index.usable_rows,
+                    lookup_index,
+                    lookup_vo.get_expressions(),
+                    lookup_vo.get_table_queries(),
+                    lookup_aggregation_msg.theta,
+                    &state.domain,
+                    &index.extended_coset_domain,
+                    zk_rng,
+                )
+            })
+            .collect();
+
+        // In order: (a, s, a_prime, s_prime)
+        state.lookup_polys = Some(lookup_polys.clone());
+        lookup_polys
+    }
+
+    pub fn prover_lookup_subset_equality_round<R: Rng>(
+        permutation_msg: &VerifierPermutationMsg<F>,
+        // In order: (a, s, a_prime, s_prime)
+        lookup_polys: &Vec<(
+            WitnessProverOracle<F>,
+            WitnessProverOracle<F>,
+            WitnessProverOracle<F>,
+            WitnessProverOracle<F>,
+        )>,
+        state: &mut ProverState<F>,
+        index: &Index<F>,
+        zk_rng: &mut R,
+    ) -> Vec<WitnessProverOracle<F>> {
+        let lookup_z_polys: Vec<_> = lookup_polys
+            .iter()
+            .enumerate()
+            .map(|(lookup_index, (a, s, a_prime, s_prime))| {
+                SubsetEqualityArgument::construct_agg_poly(
+                    a,
+                    s,
+                    a_prime,
+                    s_prime,
+                    permutation_msg.beta,
+                    permutation_msg.gamma,
+                    lookup_index,
+                    index.usable_rows,
+                    &state.domain,
+                    &index.extended_coset_domain,
+                    zk_rng,
+                )
+            })
+            .collect();
+
+        state.lookup_z_polys = Some(lookup_z_polys.clone());
+        lookup_z_polys
+    }
+
+    pub fn prover_quotient_round(
         verifier_permutation_msg: &VerifierPermutationMsg<F>,
         verifier_msg: &VerifierFirstMsg<F>,
         state: &mut ProverState<F>,
@@ -132,58 +238,66 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
         let mut numerator_evals =
             vec![F::zero(); vk.index_info.extended_coset_domain.size()];
 
-        let empty = vec![];
-        let dummy_fixed = FixedProverOracle {
-            label: "".to_string(),
-            poly: DensePolynomial::default(),
-            evals: vec![F::zero(); 1],
-            evals_at_coset_of_extended_domain: None,
-            queried_rotations: BTreeSet::default(),
-        };
+        let _lookup_evals =
+            vec![F::zero(); vk.index_info.extended_coset_domain.size()];
 
-        let (permutation_alphas, z_polys, l0_coset_evals, lu_coset_evals, q_blind) = if let Some(permutation_argument) =
-            &vk.index_info.permutation_argument
-        {
-            let z_polys =
-                state.z_polys.as_ref().expect("z polys must be in state");
-            let number_of_alphas =
-                permutation_argument.number_of_alphas(z_polys.len());
+        let z_polys = state.z_polys.as_ref().expect("Z polys are not in state");
+        let lookup_polys = state
+            .lookup_polys
+            .as_ref()
+            .expect("lookup polys are not in state");
+        let lookup_z_polys = state
+            .lookup_z_polys
+            .as_ref()
+            .expect("lookup aggregation polys are not in state");
 
-            // start from next of last power of alpha
-            let begin_with =
-                powers_of_alpha.last().unwrap().clone() * verifier_msg.alpha;
-            let powers_of_alpha: Vec<F> =
-                successors(Some(begin_with), |alpha_i| {
-                    Some(*alpha_i * verifier_msg.alpha)
-                })
-                .take(number_of_alphas)
-                .collect();
+        let number_of_permutation_alphas = vk
+            .index_info
+            .permutation_argument
+            .number_of_alphas(z_polys.len());
 
-            let domain_size = state.domain.size();
-            let mut l0_evals = vec![F::zero(); domain_size];
-            l0_evals[0] = F::one();
-            let l0 =
-                DensePolynomial::from_coefficients_slice(&state.domain.ifft(&l0_evals));
-            let l0_coset_evals = vk.index_info.extended_coset_domain.coset_fft(&l0);
-    
-            let mut lu_evals = vec![F::zero(); domain_size];
-            lu_evals[permutation_argument.u] = F::one();
-            let lu =
-                DensePolynomial::from_coefficients_slice(&state.domain.ifft(&lu_evals));
-            let lu_coset_evals = vk.index_info.extended_coset_domain.coset_fft(&lu);
-
-            let q_blind = preprocessed.q_blind.as_ref().expect("Q blind must be defined when permutation is enabled");
-
-            (powers_of_alpha, z_polys, l0_coset_evals, lu_coset_evals, q_blind)
-        } else {
-            (vec![], &empty, vec![], vec![], &dummy_fixed)
-        };
-
-        let oracles_to_copy: Vec<&WitnessProverOracle<F>> = state
-            .witness_oracles
-            .iter()
-            .filter(|&oracle| oracle.should_permute)
+        // start from next of last power of alpha
+        let permutation_begin_with =
+            powers_of_alpha.last().unwrap().clone() * verifier_msg.alpha;
+        let permutation_alphas: Vec<F> =
+            successors(Some(permutation_begin_with), |alpha_i| {
+                Some(*alpha_i * verifier_msg.alpha)
+            })
+            .take(number_of_permutation_alphas)
             .collect();
+
+        // For each lookup argument we need 5 alphas
+        // Again begin with last alpha after permutation argument
+        let lookups_begin_with = if let Some(alpha) = permutation_alphas.last()
+        {
+            alpha.clone()
+        } else {
+            powers_of_alpha.last().unwrap().clone()
+        };
+
+        let lookup_alphas: Vec<F> =
+            successors(Some(lookups_begin_with), |alpha_i| {
+                Some(*alpha_i * verifier_msg.alpha)
+            })
+            .take(5 * vk.index_info.lookups.len())
+            .collect();
+
+        let lookup_alpha_chunks: Vec<&[F]> = lookup_alphas.chunks(5).collect();
+
+        let domain_size = state.domain.size();
+        let mut l0_evals = vec![F::zero(); domain_size];
+        l0_evals[0] = F::one();
+        let l0 = DensePolynomial::from_coefficients_slice(
+            &state.domain.ifft(&l0_evals),
+        );
+        let l0_coset_evals = vk.index_info.extended_coset_domain.coset_fft(&l0);
+
+        let mut lu_evals = vec![F::zero(); domain_size];
+        lu_evals[vk.index_info.permutation_argument.usable_rows] = F::one();
+        let lu = DensePolynomial::from_coefficients_slice(
+            &state.domain.ifft(&lu_evals),
+        );
+        let lu_coset_evals = vk.index_info.extended_coset_domain.coset_fft(&lu);
 
         for i in 0..vk.index_info.extended_coset_domain.size() {
             for (vo_index, vo) in state.vos.iter().enumerate() {
@@ -220,23 +334,51 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
                 numerator_evals[i] += powers_of_alpha[vo_index] * vo_evaluation;
             }
 
-            if let Some(permutation_argument) =
-                &vk.index_info.permutation_argument
+            // Permutation argument
+            // If there are no oracles to enforce copy constraints on, we just return zero
+            numerator_evals[i] += if state.oracles_to_copy.len() > 0 {
+                vk.index_info
+                    .permutation_argument
+                    .instantiate_argument_at_omega_i(
+                        &l0_coset_evals,
+                        &lu_coset_evals,
+                        &preprocessed.q_blind,
+                        &state.oracles_to_copy,
+                        &preprocessed.permutation_oracles,
+                        &z_polys,
+                        i,
+                        vk.index_info.extended_coset_domain.element(i),
+                        verifier_permutation_msg.beta,
+                        verifier_permutation_msg.gamma,
+                        &state.domain,
+                        &permutation_alphas,
+                    )
+            } else {
+                F::zero()
+            };
+
+            for ((lookup_oracles, z), &alpha_powers) in lookup_polys
+                .iter()
+                .zip(lookup_z_polys.iter())
+                .zip(lookup_alpha_chunks.iter())
             {
-                numerator_evals[i] += permutation_argument.instantiate_argument_at_omega_i(
-                    &l0_coset_evals,
-                    &lu_coset_evals,
-                    q_blind,
-                    &oracles_to_copy,
-                    &preprocessed.permutation_oracles,
-                    &z_polys,
-                    i,
-                    vk.index_info.extended_coset_domain.element(i),
-                    verifier_permutation_msg.beta,
-                    verifier_permutation_msg.gamma,
-                    &state.domain,
-                    &permutation_alphas,
-                );
+                let (a, s, a_prime, s_prime) = lookup_oracles;
+
+                numerator_evals[i] +=
+                    LookupArgument::instantiate_argument_at_omega_i(
+                        &l0_coset_evals,
+                        &lu_coset_evals,
+                        &preprocessed.q_blind,
+                        a,
+                        s,
+                        a_prime,
+                        s_prime,
+                        z,
+                        verifier_permutation_msg.beta,
+                        verifier_permutation_msg.gamma,
+                        i,
+                        alpha_powers,
+                    )
             }
         }
 

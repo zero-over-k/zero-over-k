@@ -1,38 +1,28 @@
-use std::marker::PhantomData;
-
-use ark_ff::PrimeField;
-
-use crate::{
-    commitment::HomomorphicCommitment,
-    oracles::{
-        query::{OracleQuery, OracleType},
-        rotation::Rotation,
-        traits::{ConcreteOracle, FixedOracle, InstanceOracle, WitnessOracle},
-    },
-};
-
 use super::{
-    new_expression::NewExpression, query::VirtualQuery,
+    expression::Expression, query::VirtualQuery,
     virtual_expression::VirtualExpression, VirtualOracle,
 };
+use crate::oracles::{
+    query::{OracleQuery, OracleType},
+    traits::{FixedOracle, InstanceOracle, WitnessOracle},
+};
+use ark_ff::PrimeField;
 
 #[derive(Clone)]
-pub struct GenericVO<F: PrimeField, PC: HomomorphicCommitment<F>> {
+pub struct GenericVO<F: PrimeField> {
     pub(crate) virtual_exp: VirtualExpression<F>,
     pub(crate) virtual_queries: Vec<VirtualQuery>,
     pub(crate) queries: Option<Vec<OracleQuery>>,
-    pub(crate) expression: Option<NewExpression<F>>,
-    _pc: PhantomData<PC>,
+    pub(crate) expression: Option<Expression<F>>,
 }
 
-impl<F: PrimeField, PC: HomomorphicCommitment<F>> GenericVO<F, PC> {
+impl<F: PrimeField> GenericVO<F> {
     pub fn init(cfg: (VirtualExpression<F>, Vec<VirtualQuery>)) -> Self {
         Self {
             virtual_exp: cfg.0,
             virtual_queries: cfg.1,
             queries: None,
             expression: None,
-            _pc: PhantomData,
         }
     }
 
@@ -86,17 +76,15 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> GenericVO<F, PC> {
     }
 }
 
-impl<F: PrimeField, PC: HomomorphicCommitment<F>> VirtualOracle<F>
-    for GenericVO<F, PC>
-{
-    fn get_queries(&self) -> &[OracleQuery] {
-        match &self.queries {
-            Some(queries) => &queries,
-            None => panic!("Queries are not initialized"),
-        }
-    }
+impl<F: PrimeField> VirtualOracle<F> for GenericVO<F> {
+    // fn get_queries(&self) -> &[OracleQuery] {
+    //     match &self.queries {
+    //         Some(queries) => &queries,
+    //         None => panic!("Queries are not initialized"),
+    //     }
+    // }
 
-    fn get_expression(&self) -> &NewExpression<F> {
+    fn get_expression(&self) -> &Expression<F> {
         match &self.expression {
             Some(expr) => &expr,
             None => panic!("Expression are not initialized"),

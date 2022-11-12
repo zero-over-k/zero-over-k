@@ -28,20 +28,17 @@ mod copy_constraint_tests {
             traits::Instantiable,
             witness::WitnessVerifierOracle,
         },
-        permutation,
         rng::SimpleHashFiatShamirRng,
         util::compute_vanishing_poly_over_coset,
         vo::{
             generic_vo::GenericVO,
-            precompiled_vos::{PrecompiledPlonkArith, PrecompiledVO},
+            precompiled::{plonk_arith::PrecompiledPlonkArith, PrecompiledVO},
             VirtualOracle,
         },
     };
     use ark_bls12_381::{Bls12_381, Fr as F};
 
     type PC = KZG10<Bls12_381>;
-
-    use itertools::izip;
 
     use crate::PIL;
     use blake2::Blake2s;
@@ -141,7 +138,7 @@ mod copy_constraint_tests {
 
         let domain_size = 16;
         let poly_degree = domain_size - 1;
-        let max_degree = poly_degree;
+        let _max_degree = poly_degree;
 
         let domain = GeneralEvaluationDomain::<F>::new(domain_size).unwrap();
 
@@ -346,17 +343,17 @@ mod copy_constraint_tests {
         let c_poly =
             DensePolynomial::from_coefficients_slice(&domain.ifft(&c_evals));
 
-        let pi_poly =
+        let _pi_poly =
             DensePolynomial::from_coefficients_slice(&domain.ifft(&pi_evals));
 
-        let qm_poly =
+        let _qm_poly =
             DensePolynomial::from_coefficients_slice(&domain.ifft(&qm_evals));
-        let ql_poly =
+        let _ql_poly =
             DensePolynomial::from_coefficients_slice(&domain.ifft(&ql_evals));
-        let qr_poly =
+        let _qr_poly =
             DensePolynomial::from_coefficients_slice(&domain.ifft(&qr_evals));
 
-        let qo_poly =
+        let _qo_poly =
             DensePolynomial::from_coefficients_slice(&domain.ifft(&qo_evals));
 
         let sigma_1_poly = DensePolynomial::from_coefficients_slice(
@@ -441,9 +438,12 @@ mod copy_constraint_tests {
             queried_rotations: BTreeSet::from([Rotation::curr()]),
         };
 
-        let u = 8; // see Note at comment on top
+        let perm_params = PermutationInfo {
+            u: 8, // see Note at comment on top
+            deltas: deltas.to_vec(),
+        };
         let permutation_argument =
-            PermutationArgument::<F>::new(scaling_factor, u, &deltas);
+            PermutationArgument::<F>::new(scaling_factor, &perm_params);
 
         let witness_oracles = [&a, &b, &c];
         let permutation_oracles = [sigma1, sigma2, sigma3];
@@ -703,7 +703,7 @@ mod copy_constraint_tests {
             should_permute: false,
         };
 
-        let witness_oracles = [a, b, c];
+        let witness_oracles = [&a, &b, &c];
         let permutation_oracles = [sigma_1, sigma_2, sigma_3];
         let z_polys = [z_poly_0, z_poly_1, z_poly_2];
 
@@ -714,7 +714,6 @@ mod copy_constraint_tests {
             &z_polys,
             &permutation_oracles,
             &witness_oracles,
-            &deltas,
             beta,
             gamma,
             &domain,
@@ -814,7 +813,7 @@ mod copy_constraint_tests {
 
         let domain_size = 16;
         let poly_degree = domain_size - 1;
-        let max_degree = poly_degree;
+        let _max_degree = poly_degree;
 
         let domain = GeneralEvaluationDomain::<F>::new(domain_size).unwrap();
 
@@ -1168,9 +1167,8 @@ mod copy_constraint_tests {
 
         let permutation_oracles = [sigma1, sigma2, sigma3];
 
-        let mut plonk_vo = GenericVO::<F, PC>::init(
-            PrecompiledPlonkArith::get_expr_and_queries(),
-        );
+        let mut plonk_vo =
+            GenericVO::<F>::init(PrecompiledPlonkArith::get_expr_and_queries());
 
         plonk_vo.configure(
             &mut witness_oracles,
@@ -1188,12 +1186,14 @@ mod copy_constraint_tests {
         let vk = Indexer::<F, PC>::index(
             &verifier_key,
             &vos,
+            vec![],
             &witness_oracles,
             &instance_oracles,
             &fixed_oracles,
             domain,
             &domain.vanishing_polynomial().into(),
-            Some(permutation_info.clone()),
+            permutation_info.clone(),
+            u,
         )
         .unwrap();
 
@@ -1202,7 +1202,8 @@ mod copy_constraint_tests {
         let preprocessed = ProverPreprocessedInput::new(
             &fixed_oracles.to_vec(),
             &permutation_oracles.to_vec(),
-            Some(q_blind.clone()),
+            &vec![],
+            &q_blind,
             &vk.index_info,
         );
 
@@ -1223,7 +1224,7 @@ mod copy_constraint_tests {
             .map(|label| WitnessVerifierOracle::<F, PC> {
                 label: label.to_string(),
                 queried_rotations: BTreeSet::new(),
-                should_permute: false,
+                should_permute: true,
                 evals_at_challenges: BTreeMap::default(),
                 commitment: None,
             })
@@ -1294,9 +1295,8 @@ mod copy_constraint_tests {
             })
             .collect();
 
-          
         let q_blind_labeled = q_blind.to_labeled();
-        let (q_blind_commitment, _)  = 
+        let (q_blind_commitment, _) =
             PC::commit(&ck, &[q_blind_labeled], None).unwrap();
 
         let q_blind = FixedVerifierOracle::<F, PC> {
@@ -1306,9 +1306,8 @@ mod copy_constraint_tests {
             commitment: Some(q_blind_commitment[0].commitment().clone()),
         };
 
-        let mut plonk_vo = GenericVO::<F, PC>::init(
-            PrecompiledPlonkArith::get_expr_and_queries(),
-        );
+        let mut plonk_vo =
+            GenericVO::<F>::init(PrecompiledPlonkArith::get_expr_and_queries());
 
         plonk_vo.configure(
             &mut witness_ver_oracles,
@@ -1322,19 +1321,22 @@ mod copy_constraint_tests {
         let mut vk = Indexer::index(
             &verifier_key,
             &vos,
+            vec![],
             &witness_ver_oracles,
             &instance_oracles,
             &selector_oracles,
             domain,
             &domain.vanishing_polynomial().into(),
-            Some(permutation_info),
+            permutation_info,
+            u,
         )
         .unwrap();
 
         let verifier_pp = VerifierPreprocessedInput {
             fixed_oracles: selector_oracles.clone(),
+            table_oracles: vec![],
             permutation_oracles: sigma_oracles.clone(),
-            q_blind: Some(q_blind)
+            q_blind: q_blind,
         };
 
         // We clone because fixed oracles must be mutable in order to add evals at challenge

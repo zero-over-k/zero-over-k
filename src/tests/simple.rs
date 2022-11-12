@@ -1,8 +1,11 @@
 #[cfg(test)]
 mod test {
-    use ark_ff::{One, Zero};
-    use ark_poly::{GeneralEvaluationDomain, EvaluationDomain, univariate::DensePolynomial, UVPolynomial, Polynomial};
     use ark_bls12_381::Fr as F;
+    use ark_ff::{One, Zero};
+    use ark_poly::{
+        univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
+        Polynomial, UVPolynomial,
+    };
 
     #[test]
     fn works() {
@@ -14,7 +17,7 @@ mod test {
         let l0 =
             DensePolynomial::from_coefficients_slice(&domain.ifft(&l0_evals));
 
-        let ch = F::from(1231u64); 
+        let ch = F::from(1231u64);
         println!("eval: {}", l0.evaluate(&ch));
     }
 }
