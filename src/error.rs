@@ -16,6 +16,9 @@ pub enum Error<E> {
     MultiproofError(MultiproofError<E>),
 
     QuotientTooSmall,
+
+    /// Query failed due to a missing evaluation
+    MissingEval,
 }
 
 impl<E> From<IOPError> for Error<E> {
