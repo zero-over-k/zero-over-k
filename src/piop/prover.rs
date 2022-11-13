@@ -148,17 +148,20 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
         preprocessed: &ProverPreprocessedInput<F, PC>,
         index: &Index<F>,
         zk_rng: &mut R,
-    ) -> Vec<(
-        WitnessProverOracle<F>,
-        WitnessProverOracle<F>,
-        WitnessProverOracle<F>,
-        WitnessProverOracle<F>,
-    )> {
+    ) -> Result<
+        Vec<(
+            WitnessProverOracle<F>,
+            WitnessProverOracle<F>,
+            WitnessProverOracle<F>,
+            WitnessProverOracle<F>,
+        )>,
+        Error,
+    > {
         let lookup_polys: Vec<_> = index
             .lookups
             .iter()
             .enumerate()
-            .map(|(lookup_index, lookup_vo)| {
+            .map(|(lookup_index, lookup_vo)| -> Result<_, Error> {
                 LookupArgument::construct_a_and_s_polys_prover(
                     &state.witness_oracles_mapping,
                     &state.instance_oracles_mapping,
@@ -178,11 +181,11 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
                     zk_rng,
                 )
             })
-            .collect();
+            .collect::<Result<_, _>>()?;
 
         // In order: (a, s, a_prime, s_prime)
         state.lookup_polys = Some(lookup_polys.clone());
-        lookup_polys
+        Ok(lookup_polys)
     }
 
     pub fn prover_lookup_subset_equality_round<R: Rng>(

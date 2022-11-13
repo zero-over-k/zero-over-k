@@ -5,6 +5,7 @@ use ark_std::rand::RngCore;
 use crate::{
     commitment::HomomorphicCommitment,
     data_structures::PermutationInfo,
+    error::Error,
     oracles::{
         fixed::{FixedProverOracle, FixedVerifierOracle},
         rotation::{Rotation, Sign},
@@ -247,7 +248,7 @@ impl<F: PrimeField> PermutationArgument<F> {
         domain: &GeneralEvaluationDomain<F>,
         evaluation_challenge: F,
         alpha_powers: &[F], // quotient separation challenges
-    ) -> F {
+    ) -> Result<F, Error<PC::Error>> {
         assert_eq!(witness_oracles.len(), permutation_oracles.len());
         assert_eq!(witness_oracles.len(), self.deltas.len());
 
@@ -271,7 +272,7 @@ impl<F: PrimeField> PermutationArgument<F> {
 
         let mut permutation_eval = alpha_powers[0]
             * l_0_eval
-            * (F::one() - agg_polys[0].query(&evaluation_challenge));
+            * (F::one() - agg_polys[0].query(&evaluation_challenge)?);
         let mut alpha_shift = 1;
 
         // //let mut permutation_eval = F::zero();
@@ -292,7 +293,7 @@ impl<F: PrimeField> PermutationArgument<F> {
                     gamma,
                     domain,
                     evaluation_challenge,
-                );
+                )?;
         }
 
         alpha_shift += agg_polys.len();
@@ -300,20 +301,20 @@ impl<F: PrimeField> PermutationArgument<F> {
         for i in 0..agg_polys.len() - 1 {
             permutation_eval += alpha_powers[i + alpha_shift]
                 * l_0_eval
-                * (agg_polys[i + 1].query(&evaluation_challenge)
+                * (agg_polys[i + 1].query(&evaluation_challenge)?
                     - agg_polys[i].query(
                         &(domain.element(self.usable_rows)
                             * evaluation_challenge),
-                    ));
+                    )?);
         }
 
         let z_last_eval =
-            agg_polys.last().unwrap().query(&evaluation_challenge);
+            agg_polys.last().unwrap().query(&evaluation_challenge)?;
         permutation_eval += alpha_powers.last().unwrap().clone()
             * q_last_eval
             * (z_last_eval * z_last_eval - z_last_eval);
 
-        permutation_eval
+        Ok(permutation_eval)
     }
 }
 
@@ -737,20 +738,22 @@ mod test {
         let permutation_oracles = [sigma_1, sigma_2];
         let z_polys = [z_poly_0, z_poly_1];
 
-        let permutation_eval = permutation_argument.open_argument(
-            l_0_eval,
-            l_u_eval,
-            &q_blind,
-            &z_polys,
-            &permutation_oracles,
-            witness_oracles.as_slice(),
-            // &deltas,
-            beta,
-            gamma,
-            &domain,
-            evaluation_challenge,
-            &powers_of_alpha,
-        );
+        let permutation_eval = permutation_argument
+            .open_argument(
+                l_0_eval,
+                l_u_eval,
+                &q_blind,
+                &z_polys,
+                &permutation_oracles,
+                witness_oracles.as_slice(),
+                // &deltas,
+                beta,
+                gamma,
+                &domain,
+                evaluation_challenge,
+                &powers_of_alpha,
+            )
+            .unwrap();
 
         assert_eq!(permutation_eval, q_eval * zh_eval);
     }

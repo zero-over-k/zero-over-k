@@ -40,22 +40,22 @@ impl<F: PrimeField> LookupArgument<F> {
         Ok(x)
     }
     // }
-    const fn neg(x: Result<F, PiopError>) -> Result<F, PiopError> {
+    fn neg(x: Result<F, PiopError>) -> Result<F, PiopError> {
         x.and_then(|x_val| Ok(-x_val))
     }
-    const fn add(
+    fn add(
         x: Result<F, PiopError>,
         y: Result<F, PiopError>,
     ) -> Result<F, PiopError> {
         x.and_then(|x_val| y.and_then(|y_val| Ok(x_val + y_val)))
     }
-    const fn mul(
+    fn mul(
         x: Result<F, PiopError>,
         y: Result<F, PiopError>,
     ) -> Result<F, PiopError> {
         x.and_then(|x_val| y.and_then(|y_val| Ok(x_val * y_val)))
     }
-    const fn scale(x: Result<F, PiopError>, y: F) -> Result<F, PiopError> {
+    fn scale(x: Result<F, PiopError>, y: F) -> Result<F, PiopError> {
         x.and_then(|x_val| Ok(x_val * y))
     }
     /*
@@ -127,7 +127,7 @@ impl<F: PrimeField> LookupArgument<F> {
                                             query.rotation,
                                         )),
                                     None => Err(PiopError::MissingWtnsOracle(
-                                        query.label,
+                                        query.label.clone(),
                                     )),
                                 }
                             }
@@ -141,7 +141,7 @@ impl<F: PrimeField> LookupArgument<F> {
                                         )),
                                     None => {
                                         Err(PiopError::MissingInstanceOracle(
-                                            query.label,
+                                            query.label.clone(),
                                         ))
                                     }
                                 }
@@ -154,7 +154,7 @@ impl<F: PrimeField> LookupArgument<F> {
                                             query.rotation,
                                         )),
                                     None => Err(PiopError::MissingFixedOracle(
-                                        query.label,
+                                        query.label.clone(),
                                     )),
                                 }
                             }
@@ -188,7 +188,7 @@ impl<F: PrimeField> LookupArgument<F> {
                                     Some(index) => Ok(witness_oracles[*index]
                                         .query_in_coset(i, query.rotation)),
                                     None => Err(PiopError::MissingWtnsOracle(
-                                        query.label,
+                                        query.label.clone(),
                                     )),
                                 }
                             }
@@ -199,7 +199,7 @@ impl<F: PrimeField> LookupArgument<F> {
                                         .query_in_coset(i, query.rotation)),
                                     None => {
                                         Err(PiopError::MissingInstanceOracle(
-                                            query.label,
+                                            query.label.clone(),
                                         ))
                                     }
                                 }
@@ -209,7 +209,7 @@ impl<F: PrimeField> LookupArgument<F> {
                                     Some(index) => Ok(fixed_oracles[*index]
                                         .query_in_coset(i, query.rotation)),
                                     None => Err(PiopError::MissingFixedOracle(
-                                        query.label,
+                                        query.label.clone(),
                                     )),
                                 }
                             }
@@ -430,9 +430,9 @@ impl<F: PrimeField> LookupArgument<F> {
                         match witness_oracles_mapping.get(&query.label) {
                             Some(index) => witness_oracles[*index]
                                 .query(&evaluation_challenge),
-                            None => {
-                                Err(PiopError::MissingWtnsOracle(query.label))
-                            }
+                            None => Err(PiopError::MissingWtnsOracle(
+                                query.label.clone(),
+                            )),
                         }
                     }
                     OracleType::Instance => {
@@ -440,7 +440,7 @@ impl<F: PrimeField> LookupArgument<F> {
                             Some(index) => instance_oracles[*index]
                                 .query(&evaluation_challenge),
                             None => Err(PiopError::MissingInstanceOracle(
-                                query.label,
+                                query.label.clone(),
                             )),
                         }
                     }
@@ -448,9 +448,9 @@ impl<F: PrimeField> LookupArgument<F> {
                         match fixed_oracles_mapping.get(&query.label) {
                             Some(index) => fixed_oracles[*index]
                                 .query(&evaluation_challenge),
-                            None => {
-                                Err(PiopError::MissingFixedOracle(query.label))
-                            }
+                            None => Err(PiopError::MissingFixedOracle(
+                                query.label.clone(),
+                            )),
                         }
                     }
                 },

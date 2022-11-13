@@ -9,6 +9,7 @@ use ark_std::rand::RngCore;
 
 use crate::{
     commitment::HomomorphicCommitment,
+    error::Error,
     oracles::{
         fixed::{FixedProverOracle, FixedVerifierOracle},
         rotation::{Rotation, Sign},
@@ -150,26 +151,26 @@ impl<F: PrimeField> GrandProductArgument<F> {
         gamma: F,
         domain: &GeneralEvaluationDomain<F>,
         evaluation_challenge: F,
-    ) -> F {
+    ) -> Result<F, Error<PC::Error>> {
         let shifted_evaluation_challenge =
             domain.element(1) * evaluation_challenge;
         let zk_part =
-            F::one() - (q_last_eval + q_blind.query(&evaluation_challenge));
+            F::one() - (q_last_eval + q_blind.query(&evaluation_challenge)?);
 
-        let mut lhs = z.query(&shifted_evaluation_challenge);
-        let mut rhs = z.query(&evaluation_challenge);
+        let mut lhs = z.query(&shifted_evaluation_challenge)?;
+        let mut rhs = z.query(&evaluation_challenge)?;
 
         for ((w_i, sigma_i), &delta_i) in witness_oracles
             .iter()
             .zip(permutation_oracles.iter())
             .zip(deltas.iter())
         {
-            let w_res = w_i.query(&evaluation_challenge);
-            lhs *= w_res + beta * sigma_i.query(&evaluation_challenge) + gamma;
+            let w_res = w_i.query(&evaluation_challenge)?;
+            lhs *= w_res + beta * sigma_i.query(&evaluation_challenge)? + gamma;
             rhs *= w_res + beta * delta_i * evaluation_challenge + gamma;
         }
 
-        zk_part * (lhs - rhs)
+        Ok(zk_part * (lhs - rhs))
     }
 }
 
@@ -630,7 +631,8 @@ mod test {
             gamma,
             &domain,
             evaluation_challenge,
-        );
+        )
+        .unwrap();
 
         assert_eq!(
             opening,

@@ -8,6 +8,7 @@ use ark_poly::{
 use ark_poly_commit::{LabeledCommitment, LabeledPolynomial};
 
 use crate::commitment::HomomorphicCommitment;
+use crate::piop::error::Error;
 
 use super::{
     rotation::Rotation,
@@ -92,8 +93,8 @@ impl<F: PrimeField> ConcreteOracle<F> for FixedProverOracle<F> {
         self.queried_rotations.insert(rotation);
     }
 
-    fn query(&self, challenge: &F) -> F {
-        self.poly.evaluate(&challenge)
+    fn query(&self, challenge: &F) -> Result<F, Error> {
+        Ok(self.poly.evaluate(challenge))
     }
 
     fn get_label(&self) -> String {
@@ -226,13 +227,10 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> ConcreteOracle<F>
         self.queried_rotations.insert(rotation);
     }
 
-    fn query(&self, challenge: &F) -> F {
+    fn query(&self, challenge: &F) -> Result<F, Error> {
         match self.evals_at_challenges.get(&challenge) {
-            Some(eval) => *eval,
-            None => panic!(
-                "No eval at challenge: {} of oracle {} with type witness",
-                challenge, self.label
-            ),
+            Some(eval) => Ok(*eval),
+            None => Err(Error::MissingConcreteEval(self.label.clone())),
         }
     }
 

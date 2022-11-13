@@ -4,7 +4,7 @@ use ark_ff::{FftField, PrimeField};
 use ark_poly::{univariate::DensePolynomial, GeneralEvaluationDomain};
 use ark_poly_commit::{LabeledPolynomial, QuerySet};
 
-use crate::commitment::HomomorphicCommitment;
+use crate::{commitment::HomomorphicCommitment, piop::error::Error};
 
 use super::rotation::{Rotation, Sign};
 
@@ -15,7 +15,7 @@ pub trait ConcreteOracle<F: FftField> {
     fn get_label(&self) -> String;
     fn get_queried_rotations(&self) -> &BTreeSet<Rotation>;
     fn register_rotation(&mut self, rotation: Rotation);
-    fn query(&self, challenge: &F) -> F;
+    fn query(&self, challenge: &F) -> Result<F, Error>;
 
     // NOTE: We always want degree to be calculated same for all types of oracles consider example
     // when some witness poly is just 0, P side will derive different quotient degree then V
