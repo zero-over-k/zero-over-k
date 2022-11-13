@@ -37,8 +37,8 @@ pub mod verifier;
 pub struct PIOP<F: PrimeField> {
     _f: PhantomData<F>,
 }
-#[derive(Debug)]
-pub enum PIOPError {}
+// #[derive(Debug)]
+// pub enum PIOPError {}
 
 pub struct Multiopen<
     F: PrimeField,
@@ -77,15 +77,13 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng>
             PIOP::verifier_first_round(verifier_state, fs_rng);
 
         let prover_state: ProverState<F, PC> =
-            PIOP::init_prover(oracles, oracle_rands, domain_size)
-                .map_err(Error::from_piop_err)?;
+            PIOP::init_prover(oracles, oracle_rands, domain_size)?;
 
         let (f_agg_poly, prover_state) = PIOP::prover_first_round(
             prover_state,
             evaluation_challenge,
             &verifier_first_msg,
-        )
-        .map_err(Error::from_piop_err)?;
+        )?;
 
         let (f_agg_poly_commitment, f_agg_rand) =
             PC::commit(ck, iter::once(&f_agg_poly), Some(zk_rng))
@@ -97,8 +95,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng>
             PIOP::verifier_second_round(verifier_state, fs_rng);
 
         let q_evals =
-            PIOP::prover_second_round(&prover_state, &verifier_second_msg)
-                .map_err(Error::from_piop_err)?;
+            PIOP::prover_second_round(&prover_state, &verifier_second_msg)?;
 
         fs_rng.absorb(&to_bytes![q_evals].unwrap());
 
@@ -109,8 +106,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng>
             &prover_state,
             &verifier_third_msg,
             &f_agg_rand[0],
-        )
-        .map_err(Error::from_piop_err)?;
+        )?;
 
         let (final_poly_commitment, _) =
             PC::commit(ck, iter::once(&final_poly), None)
@@ -179,40 +175,56 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng>
         .take(oracles.len())
         .collect();
 
-        let qs = opening_sets.iter().map(|(rotations, oracles)| {
-            let mut q_i = PC::zero_comm();
-            let mut q_i_evals_set = BTreeMap::<F, F>::new();
+        let qs =
+            opening_sets.iter().map(
+                |(rotations, oracles)| -> Result<
+                    (PC::Commitment, BTreeMap<F, F>),
+                    Error<PC::Error>,
+                > {
+                    let mut q_i = PC::zero_comm();
+                    let mut q_i_evals_set = BTreeMap::<F, F>::new();
 
-            for (i, &oracle) in oracles.iter().enumerate() {
-                q_i = PC::add(
-                    &q_i,
-                    &PC::scale_com(oracle.get_commitment(), x1_powers[i]),
-                );
-            }
+                    for (i, &oracle) in oracles.iter().enumerate() {
+                        q_i = PC::add(
+                            &q_i,
+                            &PC::scale_com(
+                                oracle.get_commitment(),
+                                x1_powers[i],
+                            ),
+                        );
+                    }
 
-            let omegas: Vec<F> = domain.elements().collect();
-            for rotation in rotations {
-                let evaluation_point = rotation
-                    .compute_evaluation_point(evaluation_challenge, &omegas);
-                let mut evaluation = F::zero();
-                for (i, &oracle) in oracles.iter().enumerate() {
-                    evaluation +=
-                        x1_powers[i] * oracle.query(&evaluation_point);
-                }
+                    let omegas: Vec<F> = domain.elements().collect();
+                    for rotation in rotations {
+                        let evaluation_point = rotation
+                            .compute_evaluation_point(
+                                evaluation_challenge,
+                                &omegas,
+                            );
+                        let mut evaluation = F::zero();
+                        for (i, &oracle) in oracles.iter().enumerate() {
+                            evaluation += x1_powers[i]
+                                * oracle.query(&evaluation_point)?;
+                        }
 
-                let prev = q_i_evals_set.insert(evaluation_point, evaluation);
-                if prev.is_some() {
-                    panic!("Same evaluation point for different rotations")
-                }
-            }
+                        let prev =
+                            q_i_evals_set.insert(evaluation_point, evaluation);
+                        if prev.is_some() {
+                            panic!(
+                                "Same evaluation point for different rotations"
+                            )
+                        }
+                    }
 
-            (q_i, q_i_evals_set)
-        });
+                    Ok((q_i, q_i_evals_set))
+                },
+            );
 
-        let f_evals: Vec<F> = qs
+        let f_evals = qs
             .clone()
             .zip(proof.q_evals.iter())
-            .map(|((_, q_eval_set), &q_eval)| {
+            .map(|(qs_i, &q_eval)| -> Result<F, Error<PC::Error>> {
+                let (_, q_eval_set) = qs_i?;
                 let evaluation_domain: Vec<F> =
                     q_eval_set.keys().cloned().collect();
 
@@ -227,10 +239,11 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng>
                     r_poly += &(l_i * r_i)
                 }
 
-                (q_eval - r_poly.evaluate(&verifier_second_msg.x3))
-                    * z_h.evaluate(&verifier_second_msg.x3).inverse().unwrap()
+                // TODO: Remove unwrap
+                Ok((q_eval - r_poly.evaluate(&verifier_second_msg.x3))
+                    * z_h.evaluate(&verifier_second_msg.x3).inverse().unwrap())
             })
-            .collect();
+            .collect::<Result<Vec<F>, Error<PC::Error>>>()?;
 
         let x2_powers: Vec<F> = successors(Some(F::one()), |x2_i| {
             Some(*x2_i * verifier_first_msg.x2)
@@ -251,9 +264,8 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng>
             .take(proof.q_evals.len())
             .collect();
 
-        for (i, ((q_commitment, _), &q_eval)) in
-            qs.zip(proof.q_evals.iter()).enumerate()
-        {
+        for (i, (qs_i, &q_eval)) in qs.zip(proof.q_evals.iter()).enumerate() {
+            let (q_commitment, _) = qs_i?;
             final_poly_commitment = PC::add(
                 &final_poly_commitment,
                 &PC::scale_com(&q_commitment, x4_powers[i]),

@@ -7,12 +7,15 @@ use ark_poly::{EvaluationDomain, GeneralEvaluationDomain, Polynomial};
 use ark_poly_commit::{LabeledPolynomial, PCRandomness};
 
 use super::verifier::{VerifierFirstMsg, VerifierSecondMsg, VerifierThirdMsg};
-use super::{PIOPError, PIOP};
+use super::PIOP;
 use crate::commitment::HomomorphicCommitment;
+use crate::multiproof::error::Error as MpError;
 use crate::multiproof::poly::construct_vanishing;
 
 use crate::oracles::rotation::Rotation;
 use crate::oracles::traits::Instantiable;
+
+use crate::piop::error::Error as PiopError;
 
 // &'a Vec<Box<dyn VirtualOracle<F>>>
 
@@ -34,7 +37,7 @@ impl<F: PrimeField> PIOP<F> {
         oracles: &'a [&dyn Instantiable<F>],
         oracle_rands: &'a [PC::Randomness],
         domain_size: usize,
-    ) -> Result<ProverState<'a, F, PC>, PIOPError> {
+    ) -> Result<ProverState<'a, F, PC>, MpError<PC::Error>> {
         let mut opening_sets = BTreeMap::<
             BTreeSet<Rotation>,
             Vec<(&'a dyn Instantiable<F>, &'a PC::Randomness)>,
@@ -70,7 +73,7 @@ impl<F: PrimeField> PIOP<F> {
             LabeledPolynomial<F, DensePolynomial<F>>,
             ProverState<'a, F, PC>,
         ),
-        PIOPError,
+        MpError<PC::Error>,
     > {
         // Max number of oracles in one opening set are all oracles
         let x1_powers: Vec<F> = successors(Some(F::one()), |x1_i| {
@@ -79,55 +82,70 @@ impl<F: PrimeField> PIOP<F> {
         .take(state.num_of_oracles)
         .collect();
 
-        let qs = state.opening_sets.iter().map(|(rotations, oracles_rands)| {
-            let mut q_i = DensePolynomial::zero();
-            let mut q_i_rand = PC::Randomness::empty();
-            let mut q_i_evals_set = BTreeMap::<F, F>::new();
+        let qs = state.opening_sets.iter().map(
+            |(rotations, oracles_rands)| -> Result<_, PiopError> {
+                let mut q_i = DensePolynomial::zero();
+                let mut q_i_rand = PC::Randomness::empty();
+                let mut q_i_evals_set = BTreeMap::<F, F>::new();
 
-            for (i, (oracle, rand)) in oracles_rands.iter().enumerate() {
-                q_i = q_i + oracle.polynomial() * x1_powers[i];
-                q_i_rand = PC::add_rands(
-                    &q_i_rand,
-                    &PC::scale_rand(rand, x1_powers[i]),
-                );
-            }
-
-            let omegas: Vec<F> = state.domain.elements().collect();
-            for rotation in rotations {
-                let evaluation_point = rotation
-                    .compute_evaluation_point(evaluation_challenge, &omegas);
-                let mut evaluation = F::zero();
-                for (i, (oracle, _)) in oracles_rands.iter().enumerate() {
-                    evaluation +=
-                        x1_powers[i] * oracle.query(&evaluation_point);
+                for (i, (oracle, rand)) in oracles_rands.iter().enumerate() {
+                    q_i = q_i + oracle.polynomial() * x1_powers[i];
+                    q_i_rand = PC::add_rands(
+                        &q_i_rand,
+                        &PC::scale_rand(rand, x1_powers[i]),
+                    );
                 }
 
-                let prev = q_i_evals_set.insert(evaluation_point, evaluation);
-                if prev.is_some() {
-                    panic!("Same evaluation point for different rotations")
+                let omegas: Vec<F> = state.domain.elements().collect();
+                for rotation in rotations {
+                    let evaluation_point = rotation.compute_evaluation_point(
+                        evaluation_challenge,
+                        &omegas,
+                    );
+                    let mut evaluation = F::zero();
+                    for (i, (oracle, _)) in oracles_rands.iter().enumerate() {
+                        evaluation +=
+                            x1_powers[i] * oracle.query(&evaluation_point)?;
+                    }
+
+                    let prev =
+                        q_i_evals_set.insert(evaluation_point, evaluation);
+                    if prev.is_some() {
+                        panic!("Same evaluation point for different rotations")
+                    }
                 }
-            }
 
-            (q_i, q_i_rand, q_i_evals_set)
-        });
+                Ok((q_i, q_i_rand, q_i_evals_set))
+            },
+        );
 
+        // TODO uncomment
         state.q_polys = Some(
             qs.clone()
-                .map(|(q_poly, _, _)| {
-                    LabeledPolynomial::new(
+                .map(|qs_i| -> Result<_, _> {
+                    let (q_poly, _, _) = qs_i?;
+                    Ok(LabeledPolynomial::new(
                         "q_i".to_string(),
                         q_poly,
                         None,
                         None,
-                    )
+                    ))
                 })
-                .collect(),
+                .collect::<Result<_, PiopError>>()?,
         );
 
-        state.q_rands = Some(qs.clone().map(|(_, q_rand, _)| q_rand).collect());
+        state.q_rands = Some(
+            qs.clone()
+                .map(|qs_i| {
+                    let (_, q_rand, _) = qs_i?;
+                    Ok(q_rand)
+                })
+                .collect::<Result<_, PiopError>>()?,
+        );
 
         let f_polys: Vec<DensePolynomial<F>> = qs
-            .map(|(q_poly, _, q_eval_set)| {
+            .map(|qs_i| {
+                let (q_poly, _, q_eval_set) = qs_i?;
                 let evaluation_domain: Vec<F> =
                     q_eval_set.keys().cloned().collect();
 
@@ -143,9 +161,9 @@ impl<F: PrimeField> PIOP<F> {
 
                 */
 
-                &q_poly / &z_h
+                Ok(&q_poly / &z_h)
             })
-            .collect();
+            .collect::<Result<_, PiopError>>()?;
 
         let x2_powers: Vec<F> = successors(Some(F::one()), |x2_i| {
             Some(*x2_i * verifier_first_msg.x2)
@@ -173,7 +191,7 @@ impl<F: PrimeField> PIOP<F> {
     pub fn prover_second_round<'a, PC: HomomorphicCommitment<F>>(
         state: &'a ProverState<'a, F, PC>,
         verifier_second_msg: &VerifierSecondMsg<F>,
-    ) -> Result<Vec<F>, PIOPError> {
+    ) -> Result<Vec<F>, MpError<PC::Error>> {
         let q_polys =
             state.q_polys.as_ref().expect("Q polys should be in state");
         let q_evals = q_polys
@@ -189,7 +207,7 @@ impl<F: PrimeField> PIOP<F> {
         f_agg_poly_rand: &PC::Randomness,
     ) -> Result<
         (LabeledPolynomial<F, DensePolynomial<F>>, PC::Randomness),
-        PIOPError,
+        MpError<PC::Error>,
     > {
         let q_polys =
             state.q_polys.as_ref().expect("Q polys should be in state");
