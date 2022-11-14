@@ -16,9 +16,10 @@ pub enum Error<E> {
     MultiproofError(MultiproofError<E>),
 
     QuotientTooSmall,
-
-    /// Query failed due to a missing evaluation
-    MissingEval,
+    // TODO doc
+    WtnsTableNotAllowed(String),
+    // TODO doc
+    InstanceTableNotAllowed(String),
 }
 
 impl<E> From<IOPError> for Error<E> {

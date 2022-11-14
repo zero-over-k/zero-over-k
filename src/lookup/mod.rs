@@ -474,28 +474,32 @@ impl<F: PrimeField> LookupArgument<F> {
             should_permute: false,
         };
 
-        let table_evals_at_xi = table_queries.iter().map(|table_query| {
-            match table_query.oracle_type {
-                //TODO Remove these panics
-                OracleType::Witness => {
-                    panic!("Witness not allowed as table query")
-                }
-                OracleType::Instance => {
-                    panic!("Instance not allowed as table query")
-                }
-                OracleType::Fixed => {
-                    match table_oracles_mapping.get(&table_query.label) {
-                        Some(index) => {
-                            table_oracles[*index].query(&evaluation_challenge)
+        let table_evals_at_xi = table_queries.iter().map(
+            |table_query| -> Result<F, Error<PC::Error>> {
+                match table_query.oracle_type {
+                    //TODO Remove these panics
+                    OracleType::Witness => Err(Error::WtnsTableNotAllowed(
+                        table_query.label.clone(),
+                    )),
+                    OracleType::Instance => {
+                        Err(Error::InstanceTableNotAllowed(
+                            table_query.label.clone(),
+                        ))
+                    }
+                    OracleType::Fixed => {
+                        match table_oracles_mapping.get(&table_query.label) {
+                            Some(index) => table_oracles[*index]
+                                .query(&evaluation_challenge)
+                                .map_err(|e| Error::IOPError(e)),
+                            None => Err(PiopError::MissingFixedOracle(
+                                table_query.label.clone(),
+                            )
+                            .into()),
                         }
-                        None => panic!(
-                            "Fixed oracle with label {} not found",
-                            table_query.label
-                        ),
                     }
                 }
-            }
-        });
+            },
+        );
 
         let mut agg = F::zero();
         for (table_i, theta_i) in table_evals_at_xi.zip(powers_of_theta.iter())
