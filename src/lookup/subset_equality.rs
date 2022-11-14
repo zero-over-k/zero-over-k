@@ -16,6 +16,7 @@ use crate::{
         traits::{ConcreteOracle, Instantiable},
         witness::{WitnessProverOracle, WitnessVerifierOracle},
     },
+    piop::error::Error as PiopError,
 };
 
 pub struct SubsetEqualityArgument<F: PrimeField> {
@@ -92,21 +93,24 @@ impl<F: PrimeField> SubsetEqualityArgument<F> {
         gamma: F,
         omega_index: usize,
         alpha_powers: &Vec<F>,
-    ) -> F {
+    ) -> Result<F, PiopError> {
         assert_eq!(alpha_powers.len(), 3);
 
         let mut num = F::zero();
 
-        let a_x = a.query_in_coset(omega_index, Rotation::curr());
-        let a_prime_x = a_prime.query_in_coset(omega_index, Rotation::curr());
+        let a_x = a.query_in_coset(omega_index, Rotation::curr())?;
+        let a_prime_x =
+            a_prime.query_in_coset(omega_index, Rotation::curr())?;
 
-        let s_x = s.query_in_coset(omega_index, Rotation::curr());
-        let s_prime_x = s_prime.query_in_coset(omega_index, Rotation::curr());
+        let s_x = s.query_in_coset(omega_index, Rotation::curr())?;
+        let s_prime_x =
+            s_prime.query_in_coset(omega_index, Rotation::curr())?;
 
-        let z_x = z.query_in_coset(omega_index, Rotation::curr());
-        let z_wx = z.query_in_coset(omega_index, Rotation::next());
+        let z_x = z.query_in_coset(omega_index, Rotation::curr())?;
+        let z_wx = z.query_in_coset(omega_index, Rotation::next())?;
 
-        let q_blind_x = q_blind.query_in_coset(omega_index, Rotation::curr());
+        let q_blind_x =
+            q_blind.query_in_coset(omega_index, Rotation::curr())?;
 
         num += alpha_powers[0] * l0_coset_evals[omega_index] * (F::one() - z_x);
 
@@ -126,7 +130,7 @@ impl<F: PrimeField> SubsetEqualityArgument<F> {
             * q_last_coset_evals[omega_index]
             * (z_x * z_x - z_x);
 
-        num
+        Ok(num)
     }
 
     pub fn open_argument<PC: HomomorphicCommitment<F>>(
@@ -359,7 +363,8 @@ mod test {
                 gamma,
                 i,
                 &alpha_powers,
-            );
+            )
+            .unwrap();
 
             num_evals.push(ni);
         }

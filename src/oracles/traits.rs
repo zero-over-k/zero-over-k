@@ -31,7 +31,7 @@ pub trait Instantiable<F: FftField>: ConcreteOracle<F> {
         &mut self,
         extended_domain: &GeneralEvaluationDomain<F>,
     );
-    fn get_extended_coset_evals(&self) -> &Vec<F>;
+    fn get_extended_coset_evals(&self) -> Result<&Vec<F>, Error>;
     fn to_labeled(&self) -> LabeledPolynomial<F, DensePolynomial<F>>;
 
     fn query_in_evals_form(&self, lagrange_evals: &Vec<F>) -> F {
@@ -43,10 +43,14 @@ pub trait Instantiable<F: FftField>: ConcreteOracle<F> {
         eval
     }
 
-    fn query_in_coset(&self, omega_index: usize, rotation: Rotation) -> F {
-        let extended_coset_evals = self.get_extended_coset_evals();
+    fn query_in_coset(
+        &self,
+        omega_index: usize,
+        rotation: Rotation,
+    ) -> Result<F, Error> {
+        let extended_coset_evals = self.get_extended_coset_evals()?;
         if rotation.degree == 0 {
-            return extended_coset_evals[omega_index];
+            return Ok(extended_coset_evals[omega_index]);
         }
         let extended_domain_size = extended_coset_evals.len();
         let original_domain_size = self.evals().len();
@@ -71,7 +75,7 @@ pub trait Instantiable<F: FftField>: ConcreteOracle<F> {
                 }
             }
         };
-        return eval;
+        return Ok(eval);
     }
 
     fn query_at_omega_in_original_domain(

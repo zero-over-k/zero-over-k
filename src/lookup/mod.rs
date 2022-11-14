@@ -185,8 +185,8 @@ impl<F: PrimeField> LookupArgument<F> {
                             OracleType::Witness => {
                                 match witness_oracles_mapping.get(&query.label)
                                 {
-                                    Some(index) => Ok(witness_oracles[*index]
-                                        .query_in_coset(i, query.rotation)),
+                                    Some(index) => witness_oracles[*index]
+                                        .query_in_coset(i, query.rotation),
                                     None => Err(PiopError::MissingWtnsOracle(
                                         query.label.clone(),
                                     )),
@@ -195,8 +195,8 @@ impl<F: PrimeField> LookupArgument<F> {
                             OracleType::Instance => {
                                 match instance_oracles_mapping.get(&query.label)
                                 {
-                                    Some(index) => Ok(instance_oracles[*index]
-                                        .query_in_coset(i, query.rotation)),
+                                    Some(index) => instance_oracles[*index]
+                                        .query_in_coset(i, query.rotation),
                                     None => {
                                         Err(PiopError::MissingInstanceOracle(
                                             query.label.clone(),
@@ -206,8 +206,8 @@ impl<F: PrimeField> LookupArgument<F> {
                             }
                             OracleType::Fixed => {
                                 match fixed_oracles_mapping.get(&query.label) {
-                                    Some(index) => Ok(fixed_oracles[*index]
-                                        .query_in_coset(i, query.rotation)),
+                                    Some(index) => fixed_oracles[*index]
+                                        .query_in_coset(i, query.rotation),
                                     None => Err(PiopError::MissingFixedOracle(
                                         query.label.clone(),
                                     )),
@@ -314,8 +314,8 @@ impl<F: PrimeField> LookupArgument<F> {
                         OracleType::Fixed => {
                             match table_oracles_mapping.get(&table_query.label)
                             {
-                                Some(index) => Ok(table_oracles[*index]
-                                    .query_in_coset(i, Rotation::curr())),
+                                Some(index) => table_oracles[*index]
+                                    .query_in_coset(i, Rotation::curr()),
                                 None => Err(PiopError::MissingFixedOracle(
                                     table_query.label.clone(),
                                 )),
@@ -547,7 +547,7 @@ impl<F: PrimeField> LookupArgument<F> {
         gamma: F,
         omega_index: usize,
         alpha_powers: &[F],
-    ) -> F {
+    ) -> Result<F, PiopError> {
         // we need 3 alphas for subset equality check
         // + 1 to check that A'(w^0) = S'(w^0)
         // + 1 to check well formation of A' and S'
@@ -568,15 +568,18 @@ impl<F: PrimeField> LookupArgument<F> {
             gamma,
             omega_index,
             &alpha_powers[0..3].to_vec(),
-        );
+        )?;
 
-        let a_prime_x = a_prime.query_in_coset(omega_index, Rotation::curr());
+        let a_prime_x =
+            a_prime.query_in_coset(omega_index, Rotation::curr())?;
         let a_prime_minus_wx =
-            a_prime.query_in_coset(omega_index, Rotation::prev());
+            a_prime.query_in_coset(omega_index, Rotation::prev())?;
 
-        let s_prime_x = s_prime.query_in_coset(omega_index, Rotation::curr());
+        let s_prime_x =
+            s_prime.query_in_coset(omega_index, Rotation::curr())?;
 
-        let q_blind_x = q_blind.query_in_coset(omega_index, Rotation::curr());
+        let q_blind_x =
+            q_blind.query_in_coset(omega_index, Rotation::curr())?;
 
         num += alpha_powers[3]
             * l0_coset_evals[omega_index]
@@ -591,7 +594,7 @@ impl<F: PrimeField> LookupArgument<F> {
             * a_s_equality_check
             * a_a_prev_equality_check;
 
-        num
+        Ok(num)
     }
 
     pub fn open_argument<PC: HomomorphicCommitment<F>>(
@@ -868,7 +871,8 @@ mod test {
                 gamma,
                 i,
                 &alpha_powers,
-            );
+            )
+            .unwrap();
 
             num_evals.push(ni);
         }

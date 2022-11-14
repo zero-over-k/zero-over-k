@@ -1,29 +1,34 @@
 #[derive(Debug, PartialEq)]
 pub enum Error {
-    /// Missing commiment
+    /// Missing commiment.
     MissingWtnsCommitment(String),
-    /// Missing fixed commiment
+    /// Missing fixed commiment.
     MissingFixedCommitment(String),
-    /// Missing instance commiment
+    /// Missing instance commiment.
     MissingInstanceCommitment(String),
-    /// Missing evaluation at concrete oracle
+    /// Missing evaluation at concrete oracle.
     MissingConcreteEval(String),
+    /// Missing extended coset evaluations for witness oracle.
+    MissingCosetWtnsEval(String),
+    /// Missing extended coset evaluations for fixed oracle.
+    MissingCosetFixedEval(String),
+    /// Missing extended coset evaluations for instance oracle.
+    MissingCosetInstanceEval(String),
     MissingExtendedEvals,
-    /// Missing witness oracle with givien label
+    /// Missing witness oracle with givien label.
     MissingWtnsOracle(String),
-    /// Missing fixed oracle with givien label
+    /// Missing fixed oracle with givien label.
     MissingFixedOracle(String),
-    /// Missing instance oracle with givien label
+    /// Missing instance oracle with givien label.
     MissingInstanceOracle(String),
-    /// Missing permutation argument oracle
+    /// Missing permutation argument oracle.
     MissingPermutationOracle(String),
-    /// Missing LookUp table oracle
+    /// Missing LookUp table oracle.
     MissingLUTableOracle(String),
-    /// Query index exceeds witness oracle size
+    /// Query index exceeds witness oracle size.
     WtnsQueryIndexOutOfBounds(usize),
-    /// Query index exceeds instance oracle size
+    /// Query index exceeds instance oracle size.
     InstanceQueryIndexOutOfBounds(usize),
-
     // TODO doc
     WtnsTableNotAllowed(String),
     // TODO doc

@@ -506,20 +506,22 @@ mod copy_constraint_tests {
         let mut permutation_coset_evals =
             Vec::<F>::with_capacity(extended_coset_domain.size());
         for i in 0..extended_coset_domain.size() {
-            let q_i = permutation_argument.instantiate_argument_at_omega_i(
-                &l0_coset_evals,
-                &lu_coset_evals,
-                &q_blind,
-                &witness_oracles,
-                &permutation_oracles,
-                &agg_polys,
-                i,
-                extended_coset_domain.element(i),
-                beta,
-                gamma,
-                &domain,
-                &powers_of_alpha,
-            );
+            let q_i = permutation_argument
+                .instantiate_argument_at_omega_i(
+                    &l0_coset_evals,
+                    &lu_coset_evals,
+                    &q_blind,
+                    &witness_oracles,
+                    &permutation_oracles,
+                    &agg_polys,
+                    i,
+                    extended_coset_domain.element(i),
+                    beta,
+                    gamma,
+                    &domain,
+                    &powers_of_alpha,
+                )
+                .unwrap();
 
             permutation_coset_evals.push(q_i);
         }

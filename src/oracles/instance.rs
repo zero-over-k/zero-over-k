@@ -81,10 +81,10 @@ impl<F: PrimeField> Instantiable<F> for InstanceProverOracle<F> {
         &self.poly
     }
 
-    fn get_extended_coset_evals(&self) -> &Vec<F> {
+    fn get_extended_coset_evals(&self) -> Result<&Vec<F>, Error> {
         match &self.evals_at_coset_of_extended_domain {
-            Some(evals) => evals,
-            None => panic!("Extended coset evals for oracle with label {} of type instance are not provided", self.label),
+            Some(evals) => Ok(evals),
+            None => Err(Error::MissingCosetInstanceEval(self.label.clone())),
         }
     }
 

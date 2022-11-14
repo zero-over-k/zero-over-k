@@ -13,6 +13,7 @@ use crate::{
         witness::{WitnessProverOracle, WitnessVerifierOracle},
     },
     permutation::grand_product::GrandProductArgument,
+    piop::error::Error as PiopError,
 };
 
 pub mod grand_product;
@@ -160,7 +161,7 @@ impl<F: PrimeField> PermutationArgument<F> {
         gamma: F,
         domain: &GeneralEvaluationDomain<F>,
         alpha_powers: &[F], // quotient separation challenges
-    ) -> F {
+    ) -> Result<F, PiopError> {
         assert_eq!(witness_oracles.len(), permutation_oracles.len());
         assert_eq!(witness_oracles.len(), self.deltas.len());
 
@@ -187,7 +188,8 @@ impl<F: PrimeField> PermutationArgument<F> {
         let mut permutation_eval = alpha_powers[0]
             * l_0_coset_evals[omega_index]
             * (F::one()
-                - agg_polys[0].query_in_coset(omega_index, Rotation::curr()));
+                - agg_polys[0]
+                    .query_in_coset(omega_index, Rotation::curr())?);
         let mut alpha_shift = 1;
 
         for (i, ((ws, sigmas), ds)) in oracle_chunks
@@ -208,7 +210,7 @@ impl<F: PrimeField> PermutationArgument<F> {
                     domain_size,
                     omega,
                     omega_index,
-                );
+                )?;
         }
 
         alpha_shift += agg_polys.len();
@@ -217,22 +219,22 @@ impl<F: PrimeField> PermutationArgument<F> {
             permutation_eval += alpha_powers[i + alpha_shift]
                 * l_0_coset_evals[omega_index]
                 * (agg_polys[i + 1]
-                    .query_in_coset(omega_index, Rotation::curr())
+                    .query_in_coset(omega_index, Rotation::curr())?
                     - agg_polys[i].query_in_coset(
                         omega_index,
                         Rotation::new(self.usable_rows, Sign::Plus),
-                    ));
+                    )?);
         }
 
         let z_last_eval = agg_polys
             .last()
             .unwrap()
-            .query_in_coset(omega_index, Rotation::curr());
+            .query_in_coset(omega_index, Rotation::curr())?;
         permutation_eval += alpha_powers.last().unwrap().clone()
             * q_last_coset_evals[omega_index]
             * (z_last_eval * z_last_eval - z_last_eval);
 
-        permutation_eval
+        Ok(permutation_eval)
     }
 
     pub fn open_argument<PC: HomomorphicCommitment<F>>(
@@ -587,20 +589,22 @@ mod test {
         let mut permutation_coset_evals =
             Vec::<F>::with_capacity(extended_coset_domain.size());
         for i in 0..extended_coset_domain.size() {
-            let pe = permutation_argument.instantiate_argument_at_omega_i(
-                &l_0_coset_evals,
-                &l_u_coset_evals,
-                &q_blind,
-                &witness_oracles,
-                &permutation_oracles,
-                &z_polys,
-                i,
-                extended_coset_domain.element(i),
-                beta,
-                gamma,
-                &domain,
-                &powers_of_alpha,
-            );
+            let pe = permutation_argument
+                .instantiate_argument_at_omega_i(
+                    &l_0_coset_evals,
+                    &l_u_coset_evals,
+                    &q_blind,
+                    &witness_oracles,
+                    &permutation_oracles,
+                    &z_polys,
+                    i,
+                    extended_coset_domain.element(i),
+                    beta,
+                    gamma,
+                    &domain,
+                    &powers_of_alpha,
+                )
+                .unwrap();
 
             permutation_coset_evals.push(pe);
         }

@@ -16,6 +16,7 @@ use crate::{
         traits::{ConcreteOracle, Instantiable},
         witness::{WitnessProverOracle, WitnessVerifierOracle},
     },
+    piop::error::Error as PiopError,
 };
 
 /// This module constructs one zero knowledge adjusted permutation check
@@ -115,29 +116,30 @@ impl<F: PrimeField> GrandProductArgument<F> {
         _domain_size: usize,
         omega: F,
         omega_index: usize,
-    ) -> F {
+    ) -> Result<F, PiopError> {
         let zk_part = F::one()
             - (q_last_coset_evals[omega_index]
-                + q_blind.query_in_coset(omega_index, Rotation::curr()));
+                + q_blind.query_in_coset(omega_index, Rotation::curr())?);
 
-        let mut lhs = z.query_in_coset(omega_index, Rotation::next());
-        let mut rhs = z.query_in_coset(omega_index, Rotation::curr());
+        let mut lhs = z.query_in_coset(omega_index, Rotation::next())?;
+        let mut rhs = z.query_in_coset(omega_index, Rotation::curr())?;
 
         for ((w_i, sigma_i), &delta_i) in witness_oracles
             .iter()
             .zip(permutation_oracles.iter())
             .zip(deltas.iter())
         {
-            let w_res = w_i.query_in_coset(omega_index, Rotation::curr());
+            let w_res = w_i.query_in_coset(omega_index, Rotation::curr())?;
             lhs *= w_res
-                + beta * sigma_i.query_in_coset(omega_index, Rotation::curr())
+                + beta
+                    * sigma_i.query_in_coset(omega_index, Rotation::curr())?
                 + gamma;
             rhs *= w_res
                 + beta * delta_i * F::multiplicative_generator() * omega
                 + gamma;
         }
 
-        zk_part * (lhs - rhs)
+        Ok(zk_part * (lhs - rhs))
     }
 
     pub fn open_argument<PC: HomomorphicCommitment<F>>(
@@ -523,7 +525,8 @@ mod test {
                     domain_size,
                     extended_coset_domain.element(i),
                     i,
-                );
+                )
+                .unwrap();
 
             grand_product_evals.push(gp_i);
         }
