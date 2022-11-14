@@ -19,4 +19,9 @@ pub enum Error {
     WtnsQueryIndexOutOfBounds(usize),
     /// Query index exceeds instance oracle size
     InstanceQueryIndexOutOfBounds(usize),
+
+    // TODO doc
+    WtnsTableNotAllowed(String),
+    // TODO doc
+    InstanceTableNotAllowed(String),
 }
