@@ -703,7 +703,12 @@ where
             match witness_oracles_mapping.get(poly_label) {
                 Some(index) => witness_oracles[*index]
                     .register_eval_at_challenge(*point, evaluation),
-                None => panic!("Missing poly: {}", poly_label),
+                None => {
+                    return Err(PiopError::MissingWtnsOracle(
+                        poly_label.clone(),
+                    )
+                    .into())
+                }
             };
         }
 
@@ -723,7 +728,12 @@ where
             match fixed_oracles_mapping.get(poly_label) {
                 Some(index) => preprocessed.fixed_oracles[*index]
                     .register_eval_at_challenge(*point, evaluation),
-                None => panic!("Missing poly: {}", poly_label),
+                None => {
+                    return Err(PiopError::MissingFixedOracle(
+                        poly_label.clone(),
+                    )
+                    .into())
+                }
             };
         }
 
@@ -743,7 +753,12 @@ where
             match table_oracles_mapping.get(poly_label) {
                 Some(index) => preprocessed.table_oracles[*index]
                     .register_eval_at_challenge(*point, evaluation),
-                None => panic!("Missing poly: {}", poly_label),
+                None => {
+                    return Err(PiopError::MissingLUTableOracle(
+                        poly_label.clone(),
+                    )
+                    .into())
+                }
             };
         }
 
@@ -949,7 +964,12 @@ where
             match z_mapping.get(poly_label) {
                 Some(index) => z_polys[*index]
                     .register_eval_at_challenge(*point, evaluation),
-                None => panic!("Missing poly: {}", poly_label),
+                None => {
+                    return Err(PiopError::MissingPermutationOracle(
+                        poly_label.clone(),
+                    )
+                    .into())
+                }
             };
         }
 

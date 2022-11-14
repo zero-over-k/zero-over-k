@@ -15,6 +15,10 @@ pub enum Error {
     MissingFixedOracle(String),
     /// Missing instance oracle with givien label
     MissingInstanceOracle(String),
+    /// Missing permutation argument oracle
+    MissingPermutationOracle(String),
+    /// Missing LookUp table oracle
+    MissingLUTableOracle(String),
     /// Query index exceeds witness oracle size
     WtnsQueryIndexOutOfBounds(usize),
     /// Query index exceeds instance oracle size
