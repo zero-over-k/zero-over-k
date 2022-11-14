@@ -6,6 +6,7 @@ use crate::oracles::{
     query::{OracleQuery, OracleType},
     traits::{FixedOracle, InstanceOracle, WitnessOracle},
 };
+use crate::piop::error::Error as PiopError;
 use ark_ff::PrimeField;
 
 #[derive(Clone)]
@@ -40,7 +41,7 @@ impl<F: PrimeField> GenericLookupVO<F> {
         instance_oracles: &mut [impl InstanceOracle<F>],
         fixed_oracles: &mut [impl FixedOracle<F>],
         table_oracles: &mut [impl FixedOracle<F>],
-    ) {
+    ) -> Result<(), PiopError> {
         for query in &self.virtual_queries {
             match query.oracle_type {
                 crate::oracles::query::OracleType::Witness => {
@@ -62,12 +63,18 @@ impl<F: PrimeField> GenericLookupVO<F> {
             Vec::<OracleQuery>::with_capacity(self.virtual_table_queries.len());
         for query in &self.virtual_table_queries {
             match query.oracle_type {
-                OracleType::Witness => panic!(
-                    "Witness query is not allowed to serve as table query"
-                ), //see: https:github.com/zcash/halo2/issues/534
-                OracleType::Instance => panic!(
-                    "Instance query is not allowed to serve as table query"
-                ), //see: https:github.com/zcash/halo2/issues/534
+                OracleType::Witness => {
+                    return Err(PiopError::WtnsTableNotAllowed(
+                        format!("VirtualQuery index: {}", query.index)
+                            .to_string(),
+                    ))
+                }
+                OracleType::Instance => {
+                    return Err(PiopError::InstanceTableNotAllowed(
+                        format!("VirtualQuery index: {}", query.index)
+                            .to_string(),
+                    ))
+                }
                 OracleType::Fixed => {
                     table_oracles[query.index]
                         .register_rotation(query.rotation);
@@ -94,6 +101,7 @@ impl<F: PrimeField> GenericLookupVO<F> {
 
         self.expressions = Some(expressions);
         self.table_queries = Some(table_queries);
+        Ok(())
     }
 }
 

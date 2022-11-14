@@ -29,8 +29,8 @@ pub enum Error {
     WtnsQueryIndexOutOfBounds(usize),
     /// Query index exceeds instance oracle size.
     InstanceQueryIndexOutOfBounds(usize),
-    // TODO doc
+    //see: https:github.com/zcash/halo2/issues/534
     WtnsTableNotAllowed(String),
-    // TODO doc
+    //see: https:github.com/zcash/halo2/issues/534
     InstanceTableNotAllowed(String),
 }
