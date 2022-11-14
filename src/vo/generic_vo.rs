@@ -28,7 +28,7 @@ impl<F: PrimeField> GenericVO<F> {
 
     pub fn configure(
         &mut self,
-        witness_oracles: &mut [impl WitnessOracle<F>],
+        witness_oracles: &mut [&mut impl WitnessOracle<F>],
         instance_oracles: &mut [impl InstanceOracle<F>],
         fixed_oracles: &mut [impl FixedOracle<F>],
     ) {

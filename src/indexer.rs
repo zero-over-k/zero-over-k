@@ -43,7 +43,7 @@ pub struct Indexer<F: PrimeField, PC: HomomorphicCommitment<F>> {
 
 impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
     fn compute_quotient_degree(
-        witness_oracles: &[impl WitnessOracle<F>],
+        witness_oracles: &[&mut impl WitnessOracle<F>],
         instance_oracles: &[impl InstanceOracle<F>],
         fixed_oracles: &[impl FixedOracle<F>],
         witness_oracles_mapping: &BTreeMap<String, usize>,
@@ -138,7 +138,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
         vk: &PC::VerifierKey,
         vos: &[&dyn VirtualOracle<F>],
         lookups: Vec<&'a dyn LookupVirtualOracle<F>>,
-        witness_oracles: &[impl WitnessOracle<F>],
+        witness_oracles: &[&mut impl WitnessOracle<F>],
         instance_oracles: &[impl InstanceOracle<F>],
         fixed_oracles: &[impl FixedOracle<F>],
         domain: GeneralEvaluationDomain<F>,

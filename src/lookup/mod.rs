@@ -44,7 +44,7 @@ impl<F: PrimeField> LookupArgument<F> {
         instance_oracles_mapping: &BTreeMap<String, usize>,
         fixed_oracles_mapping: &BTreeMap<String, usize>,
         table_oracles_mapping: &BTreeMap<String, usize>,
-        witness_oracles: &'a [WitnessProverOracle<F>],
+        witness_oracles: &'a [&WitnessProverOracle<F>],
         instance_oracles: &'a [InstanceProverOracle<F>],
         fixed_oracles: &'a [FixedProverOracle<F>],
         table_oracles: &'a [FixedProverOracle<F>],

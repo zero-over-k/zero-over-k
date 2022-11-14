@@ -19,7 +19,8 @@ use error::Error;
 use multiproof::piop::Multiopen;
 use oracles::instance::{InstanceProverOracle, InstanceVerifierOracle};
 
-use oracles::traits::{ConcreteOracle, Instantiable};
+use crate::oracles::traits::{ConcreteOracle, Instantiable};
+use crate::oracles::traits::CommittedOracle;
 use oracles::witness::{WitnessProverOracle, WitnessVerifierOracle};
 use piop::PIOPforPolyIdentity;
 use rng::FiatShamirRng;
@@ -29,7 +30,7 @@ use crate::lookup::LookupArgument;
 
 use crate::oracles::query::OracleType;
 use crate::oracles::rotation::{Rotation, Sign};
-use crate::oracles::traits::CommittedOracle;
+use crate::oracles::fixed::{FixedProverOracle, FixedVerifierOracle};
 
 use crate::util::evaluate_query_set;
 
@@ -85,7 +86,7 @@ where
     pub fn prove<'a, R: Rng>(
         pk: &ProverKey<F, PC>,
         preprocessed: &ProverPreprocessedInput<F, PC>,
-        witness_oracles: &'a mut [WitnessProverOracle<F>],
+        witness_oracles: &mut [&mut WitnessProverOracle<F>],
         instance_oracles: &'a mut [InstanceProverOracle<F>],
         vos: &[&'a dyn VirtualOracle<F>], // TODO: this should be in index
         domain_size: usize,
@@ -303,39 +304,64 @@ where
         // TODO!!!! PUT ALL EVALS IN TRANSCRIPT
 
         // Compute witness evals
+        let mut w_v = vec![];
+        for w in witness_oracles.iter() {
+            let w = w as &WitnessProverOracle<F>;
+            w_v.push(w);
+        }
+
         let witness_query_set = PIOPforPolyIdentity::<F, PC>::get_query_set(
-            &witness_oracles,
+            w_v.as_slice(),
             verifier_second_msg.label,
             verifier_second_msg.xi,
             &omegas,
         );
 
-        let witness_evals: Vec<F> =
-            evaluate_query_set(witness_oracles, &witness_query_set);
+        let mut w_v = vec![];
+        for w in witness_oracles.iter() {
+            let w = w as &WitnessProverOracle<F>;
+            w_v.push(w);
+        }
+        let witness_evals: Vec<F> = evaluate_query_set(
+            w_v.as_slice(),
+            &witness_query_set
+        );
 
         // fs_rng.absorb(&to_bytes![witness_evals].unwrap());
         // Compute fixed evals
+        //
+        let mut preprocessed_fixed_oracles = vec![];
+        for w in preprocessed.fixed_oracles.iter() {
+            let w = w as &FixedProverOracle<F>;
+            preprocessed_fixed_oracles.push(w);
+        }
 
         let fixed_query_set = PIOPforPolyIdentity::<F, PC>::get_query_set(
-            &preprocessed.fixed_oracles,
+            //&preprocessed.fixed_oracles,
+            preprocessed_fixed_oracles.as_slice(),
             verifier_second_msg.label,
             verifier_second_msg.xi,
             &omegas,
         );
 
         let fixed_oracle_evals: Vec<F> =
-            evaluate_query_set(&preprocessed.fixed_oracles, &fixed_query_set);
+            evaluate_query_set(preprocessed_fixed_oracles.as_slice(), &fixed_query_set);
 
+        let mut preprocessed_table_oracles = vec![];
+        for w in preprocessed.table_oracles.iter() {
+            let w = w as &FixedProverOracle<F>;
+            preprocessed_table_oracles.push(w);
+        }
         // Compute table evals
         let table_query_set = PIOPforPolyIdentity::<F, PC>::get_query_set(
-            &preprocessed.table_oracles,
+            preprocessed_table_oracles.as_slice(),
             verifier_second_msg.label,
             verifier_second_msg.xi,
             &omegas,
         );
 
         let table_oracle_evals: Vec<F> =
-            evaluate_query_set(&preprocessed.table_oracles, &table_query_set);
+            evaluate_query_set(&preprocessed_table_oracles.as_slice(), &table_query_set);
 
         // Compute lookup evals
         // For each lookup argument we will always put it in same order:
@@ -383,14 +409,19 @@ where
             .collect();
 
         // Compute z polys oracle evals
+        let mut z_polys_v = vec![];
+        for w in z_polys.iter() {
+            let w = w as &WitnessProverOracle<F>;
+            z_polys_v.push(w);
+        }
         let z_query_set = PIOPforPolyIdentity::<F, PC>::get_query_set(
-            &z_polys,
+            z_polys_v.as_slice(),
             verifier_second_msg.label,
             verifier_second_msg.xi,
             &omegas,
         );
 
-        let z_evals = evaluate_query_set(&z_polys, &z_query_set);
+        let z_evals = evaluate_query_set(z_polys_v.as_slice(), &z_query_set);
 
         // compute q_blind eval
         let q_blind_eval = preprocessed
@@ -399,13 +430,33 @@ where
             .evaluate(&verifier_second_msg.xi);
 
         // Multiopen
+        //let mut oracles: Vec<&dyn Instantiable<F>> = Vec::with_capacity(
+            //lookup_polys.len() * 2 +
+            //lookup_z_polys.len() +
+            //quotient_chunk_oracles.len() +
+            //z_polys.len()
+        //);
+
         let mut oracles: Vec<&dyn Instantiable<F>> = witness_oracles
             .iter()
-            .chain(lookup_polys_to_open)
-            .chain(lookup_z_polys.iter())
-            .chain(quotient_chunk_oracles.iter())
-            .chain(z_polys.iter())
+            .map(|o| o as &WitnessProverOracle<F>)
             .map(|o| o as &dyn Instantiable<F>)
+            .chain(
+                lookup_polys_to_open
+                .map(|o| o as &dyn Instantiable<F>)
+            )
+            .chain(
+                lookup_z_polys.iter()
+                .map(|o| o as &dyn Instantiable<F>)
+            )
+            .chain(
+                quotient_chunk_oracles.iter()
+                .map(|o| o as &dyn Instantiable<F>)
+            )
+            .chain(
+                z_polys.iter()
+                .map(|o| o as &dyn Instantiable<F>)
+           )
             .collect();
         let preprocessed_oracles: Vec<&dyn Instantiable<F>> = preprocessed
             .fixed_oracles
@@ -690,8 +741,13 @@ where
         let omegas: Vec<F> = domain.elements().collect();
 
         // Map witness oracles evaluations
+        let mut witness_oracles_v = vec![];
+        for w in witness_oracles.iter() {
+            let w = w as &WitnessVerifierOracle<F, PC>;
+            witness_oracles_v.push(w);
+        }
         let query_set = PIOPforPolyIdentity::<F, PC>::get_query_set(
-            witness_oracles,
+            witness_oracles_v.as_slice(),
             verifier_second_msg.label,
             verifier_second_msg.xi,
             &omegas,
@@ -711,8 +767,13 @@ where
         }
 
         // Map fixed oracles evaluations
+        let mut preprocessed_fixed_oracles = vec![];
+        for w in preprocessed.fixed_oracles.iter() {
+            let w = w as &FixedVerifierOracle<F, PC>;
+            preprocessed_fixed_oracles.push(w);
+        }
         let fixed_query_set = PIOPforPolyIdentity::<F, PC>::get_query_set(
-            &preprocessed.fixed_oracles,
+            preprocessed_fixed_oracles.as_slice(),
             verifier_second_msg.label,
             verifier_second_msg.xi,
             &omegas,
@@ -731,8 +792,13 @@ where
         }
 
         // Map table oracles evaluations
+        let mut preprocessed_table_oracles = vec![];
+        for w in preprocessed.table_oracles.iter() {
+            let w = w as &FixedVerifierOracle<F, PC>;
+            preprocessed_table_oracles.push(w);
+        }
         let table_query_set = PIOPforPolyIdentity::<F, PC>::get_query_set(
-            &preprocessed.table_oracles,
+            preprocessed_table_oracles.as_slice(),
             verifier_second_msg.label,
             verifier_second_msg.xi,
             &omegas,
@@ -930,8 +996,13 @@ where
             })
             .collect();
 
+        let mut z_polys_v = vec![];
+        for w in z_polys.iter() {
+            let w = w as &WitnessVerifierOracle<F, PC>;
+            z_polys_v.push(w);
+        }
         let z_query_set = PIOPforPolyIdentity::<F, PC>::get_query_set(
-            &z_polys,
+            z_polys_v.as_slice(),
             verifier_second_msg.label,
             verifier_second_msg.xi,
             &omegas,

@@ -41,7 +41,7 @@ pub struct ProverState<'a, F: PrimeField> {
     pub(crate) instance_oracles_mapping: BTreeMap<String, usize>,
     pub(crate) fixed_oracles_mapping: BTreeMap<String, usize>,
     pub(crate) table_oracles_mapping: BTreeMap<String, usize>,
-    pub(crate) witness_oracles: &'a [WitnessProverOracle<F>],
+    pub(crate) witness_oracles: Vec<&'a WitnessProverOracle<F>>,
     pub(crate) instance_oracles: &'a [InstanceProverOracle<F>],
     pub(crate) z_polys: Option<Vec<WitnessProverOracle<F>>>,
     pub(crate) lookup_polys: Option<
@@ -62,7 +62,7 @@ pub struct ProverState<'a, F: PrimeField> {
 
 impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
     pub fn init_prover<'a>(
-        witness_oracles: &'a [WitnessProverOracle<F>],
+        witness_oracles: &'a mut [&mut WitnessProverOracle<F>],
         instance_oracles: &'a [InstanceProverOracle<F>],
         vos: &'a [&'a dyn VirtualOracle<F>],
         domain_size: usize,
@@ -94,17 +94,21 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
             .map(|(i, oracle)| (oracle.get_label(), i))
             .collect();
 
-        let oracles_to_copy: Vec<&WitnessProverOracle<F>> = witness_oracles
-            .iter()
-            .filter(|&oracle| oracle.should_permute)
-            .collect();
+        let mut oracles_to_copy: Vec<&WitnessProverOracle<F>> = Vec::with_capacity(witness_oracles.len());
+        let mut w: Vec<&WitnessProverOracle<F>> = Vec::with_capacity(witness_oracles.len());
+        for o in witness_oracles.iter() {
+            if o.should_permute {
+                oracles_to_copy.push(o);
+            }
+            w.push(o as &WitnessProverOracle<F>);
+        }
 
         ProverState {
             witness_oracles_mapping,
             instance_oracles_mapping,
             fixed_oracles_mapping,
             table_oracles_mapping,
-            witness_oracles,
+            witness_oracles: w,
             instance_oracles,
             z_polys: None,
             lookup_polys: None,
@@ -130,8 +134,9 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
             state.z_polys = Some(vec![]);
             return vec![];
         }
+
         let z_polys = permutation_argument.construct_agg_polys(
-            &state.oracles_to_copy,
+            state.oracles_to_copy.as_slice(),
             &preprocessed.permutation_oracles,
             permutation_msg.beta,
             permutation_msg.gamma,
