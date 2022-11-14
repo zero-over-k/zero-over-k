@@ -5,10 +5,10 @@ pub trait PrecompiledVO<F: PrimeField> {
     fn get_expr_and_queries() -> (VirtualExpression<F>, Vec<VirtualQuery>);
 }
 
-pub mod logic;
+//pub mod logic;
 pub mod mul;
-pub mod plonk_arith;
-pub mod rescue;
+//pub mod plonk_arith;
+//pub mod rescue;
 
-#[cfg(test)]
-pub(crate) mod tests;
+//#[cfg(test)]
+//pub(crate) mod tests;
