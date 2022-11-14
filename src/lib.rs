@@ -623,7 +623,7 @@ where
         vk: &VerifierKey<F, PC>,
         preprocessed: &mut VerifierPreprocessedInput<F, PC>,
         proof: Proof<F, PC>,
-        witness_oracles: &mut [WitnessVerifierOracle<F, PC>],
+        witness_oracles: &mut [&mut WitnessVerifierOracle<F, PC>],
         instance_oracles: &mut [InstanceVerifierOracle<F>],
         vos: &[&dyn VirtualOracle<F>],
         domain_size: usize,
@@ -833,6 +833,7 @@ where
         let oracles_to_copy: Vec<&WitnessVerifierOracle<F, PC>> =
             witness_oracles
                 .iter()
+                .map(|oracle| oracle as &WitnessVerifierOracle<F, PC>)
                 .filter(|&oracle| oracle.should_permute)
                 .collect();
 
@@ -879,7 +880,7 @@ where
                     &instance_oracles_mapping,
                     &fixed_oracles_mapping,
                     &table_oracles_mapping,
-                    witness_oracles,
+                    &witness_oracles,
                     instance_oracles,
                     &preprocessed.fixed_oracles,
                     &preprocessed.table_oracles,
@@ -1192,11 +1193,24 @@ where
 
         let mut oracles: Vec<&dyn CommittedOracle<F, PC>> = witness_oracles
             .iter()
-            .chain(lookup_polys_to_check_in_opening)
-            .chain(lookup_z_polys.iter())
-            .chain(quotient_chunk_oracles.iter())
-            .chain(z_polys.iter())
+            .map(|o| o as &WitnessVerifierOracle<F, PC>)
             .map(|a| a as &dyn CommittedOracle<F, PC>)
+            .chain(
+                lookup_polys_to_check_in_opening
+                    .map(|a| a as &dyn CommittedOracle<F, PC>)
+            )
+            .chain(
+                lookup_z_polys.iter()
+                    .map(|a| a as &dyn CommittedOracle<F, PC>)
+            )
+            .chain(
+                quotient_chunk_oracles.iter()
+                    .map(|a| a as &dyn CommittedOracle<F, PC>)
+            )
+            .chain(
+                z_polys.iter()
+                    .map(|a| a as &dyn CommittedOracle<F, PC>)
+            )
             .collect();
         let preprocessed_oracles: Vec<&dyn CommittedOracle<F, PC>> =
             preprocessed

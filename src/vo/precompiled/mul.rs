@@ -28,7 +28,7 @@ impl<F: PrimeField> PrecompiledVO<F> for PrecompiledMul {
 #[cfg(test)]
 mod test {
     use super::PrecompiledMul;
-    use std::collections::BTreeSet;
+    use std::collections::{BTreeMap, BTreeSet};
 
     use ark_bls12_381::{Bls12_381, Fr};
     use ark_ff::Zero;
@@ -42,24 +42,28 @@ mod test {
     use rand_chacha::ChaChaRng;
 
     use crate::data_structures::{
-        PermutationInfo, ProverKey, ProverPreprocessedInput,
+        PermutationInfo,
+        ProverKey,
+        ProverPreprocessedInput,
+        VerifierPreprocessedInput,
         VerifierKey,
     };
     use crate::indexer::Indexer;
 
-    use crate::oracles::fixed::FixedProverOracle;
+    use crate::oracles::fixed::{FixedProverOracle, FixedVerifierOracle};
     use crate::oracles::instance::{
+        InstanceVerifierOracle,
         InstanceProverOracle
     };
 
-    use crate::oracles::witness::WitnessProverOracle;
+    use crate::oracles::witness::{WitnessProverOracle, WitnessVerifierOracle};
     use crate::rng::SimpleHashFiatShamirRng;
     use crate::vo::generic_vo::GenericVO;
     use crate::vo::precompiled::PrecompiledVO;
     use crate::PIL;
     use blake2::Blake2s;
 
-    use crate::commitment::KZG10;
+    use crate::commitment::{HomomorphicCommitment, KZG10};
     use crate::vo::VirtualOracle;
 
     type F = Fr;
@@ -155,13 +159,6 @@ mod test {
             &vk.index_info,
         );
 
-        //// compute extended evals of each oracle
-        //for oracle in witness_oracles.iter() {
-            //oracle.compute_extended_evals(
-                //&pk.vk.index_info.extended_coset_domain,
-            //);
-        //}
-
         let proof = PilInstance::prove(
             &pk,
             &preprocessed,
@@ -174,17 +171,17 @@ mod test {
         )
         .unwrap();
 
-        /*
         // println!("{}", proof.info());
         // println!("{}", proof.cumulative_info());
 
         // Verifier
         // Repeat just to make sure some change from prover does not affect this
-        let a_ver = WitnessVerifierOracle::<F, PC>::new("a", false);
-        let b_ver = WitnessVerifierOracle::<F, PC>::new("b", false);
+        let mut a_ver = WitnessVerifierOracle::<F, PC>::new("a", false);
+        let mut b_ver = WitnessVerifierOracle::<F, PC>::new("b", false);
         let c = InstanceVerifierOracle::new("c", c_poly.clone(), &c_evals);
 
-        let mut ver_wtns_oracles = [a_ver, b_ver];
+        let mut ver_wtns_oracles: &mut [&mut WitnessVerifierOracle<F, PC>] = &mut [&mut a_ver, &mut b_ver];
+
         let mut instance_oracles = [c];
         let mut fixed_oracles: [FixedVerifierOracle<F, PC>; 0] = [];
 
@@ -247,6 +244,5 @@ mod test {
         .unwrap();
 
         assert_eq!(res, ());
-        */
     }
 }

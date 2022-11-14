@@ -188,7 +188,7 @@ mod test {
 
         let a_poly =
             DensePolynomial::from_coefficients_slice(&domain.ifft(&a_evals));
-        let a = WitnessProverOracle {
+        let mut a = WitnessProverOracle {
             label: "a".to_string(),
             poly: a_poly,
             evals_at_coset_of_extended_domain: None,
@@ -199,7 +199,7 @@ mod test {
 
         let b_poly =
             DensePolynomial::from_coefficients_slice(&domain.ifft(&b_evals));
-        let b = WitnessProverOracle {
+        let mut b = WitnessProverOracle {
             label: "b".to_string(),
             poly: b_poly,
             evals_at_coset_of_extended_domain: None,
@@ -210,7 +210,7 @@ mod test {
 
         let c_poly =
             DensePolynomial::from_coefficients_slice(&domain.ifft(&c_evals));
-        let c = WitnessProverOracle {
+        let mut c = WitnessProverOracle {
             label: "c".to_string(),
             poly: c_poly,
             evals_at_coset_of_extended_domain: None,
@@ -255,7 +255,7 @@ mod test {
             evals: table_evals,
         };
 
-        let mut witness_oracles = [a, b, c];
+        let mut witness_oracles: &mut [&mut WitnessProverOracle<F>] = &mut [&mut a, &mut b, &mut c];
         let mut instance_oracles: [InstanceProverOracle<F>; 0] = [];
         let mut fixed_oracles = [q];
         let mut table_oracles = [t];
@@ -321,7 +321,7 @@ mod test {
         println!("{}", proof.cumulative_info());
 
         //Verifier
-        let a_ver = WitnessVerifierOracle::<F, PC> {
+        let mut a_ver = WitnessVerifierOracle::<F, PC> {
             label: "a".to_string(),
             queried_rotations: BTreeSet::default(),
             should_permute: false,
@@ -329,7 +329,7 @@ mod test {
             commitment: None,
         };
 
-        let b_ver = WitnessVerifierOracle {
+        let mut b_ver = WitnessVerifierOracle {
             label: "b".to_string(),
             queried_rotations: BTreeSet::default(),
             should_permute: false,
@@ -337,7 +337,7 @@ mod test {
             commitment: None,
         };
 
-        let c_ver = WitnessVerifierOracle {
+        let mut c_ver = WitnessVerifierOracle {
             label: "c".to_string(),
             queried_rotations: BTreeSet::default(),
             should_permute: false,
@@ -409,7 +409,7 @@ mod test {
             commitment: Some(q_blind_commitment[0].commitment().clone()),
         };
 
-        let mut ver_wtns_oracles = [a_ver, b_ver, c_ver];
+        let mut ver_wtns_oracles: &mut [&mut WitnessVerifierOracle<F, PC>] = &mut [&mut a_ver, &mut b_ver, &mut c_ver];
         let mut instance_oracles: [InstanceVerifierOracle<F>; 0] = [];
 
         let mut mul_vo = GenericVO::<F>::init(get_vo_expression_and_queries());

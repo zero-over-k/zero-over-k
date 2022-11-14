@@ -375,7 +375,7 @@ mod copy_constraint_tests {
             GeneralEvaluationDomain::<F>::new(scaling_factor * domain_size)
                 .unwrap();
 
-        let a = WitnessProverOracle {
+        let mut a = WitnessProverOracle {
             label: "a".to_string(),
             poly: a_poly.clone(),
             evals_at_coset_of_extended_domain: Some(
@@ -386,7 +386,7 @@ mod copy_constraint_tests {
             evals: a_evals,
         };
 
-        let b = WitnessProverOracle {
+        let mut b = WitnessProverOracle {
             label: "b".to_string(),
             poly: b_poly.clone(),
             evals_at_coset_of_extended_domain: Some(
@@ -397,7 +397,7 @@ mod copy_constraint_tests {
             evals: b_evals,
         };
 
-        let c = WitnessProverOracle {
+        let mut c = WitnessProverOracle {
             label: "c".to_string(),
             poly: c_poly.clone(),
             evals_at_coset_of_extended_domain: Some(
@@ -445,11 +445,20 @@ mod copy_constraint_tests {
         let permutation_argument =
             PermutationArgument::<F>::new(scaling_factor, &perm_params);
 
-        let witness_oracles = [&a, &b, &c];
+        let witness_oracles: &mut [&mut WitnessProverOracle<F>] = &mut [&mut a, &mut b, &mut c];
         let permutation_oracles = [sigma1, sigma2, sigma3];
 
+        let mut oracles_to_copy: Vec<&WitnessProverOracle<F>> = Vec::with_capacity(witness_oracles.len());
+        let mut w: Vec<&WitnessProverOracle<F>> = Vec::with_capacity(witness_oracles.len());
+        for o in witness_oracles.iter() {
+            if o.should_permute {
+                oracles_to_copy.push(o);
+            }
+            w.push(o as &WitnessProverOracle<F>);
+        }
+
         let agg_polys = permutation_argument.construct_agg_polys(
-            &witness_oracles,
+            oracles_to_copy.as_slice(),
             &permutation_oracles,
             beta,
             gamma,
@@ -510,7 +519,11 @@ mod copy_constraint_tests {
                 &l0_coset_evals,
                 &lu_coset_evals,
                 &q_blind,
-                &witness_oracles,
+                witness_oracles
+                    .iter()
+                    .map(|x| x as &WitnessProverOracle<F>)
+                    .collect::<Vec<&WitnessProverOracle<F>>>()
+                    .as_slice(),
                 &permutation_oracles,
                 &agg_polys,
                 i,
@@ -560,7 +573,7 @@ mod copy_constraint_tests {
             commitment: None,
         };
 
-        let a = WitnessVerifierOracle::<F, PC> {
+        let mut a = WitnessVerifierOracle::<F, PC> {
             label: "a".to_string(),
             queried_rotations: BTreeSet::from([Rotation::curr()]),
             evals_at_challenges: BTreeMap::from([(
@@ -1042,7 +1055,7 @@ mod copy_constraint_tests {
         );
 
         // Witness oracles
-        let a = WitnessProverOracle {
+        let mut a = WitnessProverOracle {
             label: "a".to_string(),
             poly: a_poly.clone(),
             evals_at_coset_of_extended_domain: None,
@@ -1051,7 +1064,7 @@ mod copy_constraint_tests {
             evals: a_evals,
         };
 
-        let b = WitnessProverOracle {
+        let mut b = WitnessProverOracle {
             label: "b".to_string(),
             poly: b_poly.clone(),
             evals_at_coset_of_extended_domain: None,
@@ -1060,7 +1073,7 @@ mod copy_constraint_tests {
             evals: b_evals,
         };
 
-        let c = WitnessProverOracle {
+        let mut c = WitnessProverOracle {
             label: "c".to_string(),
             poly: c_poly.clone(),
             evals_at_coset_of_extended_domain: None,
@@ -1161,7 +1174,7 @@ mod copy_constraint_tests {
             queried_rotations: BTreeSet::from([Rotation::curr()]),
         };
 
-        let mut witness_oracles = [a, b, c];
+        let mut witness_oracles: &mut [&mut WitnessProverOracle<F>] = &mut [&mut a, &mut b, &mut c];
         let mut instance_oracles = [pi];
         let mut fixed_oracles = [qm, ql, qr, qo, qc];
 
@@ -1219,16 +1232,34 @@ mod copy_constraint_tests {
         )
         .unwrap();
 
-        let mut witness_ver_oracles: Vec<_> = ["a", "b", "c"]
-            .into_iter()
-            .map(|label| WitnessVerifierOracle::<F, PC> {
-                label: label.to_string(),
-                queried_rotations: BTreeSet::new(),
-                should_permute: true,
-                evals_at_challenges: BTreeMap::default(),
-                commitment: None,
-            })
-            .collect();
+        let mut a_ver = WitnessVerifierOracle::<F, PC> {
+            label: "a".to_string(),
+            queried_rotations: BTreeSet::new(),
+            should_permute: true,
+            evals_at_challenges: BTreeMap::default(),
+            commitment: None,
+        };
+        let mut b_ver = WitnessVerifierOracle::<F, PC> {
+            label: "b".to_string(),
+            queried_rotations: BTreeSet::new(),
+            should_permute: true,
+            evals_at_challenges: BTreeMap::default(),
+            commitment: None,
+        };
+        let mut c_ver = WitnessVerifierOracle::<F, PC> {
+            label: "c".to_string(),
+            queried_rotations: BTreeSet::new(),
+            should_permute: true,
+            evals_at_challenges: BTreeMap::default(),
+            commitment: None,
+        };
+
+
+        let mut witness_ver_oracles: &mut [&mut WitnessVerifierOracle<F, PC>] = &mut [
+            &mut a_ver,
+            &mut b_ver,
+            &mut c_ver,
+        ];
 
         let pi = InstanceVerifierOracle {
             label: "pi".to_string(),

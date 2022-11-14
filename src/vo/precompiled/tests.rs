@@ -67,14 +67,18 @@ pub(crate) fn run_prover(
     rng: &mut StdRng,
 ) -> Proof<F, PC> {
     // 1. Generate Prover Oracles
-    let mut witness_oracles: Vec<_> = witness
-        .into_iter()
-        .map(|(label, evals)| {
-            let poly =
-                DensePolynomial::from_coefficients_slice(&domain.ifft(&evals));
-            WitnessProverOracle::new(label, poly, &evals, false)
-        })
-        .collect();
+    let mut witness_oracles_raw: Vec<WitnessProverOracle<F>> = Vec::with_capacity(witness.len());
+    let mut witness_oracles_refs: Vec<&mut WitnessProverOracle<F>> = Vec::with_capacity(witness.len());
+    for (label, evals) in witness {
+        let poly = DensePolynomial::from_coefficients_slice(&domain.ifft(&evals));
+        let w = WitnessProverOracle::new(label, poly, &evals, false);
+        witness_oracles_raw.push(w);
+    }
+    for w in witness_oracles_raw.iter_mut() {
+        witness_oracles_refs.push(w);
+    }
+
+    let mut witness_oracles: &mut [&mut WitnessProverOracle<F>] = &mut witness_oracles_refs;
 
     let mut fixed_oracles: Vec<_> = fixed
         .into_iter()
@@ -95,7 +99,6 @@ pub(crate) fn run_prover(
         .collect();
 
     // 2. Configure VO
-
     vo.configure(
         &mut witness_oracles,
         &mut instance_oracles,
@@ -106,11 +109,11 @@ pub(crate) fn run_prover(
 
     let vos: Vec<&dyn VirtualOracle<F>> = vec![&vo];
 
-    let vk = Indexer::index(
+    let vk: crate::data_structures::VerifierKey<F, PC> = Indexer::index(
         &cs_vk,
         &vos,
         vec![],
-        &witness_oracles,
+        witness_oracles,
         &instance_oracles,
         &fixed_oracles,
         domain,
@@ -121,6 +124,7 @@ pub(crate) fn run_prover(
     .unwrap();
 
     let pk = ProverKey::from_ck_and_vk(&ck, &vk);
+
 
     // 4. Generate Prover precoessed input
 
@@ -171,10 +175,17 @@ pub(crate) fn run_verifier(
     rng: &mut StdRng,
 ) {
     // 1. Generate Verifier Oracles
-    let mut witness_ver_oracles: Vec<_> = witness_labels
-        .into_iter()
-        .map(|label| WitnessVerifierOracle::new(label, false))
-        .collect();
+    let mut witness_oracles_raw: Vec<WitnessVerifierOracle<F, PC>> = Vec::with_capacity(witness_labels.len());
+    let mut witness_oracles_refs: Vec<&mut WitnessVerifierOracle<F, PC>> = Vec::with_capacity(witness_labels.len());
+    for label in witness_labels {
+        let w = WitnessVerifierOracle::new(label, false);
+        witness_oracles_raw.push(w);
+    }
+    for w in witness_oracles_raw.iter_mut() {
+        witness_oracles_refs.push(w);
+    }
+
+    let mut witness_ver_oracles: &mut [&mut WitnessVerifierOracle<F, PC>] = &mut witness_oracles_refs;
 
     let mut instance_oracles: Vec<InstanceVerifierOracle<F>> = instance
         .into_iter()
