@@ -250,13 +250,10 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> CommittedOracle<F, PC>
         self.commitment = Some(c);
     }
 
-    fn get_commitment(&self) -> &<PC>::Commitment {
+    fn get_commitment(&self) -> Result<&<PC>::Commitment, Error> {
         match &self.commitment {
-            Some(c) => c,
-            None => panic!(
-                "Commitment for oracle {} not provided of type fixed",
-                self.label
-            ),
+            Some(c) => Ok(c),
+            None => Err(Error::MissingFixedCommitment(self.label.clone())),
         }
     }
 }

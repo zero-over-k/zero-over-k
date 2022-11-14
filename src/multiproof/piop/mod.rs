@@ -185,13 +185,8 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng>
                     let mut q_i_evals_set = BTreeMap::<F, F>::new();
 
                     for (i, &oracle) in oracles.iter().enumerate() {
-                        q_i = PC::add(
-                            &q_i,
-                            &PC::scale_com(
-                                oracle.get_commitment(),
-                                x1_powers[i],
-                            ),
-                        );
+                        let comm = oracle.get_commitment()?;
+                        q_i = PC::add(&q_i, &PC::scale_com(comm, x1_powers[i]));
                     }
 
                     let omegas: Vec<F> = domain.elements().collect();

@@ -1,5 +1,11 @@
 #[derive(Debug, PartialEq)]
 pub enum Error {
+    /// Missing commiment
+    MissingWtnsCommitment(String),
+    /// Missing fixed commiment
+    MissingFixedCommitment(String),
+    /// Missing instance commiment
+    MissingInstanceCommitment(String),
     /// Missing evaluation at concrete oracle
     MissingConcreteEval(String),
     MissingExtendedEvals,

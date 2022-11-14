@@ -107,7 +107,7 @@ pub trait CommittedOracle<F: PrimeField, PC: HomomorphicCommitment<F>>:
     ConcreteOracle<F>
 {
     fn register_commitment(&mut self, c: PC::Commitment);
-    fn get_commitment(&self) -> &PC::Commitment;
+    fn get_commitment(&self) -> Result<&PC::Commitment, Error>;
 }
 
 pub trait WitnessOracle<F: PrimeField>: ConcreteOracle<F> {

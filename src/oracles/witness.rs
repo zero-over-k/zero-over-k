@@ -185,11 +185,10 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> CommittedOracle<F, PC>
         self.commitment = Some(c);
     }
 
-    // TODO Remove panic
-    fn get_commitment(&self) -> &<PC>::Commitment {
+    fn get_commitment(&self) -> Result<&<PC>::Commitment, Error> {
         match &self.commitment {
-            Some(c) => c,
-            None => panic!("Commitment not provided"),
+            Some(c) => Ok(c),
+            None => Err(Error::MissingWtnsCommitment(self.label.clone())),
         }
     }
 }
