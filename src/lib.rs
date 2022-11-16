@@ -461,10 +461,20 @@ where
         let preprocessed_oracles: Vec<&dyn Instantiable<F>> = preprocessed
             .fixed_oracles
             .iter()
-            .chain(preprocessed.table_oracles.iter())
-            .chain(preprocessed.permutation_oracles.iter())
-            .chain(iter::once(&preprocessed.q_blind))
+            .map(|o| o as &FixedProverOracle<F>)
             .map(|o| o as &dyn Instantiable<F>)
+            .chain(
+                preprocessed.table_oracles.iter()
+                .map(|o| o as &dyn Instantiable<F>)
+            )
+            .chain(
+                preprocessed.permutation_oracles.iter()
+                .map(|o| o as &dyn Instantiable<F>)
+            )
+            .chain(
+                iter::once(&preprocessed.q_blind)
+                .map(|o| o as &dyn Instantiable<F>)
+            )
             .collect();
 
         oracles.extend_from_slice(&preprocessed_oracles.as_slice());

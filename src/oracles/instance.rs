@@ -92,6 +92,7 @@ impl<F: PrimeField> Instantiable<F> for InstanceProverOracle<F> {
     }
 }
 
+#[derive(Clone)]
 pub struct InstanceVerifierOracle<F: PrimeField> {
     pub(crate) label: String,
     pub(crate) poly: DensePolynomial<F>,

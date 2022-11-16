@@ -21,7 +21,7 @@ impl<F: PrimeField> VirtualExpression<F> {
         &self,
         witness_oracles: &[&mut impl ConcreteOracle<F>],
         instance_oracles: &[impl ConcreteOracle<F>],
-        fixed_oracles: &[impl ConcreteOracle<F>],
+        fixed_oracles: &[&mut impl ConcreteOracle<F>],
     ) -> Expression<F> {
         match self {
             VirtualExpression::Constant(f) => Expression::Constant(*f),

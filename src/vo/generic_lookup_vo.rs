@@ -38,7 +38,7 @@ impl<F: PrimeField> GenericLookupVO<F> {
         &mut self,
         witness_oracles: &mut [&mut impl WitnessOracle<F>],
         instance_oracles: &mut [impl InstanceOracle<F>],
-        fixed_oracles: &mut [impl FixedOracle<F>],
+        fixed_oracles: &mut [&mut impl FixedOracle<F>],
         table_oracles: &mut [impl FixedOracle<F>],
     ) {
         for query in &self.virtual_queries {

@@ -573,7 +573,7 @@ mod copy_constraint_tests {
             commitment: None,
         };
 
-        let mut a = WitnessVerifierOracle::<F, PC> {
+        let a = WitnessVerifierOracle::<F, PC> {
             label: "a".to_string(),
             queried_rotations: BTreeSet::from([Rotation::curr()]),
             evals_at_challenges: BTreeMap::from([(
