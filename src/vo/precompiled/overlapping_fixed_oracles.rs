@@ -48,10 +48,11 @@ mod tests {
     use ark_bls12_381::{Bls12_381, Fr as F};
     use ark_ff::Zero;
     use ark_poly::{GeneralEvaluationDomain, EvaluationDomain, univariate::DensePolynomial, UVPolynomial, Polynomial};
+    use ark_poly_commit::{LabeledPolynomial, PolynomialCommitment};
     use ark_std::test_rng;
     use blake2::Blake2s;
     use rand_chacha::ChaChaRng;
-    use crate::{rng::SimpleHashFiatShamirRng, commitment::{KZG10, HomomorphicCommitment}, PIL, oracles::{witness::{WitnessProverOracle, WitnessVerifierOracle}, fixed::{FixedProverOracle, FixedVerifierOracle}, instance::{InstanceProverOracle, InstanceVerifierOracle}}, vo::{generic_vo::GenericVO, VirtualOracle}, indexer::Indexer, data_structures::{PermutationInfo, ProverKey, ProverPreprocessedInput, VerifierPreprocessedInput}};
+    use crate::{rng::SimpleHashFiatShamirRng, commitment::{KZG10, HomomorphicCommitment}, PIL, oracles::{witness::{WitnessProverOracle, WitnessVerifierOracle}, fixed::{FixedProverOracle, FixedVerifierOracle}, instance::{InstanceProverOracle, InstanceVerifierOracle}}, vo::{generic_vo::GenericVO, VirtualOracle}, indexer::Indexer, data_structures::{PermutationInfo, ProverKey, ProverPreprocessedInput, VerifierKey, VerifierPreprocessedInput}};
 
     type FS = SimpleHashFiatShamirRng<Blake2s, ChaChaRng>;
     type PC = KZG10<Bls12_381>;
@@ -139,14 +140,13 @@ mod tests {
         );
 
         // witness_oracles should contain the CONFIGURED witness oracles.
-        // Can't be [&mut a, &mut b, &mut c, &mut a] because Rust won't allow &mut a twice
         let mut witness_oracles: &mut [&mut WitnessProverOracle<F>] = &mut [&mut a, &mut b, &mut c, &mut d];
 
         let mut instance_oracles = vec![];
         instance_oracles.extend(gate_1_instance_oracles.clone());
         instance_oracles.extend(gate_2_instance_oracles.clone());
 
-        let fixed_oracles: &[&mut FixedProverOracle<F>] = &[&mut x];
+        let fixed_oracles: &[&mut FixedProverOracle<F>] = &[&mut x.clone()];
 
         let vos: Vec<&dyn VirtualOracle<F>> = vec![&gate_1_vo, &gate_2_vo];
 
@@ -189,23 +189,36 @@ mod tests {
         )
         .unwrap();
 
-        /*
+        ///////////////////////////////////////////////////////////
         // Proof verification
-        let mut w1 = WitnessVerifierOracle::new("a", false);
-        let mut w2 = WitnessVerifierOracle::new("b", false);
-        let mut w3 = WitnessVerifierOracle::new("c", false);
-        let mut w4 = WitnessVerifierOracle::new("d", false);
+        let mut w1: WitnessVerifierOracle<F, PC> = WitnessVerifierOracle::new("a", false);
+        let mut w2: WitnessVerifierOracle<F, PC> = WitnessVerifierOracle::new("b", false);
+        let mut w3: WitnessVerifierOracle<F, PC> = WitnessVerifierOracle::new("c", false);
+        let mut w4: WitnessVerifierOracle<F, PC> = WitnessVerifierOracle::new("d", false);
+
+        let x_poly = DensePolynomial::from_coefficients_slice(&domain.ifft(&x_evals));
+        let x = LabeledPolynomial::new("x".to_string(), x_poly.clone(), None, None);
+
+        let (fixed_comm, _) = PC::commit(&ck, [x.clone()].iter(), None).unwrap();
+
+        // Gate 1
+        let mut gate_1_fixed_oracles_raw = fixed_comm.clone()
+            .into_iter()
+            .map(|comm| FixedVerifierOracle::from_commitment(comm.clone()))
+            .collect::<Vec<FixedVerifierOracle<F, PC>>>();
+
+        let mut gate_1_fixed_oracles_v: Vec<&mut FixedVerifierOracle<F, PC>> = gate_1_fixed_oracles_raw
+            .iter_mut()
+            .collect();
 
         let pi = InstanceVerifierOracle::new("pi1", pi_poly.clone(), &pi_evals);
 
-        let fixed_oracles: Vec<FixedVerifierOracle<F, PC>> = vec![];
-
         let mut gate_1_witness_oracles: &mut [&mut WitnessVerifierOracle<F, PC>] = &mut [&mut w1, &mut w2];
         let mut gate_1_instance_oracles = vec![pi.clone()];
-        let mut gate_1_fixed_oracles: Vec<FixedVerifierOracle<F, PC>> = vec![];
 
         let mut gate_1_vo = GenericVO::<F>::init(get_expr_and_queries());
         let mut gate_2_vo = GenericVO::<F>::init(get_expr_and_queries());
+        let mut gate_1_fixed_oracles: &mut [&mut FixedVerifierOracle<F, PC>] = gate_1_fixed_oracles_v.iter_mut().into_slice();
 
         gate_1_vo.configure(
             &mut gate_1_witness_oracles,
@@ -213,9 +226,19 @@ mod tests {
             &mut gate_1_fixed_oracles,
         );
 
+        // Gate 2
+        let mut gate_2_fixed_oracles = gate_1_fixed_oracles;
+            //.into_iter()
+            //.map(|comm| FixedVerifierOracle::from_commitment(comm.clone()))
+            //.collect::<Vec<FixedVerifierOracle<F, PC>>>();
+
+        //let mut gate_2_fixed_oracles_v: Vec<&mut FixedVerifierOracle<F, PC>> = gate_2_fixed_oracles
+            //.iter_mut()
+            //.collect();
+
         let mut gate_2_witness_oracles: &mut [&mut WitnessVerifierOracle<F, PC>] = &mut [&mut w3, &mut w4];
         let mut gate_2_instance_oracles = vec![pi.clone()];
-        let mut gate_2_fixed_oracles: Vec<FixedVerifierOracle<F, PC>> = vec![];
+        //let mut gate_2_fixed_oracles: &mut [&mut FixedVerifierOracle<F, PC>] = gate_2_fixed_oracles_v.iter_mut().into_slice();
 
         gate_2_vo.configure(
             &mut gate_2_witness_oracles,
@@ -232,7 +255,7 @@ mod tests {
         let vos: Vec<&dyn VirtualOracle<F>> = vec![&gate_1_vo, &gate_2_vo];
 
         // Repeat but this time provide verifier witness oracles
-        let mut vk = Indexer::index(
+        let mut vk: VerifierKey<F, PC> = Indexer::index(
             &verifier_key,
             &vos,
             vec![],
@@ -249,7 +272,7 @@ mod tests {
         let q_blind = FixedVerifierOracle::new("q_blind".to_string(), Some(PC::zero_comm()));
 
         let preprocessed = VerifierPreprocessedInput {
-            fixed_oracles: fixed_oracles,
+            fixed_oracles: gate_1_fixed_oracles_raw,
             table_oracles: vec![],
             permutation_oracles: vec![],
             q_blind,
@@ -274,6 +297,5 @@ mod tests {
         .unwrap();
 
         assert_eq!(res, ());
-        */
     }
 }
