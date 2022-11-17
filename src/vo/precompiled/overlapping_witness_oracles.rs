@@ -108,26 +108,26 @@ mod tests {
         let mut gate_1_vo = GenericVO::<F>::init(get_expr_and_queries());
         let mut gate_2_vo = GenericVO::<F>::init(get_expr_and_queries());
 
-        let fixed_oracles: Vec<FixedProverOracle<F>> = vec![];
+        let mut prover_fixed_oracles = &mut [] as &mut [&mut FixedProverOracle<F>];
+        let mut verifier_fixed_oracles = &mut [] as &mut [&mut FixedVerifierOracle<F, PC>];
 
         // Note that vo.configure MUTATES each witness oracle
         let mut gate_1_witness_oracles: &mut [&mut WitnessProverOracle<F>] = &mut [&mut a, &mut b];
         let mut gate_1_instance_oracles = vec![pi1.clone()];
-        let mut gate_1_fixed_oracles: Vec<FixedVerifierOracle<F, PC>> = vec![];
 
         gate_1_vo.configure(
             &mut gate_1_witness_oracles,
             &mut gate_1_instance_oracles,
-            &mut gate_1_fixed_oracles,
+            &mut prover_fixed_oracles,
         );
 
         let mut gate_2_witness_oracles: &mut [&mut WitnessProverOracle<F>] = &mut [&mut c, &mut a];
         let mut gate_2_instance_oracles = vec![pi2.clone()];
-        let mut gate_2_fixed_oracles: Vec<FixedVerifierOracle<F, PC>> = vec![];
+
         gate_2_vo.configure(
             &mut gate_2_witness_oracles,
             &mut gate_2_instance_oracles,
-            &mut gate_2_fixed_oracles,
+            &mut prover_fixed_oracles,
         );
 
         // witness_oracles should contain the CONFIGURED witness oracles.
@@ -146,7 +146,7 @@ mod tests {
             vec![],
             &witness_oracles,
             &instance_oracles,
-            &fixed_oracles,
+            &mut verifier_fixed_oracles,
             domain,
             &domain.vanishing_polynomial().into(),
             PermutationInfo::dummy(),
@@ -158,8 +158,8 @@ mod tests {
 
         let q_blind = FixedProverOracle::new("q_blind", DensePolynomial::zero(), &vec![]);
 
-        let preprocessed = ProverPreprocessedInput::new(
-            &fixed_oracles,
+        let mut preprocessed = ProverPreprocessedInput::new(
+            &mut prover_fixed_oracles,
             &vec![],
             &vec![],
             &q_blind,
@@ -168,7 +168,7 @@ mod tests {
 
         let proof = PilInstance::prove(
             &pk,
-            &preprocessed,
+            &mut preprocessed,
             &mut witness_oracles,
             &mut instance_oracles,
             &vos,
@@ -186,11 +186,8 @@ mod tests {
         let pi1 = InstanceVerifierOracle::new("pi1", pi1_poly.clone(), &pi1_evals);
         let pi2 = InstanceVerifierOracle::new("pi2", pi2_poly.clone(), &pi2_evals);
 
-        let fixed_oracles: Vec<FixedVerifierOracle<F, PC>> = vec![];
-
         let mut gate_1_witness_oracles: &mut [&mut WitnessVerifierOracle<F, PC>] = &mut [&mut w1, &mut w2];
         let mut gate_1_instance_oracles = vec![pi1];
-        let mut gate_1_fixed_oracles: Vec<FixedVerifierOracle<F, PC>> = vec![];
 
         let mut gate_1_vo = GenericVO::<F>::init(get_expr_and_queries());
         let mut gate_2_vo = GenericVO::<F>::init(get_expr_and_queries());
@@ -198,17 +195,16 @@ mod tests {
         gate_1_vo.configure(
             &mut gate_1_witness_oracles,
             &mut gate_1_instance_oracles,
-            &mut gate_1_fixed_oracles,
+            &mut verifier_fixed_oracles,
         );
 
         let mut gate_2_witness_oracles: &mut [&mut WitnessVerifierOracle<F, PC>] = &mut [&mut w3, &mut w1];
         let mut gate_2_instance_oracles = vec![pi2];
-        let mut gate_2_fixed_oracles: Vec<FixedVerifierOracle<F, PC>> = vec![];
 
         gate_2_vo.configure(
             &mut gate_2_witness_oracles,
             &mut gate_2_instance_oracles,
-            &mut gate_2_fixed_oracles,
+            &mut verifier_fixed_oracles,
         );
 
         let mut witness_oracles: &mut [&mut WitnessVerifierOracle<F, PC>] = &mut [&mut w1, &mut w2, &mut w3];
@@ -226,7 +222,7 @@ mod tests {
             vec![],
             &mut witness_oracles,
             &instance_oracles,
-            &fixed_oracles,
+            &mut verifier_fixed_oracles,
             domain,
             &domain.vanishing_polynomial().into(),
             PermutationInfo::dummy(),
@@ -236,8 +232,8 @@ mod tests {
 
         let q_blind = FixedVerifierOracle::new("q_blind".to_string(), Some(PC::zero_comm()));
 
-        let preprocessed = VerifierPreprocessedInput {
-            fixed_oracles: fixed_oracles,
+        let mut preprocessed = VerifierPreprocessedInput {
+            fixed_oracles: verifier_fixed_oracles,
             table_oracles: vec![],
             permutation_oracles: vec![],
             q_blind,
@@ -246,11 +242,11 @@ mod tests {
         // Since we mutate fixed oracles by adding evals at challenge for specific proof
         // preprocessed input is cloned in order to enable preserving original preprocessed
         // Second option is just to "reset" preprocessed after verification ends
-        let mut pp_clone = preprocessed.clone();
+        //let mut pp_clone = preprocessed.clone();
 
         let res = PilInstance::verify(
             &mut vk,
-            &mut pp_clone,
+            &mut preprocessed,
             proof,
             &mut witness_oracles,
             &mut instance_oracles,

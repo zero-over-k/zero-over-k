@@ -64,11 +64,9 @@ mod test {
     use crate::commitment::KZG10;
     use ark_bls12_381::{Bls12_381, Fr as F};
 
-    type PC = KZG10<Bls12_381>;
-
     #[test]
     fn test_simple_lookup_configuration() {
-        let a = WitnessProverOracle {
+        let mut a = WitnessProverOracle {
             label: "a".to_string(),
             poly: DensePolynomial::zero(),
             evals: vec![],
@@ -77,7 +75,7 @@ mod test {
             should_permute: false,
         };
 
-        let b = WitnessProverOracle {
+        let mut b = WitnessProverOracle {
             label: "b".to_string(),
             poly: DensePolynomial::zero(),
             evals: vec![],
@@ -86,7 +84,7 @@ mod test {
             should_permute: false,
         };
 
-        let c = WitnessProverOracle {
+        let mut c = WitnessProverOracle {
             label: "c".to_string(),
             poly: DensePolynomial::zero(),
             evals: vec![],
@@ -123,9 +121,9 @@ mod test {
             PrecompiledSimple3ArithLookup::get_expressions_and_queries(),
         );
 
-        let mut witness_oracles = vec![a, b, c];
+        let mut witness_oracles: &mut [&mut WitnessProverOracle<F>] = &mut [&mut a, &mut b, &mut c];
         let mut instance_oracles: Vec<InstanceProverOracle<F>> = vec![];
-        let mut fixed_oracles: Vec<FixedProverOracle<F>> = vec![];
+        let mut fixed_oracles = &mut [] as &mut [&mut FixedProverOracle<F>];
 
         let mut table_oracles = vec![t1, t2, t3];
 

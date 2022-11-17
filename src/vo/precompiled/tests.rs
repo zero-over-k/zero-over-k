@@ -27,7 +27,7 @@ use crate::vo::generic_vo::GenericVO;
 use crate::PIL;
 use blake2::Blake2s;
 
-use crate::commitment::KZG10;
+use crate::commitment::{HomomorphicCommitment, KZG10};
 use crate::vo::VirtualOracle;
 
 type F = Fr;
@@ -80,7 +80,7 @@ pub(crate) fn run_prover(
 
     let mut witness_oracles: &mut [&mut WitnessProverOracle<F>] = &mut witness_oracles_refs;
 
-    let mut fixed_oracles: Vec<_> = fixed
+    let mut fixed_oracles_raw: Vec<FixedProverOracle<F>> = fixed
         .into_iter()
         .map(|(label, evals)| {
             let poly =
@@ -88,6 +88,14 @@ pub(crate) fn run_prover(
             FixedProverOracle::new(label, poly, &evals)
         })
         .collect();
+
+    let mut fixed_oracles_v: Vec<&mut FixedProverOracle<F>> = fixed_oracles_raw
+        .iter_mut()
+        .collect();
+
+    let mut fixed_oracles: &mut [&mut FixedProverOracle<F>] = fixed_oracles_v.iter_mut().into_slice();
+
+    //let mut fixed_oracles: &mut [&mut FixedProverOracle<F>] = fixed.
 
     let mut instance_oracles: Vec<_> = instance
         .into_iter()
@@ -131,8 +139,8 @@ pub(crate) fn run_prover(
     let q_blind =
         FixedProverOracle::new("q_blind", DensePolynomial::zero(), &[]);
 
-    let preprocessed = ProverPreprocessedInput::new(
-        &fixed_oracles,
+    let mut preprocessed = ProverPreprocessedInput::new(
+        &mut fixed_oracles,
         &vec![],
         &vec![],
         &q_blind,
@@ -143,7 +151,7 @@ pub(crate) fn run_prover(
 
     let proof = PilInstance::prove(
         &pk,
-        &preprocessed,
+        &mut preprocessed,
         &mut witness_oracles,
         &mut instance_oracles,
         &vos,
@@ -207,10 +215,16 @@ pub(crate) fn run_verifier(
 
     let (fixed_comm, _) = PC::commit(&ck, labeled_fixed.iter(), None).unwrap();
 
-    let mut fixed_oracles: Vec<_> = fixed_comm
+    let mut fixed_oracles_raw: Vec<FixedVerifierOracle<F, PC>> = fixed_comm
         .into_iter()
         .map(|comm| FixedVerifierOracle::from_commitment(comm))
         .collect();
+
+    let mut fixed_oracles_v: Vec<&mut FixedVerifierOracle<F, PC>> = fixed_oracles_raw
+        .iter_mut()
+        .collect();
+    
+    let mut fixed_oracles: &mut [&mut FixedVerifierOracle<F, PC>] = fixed_oracles_v.iter_mut().into_slice();
 
     // 2. Configure VO
     vo.configure(
@@ -220,7 +234,6 @@ pub(crate) fn run_verifier(
     );
 
     // 3. Generate verifier's preprocessed
-
     let vos: Vec<&dyn VirtualOracle<F>> = vec![&vo];
 
     let mut vk = Indexer::index(
@@ -229,7 +242,7 @@ pub(crate) fn run_verifier(
         vec![],
         &witness_ver_oracles,
         &instance_oracles,
-        &fixed_oracles,
+        &mut fixed_oracles,
         domain,
         &domain.vanishing_polynomial().into(),
         PermutationInfo::empty(),
@@ -237,17 +250,19 @@ pub(crate) fn run_verifier(
     )
     .unwrap();
 
-    let mut verifier_pp = VerifierPreprocessedInput::new_wo_blind(
-        fixed_oracles.clone(),
-        vec![], // empty table oracles
-        vec![], // empty lookup oracles
-    );
+    let q_blind = FixedVerifierOracle::new("q_blind".to_string(), Some(PC::zero_comm()));
+    let mut preprocessed = VerifierPreprocessedInput {
+        fixed_oracles,
+        table_oracles: vec![],
+        permutation_oracles: vec![],
+        q_blind,
+    };
 
     // 4. Verify proof
 
     let res = PilInstance::verify(
         &mut vk,
-        &mut verifier_pp,
+        &mut preprocessed,
         proof,
         &mut witness_ver_oracles,
         &mut instance_oracles,

@@ -202,7 +202,7 @@ mod tests {
         let (fixed_comm, _) = PC::commit(&ck, [x.clone()].iter(), None).unwrap();
 
         // Gate 1
-        let mut gate_1_fixed_oracles_raw = fixed_comm.clone()
+        let mut gate_1_fixed_oracles_raw = fixed_comm
             .into_iter()
             .map(|comm| FixedVerifierOracle::from_commitment(comm.clone()))
             .collect::<Vec<FixedVerifierOracle<F, PC>>>();

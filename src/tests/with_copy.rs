@@ -875,6 +875,7 @@ mod copy_constraint_tests {
         let mut qr_evals = vec![zero, zero, -one, zero, one, -one, one, zero];
 
         let mut qo_evals = vec![-one, -one, zero, -one, -one, zero, -one, -one];
+        let qc_evals = vec![F::zero(); domain_size];
 
         assert_eq!(x_cube + two_x + twelve, zero);
 
@@ -1040,9 +1041,10 @@ mod copy_constraint_tests {
             DensePolynomial::from_coefficients_slice(&domain.ifft(&ql_evals));
         let qr_poly =
             DensePolynomial::from_coefficients_slice(&domain.ifft(&qr_evals));
-
         let qo_poly =
             DensePolynomial::from_coefficients_slice(&domain.ifft(&qo_evals));
+        let qc_poly =
+            DensePolynomial::from_coefficients_slice(&domain.ifft(&qc_evals));
 
         let sigma_1_poly = DensePolynomial::from_coefficients_slice(
             &domain.ifft(&sigma_1_evals),
@@ -1092,45 +1094,11 @@ mod copy_constraint_tests {
         };
 
         // Fixed oracles
-        let qm = FixedProverOracle {
-            label: "qm".to_string(),
-            poly: qm_poly.clone(),
-            evals: qm_evals.clone(),
-            evals_at_coset_of_extended_domain: None,
-            queried_rotations: BTreeSet::default(),
-        };
-
-        let ql = FixedProverOracle {
-            label: "ql".to_string(),
-            poly: ql_poly.clone(),
-            evals: ql_evals.clone(),
-            evals_at_coset_of_extended_domain: None,
-            queried_rotations: BTreeSet::default(),
-        };
-
-        let qr = FixedProverOracle {
-            label: "qr".to_string(),
-            poly: qr_poly.clone(),
-            evals: qr_evals.clone(),
-            evals_at_coset_of_extended_domain: None,
-            queried_rotations: BTreeSet::default(),
-        };
-
-        let qo = FixedProverOracle {
-            label: "qo".to_string(),
-            poly: qo_poly.clone(),
-            evals: qo_evals.clone(),
-            evals_at_coset_of_extended_domain: None,
-            queried_rotations: BTreeSet::default(),
-        };
-
-        let qc = FixedProverOracle {
-            label: "qc".to_string(),
-            poly: DensePolynomial::default(),
-            evals: vec![F::zero(); domain_size],
-            evals_at_coset_of_extended_domain: None,
-            queried_rotations: BTreeSet::default(),
-        };
+        let mut qm = FixedProverOracle::<F>::new("qm", qm_poly.clone(), &qm_evals);
+        let mut ql = FixedProverOracle::<F>::new("ql", ql_poly.clone(), &ql_evals);
+        let mut qr = FixedProverOracle::<F>::new("qr", qr_poly.clone(), &qr_evals);
+        let mut qo = FixedProverOracle::<F>::new("qo", qo_poly.clone(), &qo_evals);
+        let mut qc = FixedProverOracle::<F>::new("qc", qc_poly.clone(), &qc_evals);
 
         // Permutation polynomials
         let sigma1 = FixedProverOracle {
@@ -1176,7 +1144,13 @@ mod copy_constraint_tests {
 
         let mut witness_oracles: &mut [&mut WitnessProverOracle<F>] = &mut [&mut a, &mut b, &mut c];
         let mut instance_oracles = [pi];
-        let mut fixed_oracles = [qm, ql, qr, qo, qc];
+        let mut fixed_oracles: &mut [&mut FixedProverOracle<F>] = &mut [
+            &mut qm,
+            &mut ql,
+            &mut qr,
+            &mut qo,
+            &mut qc,
+        ];
 
         let permutation_oracles = [sigma1, sigma2, sigma3];
 
@@ -1209,11 +1183,11 @@ mod copy_constraint_tests {
             u,
         )
         .unwrap();
-
+        
         let pk = ProverKey::from_ck_and_vk(&ck, &vk);
 
-        let preprocessed = ProverPreprocessedInput::new(
-            &fixed_oracles.to_vec(),
+        let mut preprocessed = ProverPreprocessedInput::new(
+            fixed_oracles,
             &permutation_oracles.to_vec(),
             &vec![],
             &q_blind,
@@ -1222,7 +1196,7 @@ mod copy_constraint_tests {
 
         let proof = PilInstance::prove(
             &pk,
-            &preprocessed,
+            &mut preprocessed,
             &mut witness_oracles,
             &mut instance_oracles,
             &vos,
@@ -1292,7 +1266,7 @@ mod copy_constraint_tests {
         let (selector_commitments, _) =
             PC::commit(&ck, labeled_selectors.iter(), None).unwrap();
 
-        let mut selector_oracles: Vec<_> = selector_commitments
+        let mut selector_oracles_raw: Vec<_> = selector_commitments
             .iter()
             .map(|cmt| FixedVerifierOracle::<F, PC> {
                 label: cmt.label().clone(),
@@ -1301,6 +1275,11 @@ mod copy_constraint_tests {
                 commitment: Some(cmt.commitment().clone()),
             })
             .collect();
+
+        let mut selector_oracles_v: Vec<&mut FixedVerifierOracle<F, PC>> = selector_oracles_raw
+            .iter_mut()
+            .collect();
+        let mut selector_oracles: &mut [&mut FixedVerifierOracle<F, PC>] = selector_oracles_v.iter_mut().into_slice();
 
         let labeled_sigmas: Vec<LabeledPolynomial<F, DensePolynomial<F>>> = [
             (sigma_1_poly.clone(), "sigma_1"),
@@ -1363,8 +1342,8 @@ mod copy_constraint_tests {
         )
         .unwrap();
 
-        let verifier_pp = VerifierPreprocessedInput {
-            fixed_oracles: selector_oracles.clone(),
+        let mut verifier_pp = VerifierPreprocessedInput {
+            fixed_oracles: selector_oracles,
             table_oracles: vec![],
             permutation_oracles: sigma_oracles.clone(),
             q_blind: q_blind,
@@ -1373,11 +1352,11 @@ mod copy_constraint_tests {
         // We clone because fixed oracles must be mutable in order to add evals at challenge
         // Another option is to create reset method which will just reset challenge to eval mapping
         // This is anyway just mockup of frontend
-        let mut pp_clone = verifier_pp.clone();
+        //let mut pp_clone = verifier_pp.clone();
 
         let res = PilInstance::verify(
             &mut vk,
-            &mut pp_clone,
+            &mut verifier_pp,
             proof,
             &mut witness_ver_oracles,
             &mut instance_oracles,
