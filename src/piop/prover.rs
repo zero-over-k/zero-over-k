@@ -3,10 +3,10 @@ use std::{
     iter::successors,
 };
 
-use ark_ff::{PrimeField, Zero};
+use ark_ff::PrimeField;
 use ark_poly::{
     univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
-    Polynomial, UVPolynomial,
+    UVPolynomial,
 };
 use ark_std::rand::Rng;
 
@@ -63,7 +63,6 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
     const fn ident(x: F) -> Result<F, PiopError> {
         Ok(x)
     }
-    // }
     fn neg(x: Result<F, PiopError>) -> Result<F, PiopError> {
         x.and_then(|x_val| Ok(-x_val))
     }
@@ -338,7 +337,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
                             {
                                 Some(index) => state.witness_oracles[*index]
                                     .query_in_coset(i, query.rotation),
-                                None => Err(PiopError::MissingWtnsOracle(
+                                None => Err(PiopError::MissingWitnessOracle(
                                     query.label.clone(),
                                 )),
                             }

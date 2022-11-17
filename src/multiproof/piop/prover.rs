@@ -17,8 +17,6 @@ use crate::oracles::traits::Instantiable;
 
 use crate::piop::error::Error as PiopError;
 
-// &'a Vec<Box<dyn VirtualOracle<F>>>
-
 pub struct ProverState<'a, F: PrimeField, PC: HomomorphicCommitment<F>> {
     num_of_oracles: usize,
     opening_sets: BTreeMap<
@@ -108,10 +106,10 @@ impl<F: PrimeField> PIOP<F> {
                             x1_powers[i] * oracle.query(&evaluation_point)?;
                     }
 
-                    let prev =
-                        q_i_evals_set.insert(evaluation_point, evaluation);
-                    if prev.is_some() {
-                        panic!("Same evaluation point for different rotations")
+                    if let Some(_) =
+                        q_i_evals_set.insert(evaluation_point, evaluation)
+                    {
+                        return Err(PiopError::RepeatedRotation(*rotation));
                     }
                 }
 
@@ -119,7 +117,6 @@ impl<F: PrimeField> PIOP<F> {
             },
         );
 
-        // TODO uncomment
         state.q_polys = Some(
             qs.clone()
                 .map(|qs_i| -> Result<_, _> {

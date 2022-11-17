@@ -64,7 +64,7 @@ impl<F: PrimeField> GenericLookupVO<F> {
         for query in &self.virtual_table_queries {
             match query.oracle_type {
                 OracleType::Witness => {
-                    return Err(PiopError::WtnsTableNotAllowed(
+                    return Err(PiopError::WitnessTableNotAllowed(
                         format!("VirtualQuery index: {}", query.index)
                             .to_string(),
                     ))

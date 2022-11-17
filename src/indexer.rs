@@ -63,7 +63,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
                             match witness_oracles_mapping.get(&query.label) {
                                 Some(index) => Ok(witness_oracles[*index]
                                     .get_degree(domain_size)),
-                                None => Err(PiopError::MissingWtnsOracle(
+                                None => Err(PiopError::MissingWitnessOracle(
                                     query.label.clone(),
                                 )),
                             }

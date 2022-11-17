@@ -95,7 +95,7 @@ impl<F: PrimeField> Instantiable<F> for WitnessProverOracle<F> {
     fn get_extended_coset_evals(&self) -> Result<&Vec<F>, Error> {
         match &self.evals_at_coset_of_extended_domain {
             Some(evals) => Ok(evals),
-            None => Err(Error::MissingCosetWtnsEval(self.label.clone())),
+            None => Err(Error::MissingCosetWitnessEval(self.label.clone())),
         }
     }
 
@@ -188,7 +188,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> CommittedOracle<F, PC>
     fn get_commitment(&self) -> Result<&<PC>::Commitment, Error> {
         match &self.commitment {
             Some(c) => Ok(c),
-            None => Err(Error::MissingWtnsCommitment(self.label.clone())),
+            None => Err(Error::MissingWitnessCommitment(self.label.clone())),
         }
     }
 }

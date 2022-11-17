@@ -1,13 +1,13 @@
-use crate::piop::error::Error as PiopError;
+use crate::{oracles::rotation::Rotation, piop::error::Error as PiopError};
 #[derive(Debug)]
 pub enum Error<E> {
     /// There was an error in the underlying polynomial commitment.
     PolynomialCommitmentError(E),
 
-    /// There was an error in piop
+    /// There was an error in PIOP.
     PIOPError(PiopError),
 
-    /// Pairing was evaluated as false
+    /// Pairing check does not hold.
     OpeningCheckFailed,
 }
 

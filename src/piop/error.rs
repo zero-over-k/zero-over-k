@@ -1,7 +1,9 @@
+use crate::oracles::rotation::Rotation;
+
 #[derive(Debug, PartialEq)]
 pub enum Error {
     /// Missing commiment.
-    MissingWtnsCommitment(String),
+    MissingWitnessCommitment(String),
     /// Missing fixed commiment.
     MissingFixedCommitment(String),
     /// Missing instance commiment.
@@ -9,14 +11,14 @@ pub enum Error {
     /// Missing evaluation at concrete oracle.
     MissingConcreteEval(String),
     /// Missing extended coset evaluations for witness oracle.
-    MissingCosetWtnsEval(String),
+    MissingCosetWitnessEval(String),
     /// Missing extended coset evaluations for fixed oracle.
     MissingCosetFixedEval(String),
     /// Missing extended coset evaluations for instance oracle.
     MissingCosetInstanceEval(String),
     MissingExtendedEvals,
     /// Missing witness oracle with givien label.
-    MissingWtnsOracle(String),
+    MissingWitnessOracle(String),
     /// Missing fixed oracle with givien label.
     MissingFixedOracle(String),
     /// Missing instance oracle with givien label.
@@ -24,13 +26,19 @@ pub enum Error {
     /// Missing permutation argument oracle.
     MissingPermutationOracle(String),
     /// Missing LookUp table oracle.
-    MissingLUTableOracle(String),
+    MissingLookupTableOracle(String),
     /// Query index exceeds witness oracle size.
-    WtnsQueryIndexOutOfBounds(usize),
+    WitnessQueryIndexOutOfBounds(usize),
     /// Query index exceeds instance oracle size.
     InstanceQueryIndexOutOfBounds(usize),
+    /// Non-constant tables not supported.
+    //This feaure may get introduced in the future
     //see: https:github.com/zcash/halo2/issues/534
-    WtnsTableNotAllowed(String),
+    WitnessTableNotAllowed(String),
+    /// Non-constant tables not supported.
+    //This feaure may get introduced in the future
     //see: https:github.com/zcash/halo2/issues/534
     InstanceTableNotAllowed(String),
+    /// Rotations of challenge result in the same point.
+    RepeatedRotation(Rotation),
 }

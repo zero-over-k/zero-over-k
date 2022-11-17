@@ -32,13 +32,9 @@ use super::{
 pub mod prover;
 pub mod verifier;
 
-// use super::error::Error;
-
 pub struct PIOP<F: PrimeField> {
     _f: PhantomData<F>,
 }
-// #[derive(Debug)]
-// pub enum PIOPError {}
 
 pub struct Multiopen<
     F: PrimeField,
@@ -234,7 +230,6 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng>
                     r_poly += &(l_i * r_i)
                 }
 
-                // TODO: Remove unwrap
                 Ok((q_eval - r_poly.evaluate(&verifier_second_msg.x3))
                     * z_h.evaluate(&verifier_second_msg.x3).inverse().unwrap())
             })

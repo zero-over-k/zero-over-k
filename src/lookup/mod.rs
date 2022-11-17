@@ -126,9 +126,11 @@ impl<F: PrimeField> LookupArgument<F> {
                                             i,
                                             query.rotation,
                                         )),
-                                    None => Err(PiopError::MissingWtnsOracle(
-                                        query.label.clone(),
-                                    )),
+                                    None => {
+                                        Err(PiopError::MissingWitnessOracle(
+                                            query.label.clone(),
+                                        ))
+                                    }
                                 }
                             }
                             OracleType::Instance => {
@@ -187,9 +189,11 @@ impl<F: PrimeField> LookupArgument<F> {
                                 {
                                     Some(index) => witness_oracles[*index]
                                         .query_in_coset(i, query.rotation),
-                                    None => Err(PiopError::MissingWtnsOracle(
-                                        query.label.clone(),
-                                    )),
+                                    None => {
+                                        Err(PiopError::MissingWitnessOracle(
+                                            query.label.clone(),
+                                        ))
+                                    }
                                 }
                             }
                             OracleType::Instance => {
@@ -262,7 +266,7 @@ impl<F: PrimeField> LookupArgument<F> {
                 |table_query| -> Result<_, PiopError> {
                     match table_query.oracle_type {
                         OracleType::Witness => {
-                            Err(PiopError::WtnsTableNotAllowed(
+                            Err(PiopError::WitnessTableNotAllowed(
                                 table_query.label.clone(),
                             ))
                         }
@@ -302,7 +306,7 @@ impl<F: PrimeField> LookupArgument<F> {
                 |table_query| -> Result<_, PiopError> {
                     match table_query.oracle_type {
                         OracleType::Witness => {
-                            Err(PiopError::WtnsTableNotAllowed(
+                            Err(PiopError::WitnessTableNotAllowed(
                                 table_query.label.clone(),
                             ))
                         }
@@ -445,7 +449,7 @@ impl<F: PrimeField> LookupArgument<F> {
                         match witness_oracles_mapping.get(&query.label) {
                             Some(index) => witness_oracles[*index]
                                 .query(&evaluation_challenge),
-                            None => Err(PiopError::MissingWtnsOracle(
+                            None => Err(PiopError::MissingWitnessOracle(
                                 query.label.clone(),
                             )),
                         }
@@ -495,7 +499,7 @@ impl<F: PrimeField> LookupArgument<F> {
                 .map(|table_query| -> Result<F, PiopError> {
                     match table_query.oracle_type {
                         OracleType::Witness => {
-                            Err(PiopError::WtnsTableNotAllowed(
+                            Err(PiopError::WitnessTableNotAllowed(
                                 table_query.label.clone(),
                             ))
                         }

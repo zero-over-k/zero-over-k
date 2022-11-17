@@ -13,6 +13,7 @@ use ark_ff::PrimeField;
 /// q_3 * w_3^5 +
 /// q_4 * w_4^5 -
 /// w_5 = 0
+
 pub struct PrecompiledRescue {}
 
 impl<F> PrecompiledVO<F> for PrecompiledRescue

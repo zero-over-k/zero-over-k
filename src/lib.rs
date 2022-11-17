@@ -704,7 +704,7 @@ where
                 Some(index) => witness_oracles[*index]
                     .register_eval_at_challenge(*point, evaluation),
                 None => {
-                    return Err(PiopError::MissingWtnsOracle(
+                    return Err(PiopError::MissingWitnessOracle(
                         poly_label.clone(),
                     )
                     .into())
@@ -754,7 +754,7 @@ where
                 Some(index) => preprocessed.table_oracles[*index]
                     .register_eval_at_challenge(*point, evaluation),
                 None => {
-                    return Err(PiopError::MissingLUTableOracle(
+                    return Err(PiopError::MissingLookupTableOracle(
                         poly_label.clone(),
                     )
                     .into())
@@ -1042,14 +1042,13 @@ where
                         verifier_second_msg.xi,
                         &omegas,
                     );
-                    //TODO Add Error handling
                     match query.oracle_type {
                         OracleType::Witness => {
                             match witness_oracles_mapping.get(&query.label) {
                                 Some(index) => {
                                     witness_oracles[*index].query(&challenge)
                                 }
-                                None => Err(PiopError::MissingWtnsOracle(
+                                None => Err(PiopError::MissingWitnessOracle(
                                     query.label.clone(),
                                 )),
                             }
