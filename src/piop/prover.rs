@@ -152,7 +152,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
     pub fn prover_lookup_round<R: Rng>(
         lookup_aggregation_msg: &VerifierLookupAggregationRound<F>,
         state: &mut ProverState<F>,
-        preprocessed: &ProverPreprocessedInput<F, PC>,
+        preprocessed: &mut ProverPreprocessedInput<F, PC>,
         index: &Index<F>,
         zk_rng: &mut R,
     ) -> Vec<(
@@ -173,7 +173,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
                     &state.table_oracles_mapping,
                     &state.witness_oracles,
                     &state.instance_oracles,
-                    &preprocessed.fixed_oracles,
+                    preprocessed.fixed_oracles,
                     &preprocessed.table_oracles,
                     index.usable_rows,
                     lookup_index,

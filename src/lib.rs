@@ -85,7 +85,7 @@ where
 
     pub fn prove<'a, R: Rng>(
         pk: &ProverKey<F, PC>,
-        preprocessed: &ProverPreprocessedInput<F, PC>,
+        preprocessed: &mut ProverPreprocessedInput<F, PC>,
         witness_oracles: &mut [&mut WitnessProverOracle<F>],
         instance_oracles: &'a mut [InstanceProverOracle<F>],
         vos: &[&'a dyn VirtualOracle<F>], // TODO: this should be in index
@@ -337,7 +337,6 @@ where
         }
 
         let fixed_query_set = PIOPforPolyIdentity::<F, PC>::get_query_set(
-            //&preprocessed.fixed_oracles,
             preprocessed_fixed_oracles.as_slice(),
             verifier_second_msg.label,
             verifier_second_msg.xi,
@@ -892,7 +891,7 @@ where
                     &table_oracles_mapping,
                     &witness_oracles,
                     instance_oracles,
-                    &preprocessed.fixed_oracles,
+                    preprocessed.fixed_oracles,
                     &preprocessed.table_oracles,
                     lookup_index,
                     lookup_vo.get_expressions(),
@@ -1223,13 +1222,22 @@ where
             )
             .collect();
         let preprocessed_oracles: Vec<&dyn CommittedOracle<F, PC>> =
-            preprocessed
-                .fixed_oracles
+            preprocessed.fixed_oracles
                 .iter()
-                .chain(preprocessed.table_oracles.iter())
-                .chain(preprocessed.permutation_oracles.iter())
-                .chain(iter::once(&preprocessed.q_blind))
+                .map(|o| o as &FixedVerifierOracle<F, PC>)
                 .map(|o| o as &dyn CommittedOracle<F, PC>)
+                .chain(
+                    preprocessed.table_oracles.iter()
+                        .map(|o| o as &dyn CommittedOracle<F, PC>)
+                )
+                .chain(
+                    preprocessed.permutation_oracles.iter()
+                        .map(|o| o as &dyn CommittedOracle<F, PC>)
+                )
+                .chain(
+                    iter::once(&preprocessed.q_blind)
+                        .map(|o| o as &dyn CommittedOracle<F, PC>)
+                )
                 .collect();
 
         oracles.extend_from_slice(&preprocessed_oracles.as_slice());

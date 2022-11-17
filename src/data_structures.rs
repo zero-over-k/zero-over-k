@@ -60,26 +60,26 @@ pub struct Index<'a, F: PrimeField> {
     pub usable_rows: usize,
 }
 
-pub struct ProverPreprocessedInput<F: PrimeField, PC: HomomorphicCommitment<F>>
+pub struct ProverPreprocessedInput<'a, F: PrimeField, PC: HomomorphicCommitment<F>>
 {
-    pub fixed_oracles: Vec<FixedProverOracle<F>>,
+    pub fixed_oracles: &'a mut [&'a mut FixedProverOracle<F>],
     pub permutation_oracles: Vec<FixedProverOracle<F>>,
     pub table_oracles: Vec<FixedProverOracle<F>>,
     pub q_blind: FixedProverOracle<F>,
     pub empty_rands_for_fixed: Vec<PC::Randomness>,
 }
 
-impl<F: PrimeField, PC: HomomorphicCommitment<F>>
-    ProverPreprocessedInput<F, PC>
+impl<'a, F: PrimeField, PC: HomomorphicCommitment<F>>
+    ProverPreprocessedInput<'a, F, PC>
 {
     pub fn new(
-        fixed_oracles: &Vec<FixedProverOracle<F>>,
+        fixed_oracles: &'a mut [&'a mut FixedProverOracle<F>],
         permutation_oracles: &Vec<FixedProverOracle<F>>,
         table_oracles: &Vec<FixedProverOracle<F>>,
         q_blind: &FixedProverOracle<F>,
         index_info: &Index<F>,
     ) -> Self {
-        let mut fixed_oracles = fixed_oracles.clone();
+        //let mut fixed_oracles = fixed_oracles.clone();
         let mut permutation_oracles = permutation_oracles.clone();
         let mut table_oracles = table_oracles.clone();
 
@@ -115,21 +115,22 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>>
 }
 
 pub struct VerifierPreprocessedInput<
+    'a,
     F: PrimeField,
     PC: HomomorphicCommitment<F>,
 > {
-    pub fixed_oracles: Vec<FixedVerifierOracle<F, PC>>,
+    pub fixed_oracles: &'a mut [&'a mut FixedVerifierOracle<F, PC>],
     pub table_oracles: Vec<FixedVerifierOracle<F, PC>>,
     pub permutation_oracles: Vec<FixedVerifierOracle<F, PC>>,
     pub q_blind: FixedVerifierOracle<F, PC>,
 }
 
-impl<F: PrimeField, PC: HomomorphicCommitment<F>>
-    VerifierPreprocessedInput<F, PC>
+impl<'a, F: PrimeField, PC: HomomorphicCommitment<F>>
+    VerifierPreprocessedInput<'a, F, PC>
 {
     /// Creates a new VerifierPreprocessedInput
     pub fn new(
-        fixed_oracles: Vec<FixedVerifierOracle<F, PC>>,
+        fixed_oracles: &'a mut [&'a mut FixedVerifierOracle<F, PC>],
         table_oracles: Vec<FixedVerifierOracle<F, PC>>,
         permutation_oracles: Vec<FixedVerifierOracle<F, PC>>,
         q_blind: FixedVerifierOracle<F, PC>,
@@ -144,7 +145,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>>
 
     /// Creates a new VerifierPreprocessedInput without blinders
     pub fn new_wo_blind(
-        fixed_oracles: Vec<FixedVerifierOracle<F, PC>>,
+        fixed_oracles: &'a mut [&'a mut FixedVerifierOracle<F, PC>],
         table_oracles: Vec<FixedVerifierOracle<F, PC>>,
         permutation_oracles: Vec<FixedVerifierOracle<F, PC>>,
     ) -> Self {
@@ -159,18 +160,18 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>>
     }
 }
 
-impl<F: PrimeField, PC: HomomorphicCommitment<F>> Clone
-    for VerifierPreprocessedInput<F, PC>
-{
-    fn clone(&self) -> Self {
-        Self {
-            fixed_oracles: self.fixed_oracles.clone(),
-            table_oracles: self.table_oracles.clone(),
-            permutation_oracles: self.permutation_oracles.clone(),
-            q_blind: self.q_blind.clone(),
-        }
-    }
-}
+//impl<'a, F: PrimeField, PC: HomomorphicCommitment<F>> Clone
+    //for VerifierPreprocessedInput<'a, F, PC>
+//{
+    //fn clone(&self) -> Self {
+        //Self {
+            //fixed_oracles: self.fixed_oracles, // COULD BE DANGEROUS
+            //table_oracles: self.table_oracles.clone(),
+            //permutation_oracles: self.permutation_oracles.clone(),
+            //q_blind: self.q_blind.clone(),
+        //}
+    //}
+//}
 
 pub struct VerifierKey<'a, F: PrimeField, PC: HomomorphicCommitment<F>> {
     pub verifier_key: PC::VerifierKey,
