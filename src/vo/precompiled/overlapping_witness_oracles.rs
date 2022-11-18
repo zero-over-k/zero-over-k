@@ -102,8 +102,8 @@ mod tests {
         let mut b = WitnessProverOracle::new("b", b_poly, &b_evals, false);
         let mut c = WitnessProverOracle::new("c", c_poly, &c_evals, false);
 
-        let pi1 = InstanceProverOracle::new("pi1", pi1_poly.clone(), &pi1_evals);
-        let pi2 = InstanceProverOracle::new("pi2", pi2_poly.clone(), &pi2_evals);
+        let mut pi1 = InstanceProverOracle::new("pi1", pi1_poly.clone(), &pi1_evals);
+        let mut pi2 = InstanceProverOracle::new("pi2", pi2_poly.clone(), &pi2_evals);
 
         let mut gate_1_vo = GenericVO::<F>::init(get_expr_and_queries());
         let mut gate_2_vo = GenericVO::<F>::init(get_expr_and_queries());
@@ -113,7 +113,7 @@ mod tests {
 
         // Note that vo.configure MUTATES each witness oracle
         let mut gate_1_witness_oracles: &mut [&mut WitnessProverOracle<F>] = &mut [&mut a, &mut b];
-        let mut gate_1_instance_oracles = vec![pi1.clone()];
+        let mut gate_1_instance_oracles: &mut [&mut InstanceProverOracle<F>] = &mut [&mut pi1];
 
         gate_1_vo.configure(
             &mut gate_1_witness_oracles,
@@ -122,7 +122,7 @@ mod tests {
         );
 
         let mut gate_2_witness_oracles: &mut [&mut WitnessProverOracle<F>] = &mut [&mut c, &mut a];
-        let mut gate_2_instance_oracles = vec![pi2.clone()];
+        let mut gate_2_instance_oracles: &mut [&mut InstanceProverOracle<F>] = &mut [&mut pi2];
 
         gate_2_vo.configure(
             &mut gate_2_witness_oracles,
@@ -134,9 +134,7 @@ mod tests {
         // Can't be [&mut a, &mut b, &mut c, &mut a] because Rust won't allow &mut a twice
         let mut witness_oracles: &mut [&mut WitnessProverOracle<F>] = &mut [&mut a, &mut b, &mut c];
 
-        let mut instance_oracles = vec![];
-        instance_oracles.extend(gate_1_instance_oracles.clone());
-        instance_oracles.extend(gate_2_instance_oracles.clone());
+        let mut instance_oracles: &mut [&mut InstanceProverOracle<F>] = &mut [&mut pi1, &mut pi2];
 
         let vos: Vec<&dyn VirtualOracle<F>> = vec![&gate_1_vo, &gate_2_vo];
 
@@ -183,11 +181,11 @@ mod tests {
         let mut w2 = WitnessVerifierOracle::new("b", false);
         let mut w3 = WitnessVerifierOracle::new("c", false);
 
-        let pi1 = InstanceVerifierOracle::new("pi1", pi1_poly.clone(), &pi1_evals);
-        let pi2 = InstanceVerifierOracle::new("pi2", pi2_poly.clone(), &pi2_evals);
+        let mut pi1 = InstanceVerifierOracle::new("pi1", pi1_poly.clone(), &pi1_evals);
+        let mut pi2 = InstanceVerifierOracle::new("pi2", pi2_poly.clone(), &pi2_evals);
 
         let mut gate_1_witness_oracles: &mut [&mut WitnessVerifierOracle<F, PC>] = &mut [&mut w1, &mut w2];
-        let mut gate_1_instance_oracles = vec![pi1];
+        let mut gate_1_instance_oracles: &mut [&mut InstanceVerifierOracle<F>] = &mut [&mut pi1];
 
         let mut gate_1_vo = GenericVO::<F>::init(get_expr_and_queries());
         let mut gate_2_vo = GenericVO::<F>::init(get_expr_and_queries());
@@ -199,7 +197,7 @@ mod tests {
         );
 
         let mut gate_2_witness_oracles: &mut [&mut WitnessVerifierOracle<F, PC>] = &mut [&mut w3, &mut w1];
-        let mut gate_2_instance_oracles = vec![pi2];
+        let mut gate_2_instance_oracles: &mut [&mut InstanceVerifierOracle<F>] = &mut [&mut pi2];
 
         gate_2_vo.configure(
             &mut gate_2_witness_oracles,
@@ -209,9 +207,7 @@ mod tests {
 
         let mut witness_oracles: &mut [&mut WitnessVerifierOracle<F, PC>] = &mut [&mut w1, &mut w2, &mut w3];
 
-        let mut instance_oracles = vec![];
-        instance_oracles.extend(gate_1_instance_oracles);
-        instance_oracles.extend(gate_2_instance_oracles);
+        let mut instance_oracles: &mut [&mut InstanceVerifierOracle<F>] = &mut [&mut pi1, &mut pi2];
 
         let vos: Vec<&dyn VirtualOracle<F>> = vec![&gate_1_vo, &gate_2_vo];
 

@@ -95,9 +95,7 @@ pub(crate) fn run_prover(
 
     let mut fixed_oracles: &mut [&mut FixedProverOracle<F>] = fixed_oracles_v.iter_mut().into_slice();
 
-    //let mut fixed_oracles: &mut [&mut FixedProverOracle<F>] = fixed.
-
-    let mut instance_oracles: Vec<_> = instance
+    let mut instance_oracles_raw: Vec<_> = instance
         .into_iter()
         .map(|(label, evals)| {
             let poly =
@@ -105,6 +103,10 @@ pub(crate) fn run_prover(
             InstanceProverOracle::new(label, poly, &evals)
         })
         .collect();
+    let mut instance_oracles_v: Vec<&mut InstanceProverOracle<F>> = instance_oracles_raw
+        .iter_mut()
+        .collect();
+    let mut instance_oracles: &mut [&mut InstanceProverOracle<F>] = instance_oracles_v.iter_mut().into_slice();
 
     // 2. Configure VO
     vo.configure(
@@ -195,7 +197,7 @@ pub(crate) fn run_verifier(
 
     let mut witness_ver_oracles: &mut [&mut WitnessVerifierOracle<F, PC>] = &mut witness_oracles_refs;
 
-    let mut instance_oracles: Vec<InstanceVerifierOracle<F>> = instance
+    let mut instance_oracles_raw: Vec<InstanceVerifierOracle<F>> = instance
         .into_iter()
         .map(|(label, evals)| {
             let poly =
@@ -203,6 +205,12 @@ pub(crate) fn run_verifier(
             InstanceVerifierOracle::new(label, poly, &evals)
         })
         .collect();
+
+    let mut instance_oracles_v: Vec<&mut InstanceVerifierOracle<F>> = instance_oracles_raw
+        .iter_mut()
+        .collect();
+    
+    let mut instance_oracles: &mut [&mut InstanceVerifierOracle<F>] = instance_oracles_v.iter_mut().into_slice();
 
     let labeled_fixed: Vec<LabeledPolynomial<F, DensePolynomial<F>>> = fixed
         .into_iter()

@@ -61,8 +61,7 @@ mod test {
 
     use super::PrecompiledSimple3ArithLookup;
 
-    use crate::commitment::KZG10;
-    use ark_bls12_381::{Bls12_381, Fr as F};
+    use ark_bls12_381::Fr as F;
 
     #[test]
     fn test_simple_lookup_configuration() {
@@ -122,7 +121,7 @@ mod test {
         );
 
         let mut witness_oracles: &mut [&mut WitnessProverOracle<F>] = &mut [&mut a, &mut b, &mut c];
-        let mut instance_oracles: Vec<InstanceProverOracle<F>> = vec![];
+        let mut instance_oracles: &mut [&mut InstanceProverOracle<F>] = &mut [];
         let mut fixed_oracles = &mut [] as &mut [&mut FixedProverOracle<F>];
 
         let mut table_oracles = vec![t1, t2, t3];

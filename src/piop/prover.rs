@@ -42,7 +42,7 @@ pub struct ProverState<'a, F: PrimeField> {
     pub(crate) fixed_oracles_mapping: BTreeMap<String, usize>,
     pub(crate) table_oracles_mapping: BTreeMap<String, usize>,
     pub(crate) witness_oracles: Vec<&'a WitnessProverOracle<F>>,
-    pub(crate) instance_oracles: &'a [InstanceProverOracle<F>],
+    pub(crate) instance_oracles: Vec<&'a InstanceProverOracle<F>>,
     pub(crate) z_polys: Option<Vec<WitnessProverOracle<F>>>,
     pub(crate) lookup_polys: Option<
         Vec<(
@@ -63,7 +63,7 @@ pub struct ProverState<'a, F: PrimeField> {
 impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
     pub fn init_prover<'a>(
         witness_oracles: &'a mut [&mut WitnessProverOracle<F>],
-        instance_oracles: &'a [InstanceProverOracle<F>],
+        instance_oracles: &'a [&mut InstanceProverOracle<F>],
         vos: &'a [&'a dyn VirtualOracle<F>],
         domain_size: usize,
         vanishing_polynomial: &DensePolynomial<F>,
@@ -95,12 +95,12 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
             .collect();
 
         let mut oracles_to_copy: Vec<&WitnessProverOracle<F>> = Vec::with_capacity(witness_oracles.len());
-        let mut w: Vec<&WitnessProverOracle<F>> = Vec::with_capacity(witness_oracles.len());
+        let mut witness_oracles_vec: Vec<&WitnessProverOracle<F>> = Vec::with_capacity(witness_oracles.len());
         for o in witness_oracles.iter() {
             if o.should_permute {
                 oracles_to_copy.push(o);
             }
-            w.push(o as &WitnessProverOracle<F>);
+            witness_oracles_vec.push(o as &WitnessProverOracle<F>);
         }
 
         ProverState {
@@ -108,8 +108,11 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
             instance_oracles_mapping,
             fixed_oracles_mapping,
             table_oracles_mapping,
-            witness_oracles: w,
-            instance_oracles,
+            witness_oracles: witness_oracles_vec,
+            instance_oracles: instance_oracles
+                .iter()
+                .map(|x| x as &InstanceProverOracle<F>)
+                .collect::<Vec<&InstanceProverOracle<F>>>(),
             z_polys: None,
             lookup_polys: None,
             lookup_z_polys: None,

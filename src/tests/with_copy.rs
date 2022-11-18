@@ -1085,7 +1085,7 @@ mod copy_constraint_tests {
         };
 
         // Instance oracles
-        let pi = InstanceProverOracle {
+        let mut pi = InstanceProverOracle {
             label: "pi".to_string(),
             poly: pi_poly.clone(),
             evals: pi_evals.clone(),
@@ -1143,7 +1143,7 @@ mod copy_constraint_tests {
         };
 
         let mut witness_oracles: &mut [&mut WitnessProverOracle<F>] = &mut [&mut a, &mut b, &mut c];
-        let mut instance_oracles = [pi];
+        let mut instance_oracles: &mut [&mut InstanceProverOracle<F>] = &mut [&mut pi];
         let mut fixed_oracles: &mut [&mut FixedProverOracle<F>] = &mut [
             &mut qm,
             &mut ql,
@@ -1235,14 +1235,14 @@ mod copy_constraint_tests {
             &mut c_ver,
         ];
 
-        let pi = InstanceVerifierOracle {
+        let mut pi = InstanceVerifierOracle {
             label: "pi".to_string(),
             poly: pi_poly.clone(),
             evals: pi_evals.clone(),
             queried_rotations: BTreeSet::new(),
         };
 
-        let mut instance_oracles = [pi];
+        let mut instance_oracles: &mut [&mut InstanceVerifierOracle<F>] = &mut [&mut pi];
 
         let labeled_selectors: Vec<LabeledPolynomial<F, DensePolynomial<F>>> =
             [

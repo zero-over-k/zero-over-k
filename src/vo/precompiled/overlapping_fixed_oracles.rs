@@ -1,6 +1,6 @@
 /*
  * Two gates to create the following equation:
- * (x + a * b - p1) + (x + c * d - p1) = 0
+ * (x + a * b - p1) + (x + c * d - p2) = 0
  *
  * Gate 1: x + a * b - p1 = 0
  * Gate 2: x + c * d - p2 = 0
@@ -14,6 +14,7 @@
  * d = 10
  * x = 5
  * p1 = 35
+ * p2 = 35
  */
 
 use ark_ff::PrimeField;
@@ -86,22 +87,25 @@ mod tests {
         let x_evals = vec![F::from(5u64); domain_size];
         let x_poly = DensePolynomial::from_coefficients_slice(&domain.ifft(&x_evals));
 
-        let pi_evals = vec![F::from(35u64); domain_size];
-        let pi_poly = DensePolynomial::from_coefficients_slice(&domain.ifft(&pi_evals));
+        let pi1_evals = vec![F::from(35u64); domain_size];
+        let pi1_poly = DensePolynomial::from_coefficients_slice(&domain.ifft(&pi1_evals));
+
+        let pi2_evals = vec![F::from(35u64); domain_size];
+        let pi2_poly = DensePolynomial::from_coefficients_slice(&domain.ifft(&pi2_evals));
 
         for elem in domain.elements() {
             assert_eq!(
                 x_poly.evaluate(&elem) +
                 a_poly.evaluate(&elem) *
                 b_poly.evaluate(&elem)
-                    - pi_poly.evaluate(&elem),
+                    - pi1_poly.evaluate(&elem),
                 F::zero()
             );
             assert_eq!(
                 x_poly.evaluate(&elem) +
                 c_poly.evaluate(&elem) *
                 d_poly.evaluate(&elem)
-                    - pi_poly.evaluate(&elem),
+                    - pi2_poly.evaluate(&elem),
                 F::zero()
             );
         }
@@ -114,13 +118,14 @@ mod tests {
         let mut d = WitnessProverOracle::new("d", d_poly, &d_evals, false);
         let mut x = FixedProverOracle::new("x", x_poly, &x_evals);
 
-        let pi = InstanceProverOracle::new("pi", pi_poly.clone(), &pi_evals);
+        let mut pi1 = InstanceProverOracle::new("pi", pi1_poly.clone(), &pi1_evals);
+        let mut pi2 = InstanceProverOracle::new("pi", pi2_poly.clone(), &pi2_evals);
 
         let mut gate_1_vo = GenericVO::<F>::init(get_expr_and_queries());
         let mut gate_2_vo = GenericVO::<F>::init(get_expr_and_queries());
 
         let mut gate_1_witness_oracles: &mut [&mut WitnessProverOracle<F>] = &mut [&mut a, &mut b];
-        let mut gate_1_instance_oracles = vec![pi.clone()];
+        let mut gate_1_instance_oracles: &mut [&mut InstanceProverOracle<F>] = &mut [&mut pi1];
         let mut gate_1_fixed_oracles: &mut [&mut FixedProverOracle<F>] = &mut [&mut x];
 
         gate_1_vo.configure(
@@ -130,7 +135,7 @@ mod tests {
         );
 
         let mut gate_2_witness_oracles: &mut [&mut WitnessProverOracle<F>] = &mut [&mut c, &mut d];
-        let mut gate_2_instance_oracles = vec![pi.clone()];
+        let mut gate_2_instance_oracles: &mut [&mut InstanceProverOracle<F>] = &mut [&mut pi2];
         let mut gate_2_fixed_oracles: &mut [&mut FixedProverOracle<F>] = &mut [&mut x];
 
         gate_2_vo.configure(
@@ -142,9 +147,7 @@ mod tests {
         // witness_oracles should contain the CONFIGURED witness oracles.
         let mut witness_oracles: &mut [&mut WitnessProverOracle<F>] = &mut [&mut a, &mut b, &mut c, &mut d];
 
-        let mut instance_oracles = vec![];
-        instance_oracles.extend(gate_1_instance_oracles.clone());
-        instance_oracles.extend(gate_2_instance_oracles.clone());
+        let mut instance_oracles: &mut [&mut InstanceProverOracle<F>] = &mut [&mut pi1, &mut pi2];
 
         let fixed_oracles: &[&mut FixedProverOracle<F>] = &[&mut x.clone()];
 
@@ -211,10 +214,11 @@ mod tests {
             .iter_mut()
             .collect();
 
-        let pi = InstanceVerifierOracle::new("pi1", pi_poly.clone(), &pi_evals);
+        let mut pi1 = InstanceVerifierOracle::new("pi1", pi1_poly.clone(), &pi1_evals);
+        let mut pi2 = InstanceVerifierOracle::new("pi2", pi2_poly.clone(), &pi2_evals);
 
         let mut gate_1_witness_oracles: &mut [&mut WitnessVerifierOracle<F, PC>] = &mut [&mut w1, &mut w2];
-        let mut gate_1_instance_oracles = vec![pi.clone()];
+        let mut gate_1_instance_oracles: &mut [&mut InstanceVerifierOracle<F>] = &mut [&mut pi1];
 
         let mut gate_1_vo = GenericVO::<F>::init(get_expr_and_queries());
         let mut gate_2_vo = GenericVO::<F>::init(get_expr_and_queries());
@@ -230,7 +234,7 @@ mod tests {
         let mut gate_2_fixed_oracles = gate_1_fixed_oracles;
 
         let mut gate_2_witness_oracles: &mut [&mut WitnessVerifierOracle<F, PC>] = &mut [&mut w3, &mut w4];
-        let mut gate_2_instance_oracles = vec![pi.clone()];
+        let mut gate_2_instance_oracles: &mut [&mut InstanceVerifierOracle<F>] = &mut [&mut pi2];
 
         gate_2_vo.configure(
             &mut gate_2_witness_oracles,
@@ -240,9 +244,7 @@ mod tests {
 
         let mut witness_oracles: &mut [&mut WitnessVerifierOracle<F, PC>] = &mut [&mut w1, &mut w2, &mut w3, &mut w4];
 
-        let mut instance_oracles = vec![];
-        instance_oracles.extend(gate_1_instance_oracles);
-        instance_oracles.extend(gate_2_instance_oracles);
+        let mut instance_oracles: &mut [&mut InstanceVerifierOracle<F>] = &mut [&mut pi1, &mut pi2];
 
         let vos: Vec<&dyn VirtualOracle<F>> = vec![&gate_1_vo, &gate_2_vo];
 

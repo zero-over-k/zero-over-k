@@ -234,7 +234,7 @@ mod test {
         };
 
         let mut witness_oracles: &mut [&mut WitnessProverOracle<F>] = &mut [&mut a, &mut b, &mut c];
-        let mut instance_oracles: [InstanceProverOracle<F>; 0] = [];
+        let mut instance_oracles: &mut [&mut InstanceProverOracle<F>] = &mut [];
         let mut fixed_oracles: &mut [&mut FixedProverOracle<F>] = &mut [&mut q];
         let mut table_oracles = [t];
 
@@ -372,7 +372,7 @@ mod test {
         };
 
         let mut ver_wtns_oracles: &mut [&mut WitnessVerifierOracle<F, PC>] = &mut [&mut a_ver, &mut b_ver, &mut c_ver];
-        let mut instance_oracles: [InstanceVerifierOracle<F>; 0] = [];
+        let mut instance_oracles: &mut [&mut InstanceVerifierOracle<F>] = &mut [];
 
         let mut mul_vo = GenericVO::<F>::init(get_vo_expression_and_queries());
 
