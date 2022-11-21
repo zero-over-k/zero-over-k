@@ -4,6 +4,7 @@ use std::num::ParseIntError;
 pub enum Error {
     PointLabelError(String),
     IntError(ParseIntError),
+    UninitializedExpr,
 }
 
 impl Error {

@@ -1,10 +1,10 @@
-use super::{
-    expression::Expression, query::VirtualQuery,
-    virtual_expression::VirtualExpression, VirtualOracle,
-};
 use crate::oracles::{
     query::{OracleQuery, OracleType},
     traits::{FixedOracle, InstanceOracle, WitnessOracle},
+};
+use crate::vo::{
+    error::Error as VOError, expression::Expression, query::VirtualQuery,
+    virtual_expression::VirtualExpression, VirtualOracle,
 };
 use ark_ff::PrimeField;
 
@@ -84,10 +84,10 @@ impl<F: PrimeField> VirtualOracle<F> for GenericVO<F> {
     //     }
     // }
 
-    fn get_expression(&self) -> &Expression<F> {
+    fn get_expression(&self) -> Result<&Expression<F>, VOError> {
         match &self.expression {
-            Some(expr) => &expr,
-            None => panic!("Expression are not initialized"),
+            Some(expr) => Ok(&expr),
+            None => Err(VOError::UninitializedExpr),
         }
     }
 }

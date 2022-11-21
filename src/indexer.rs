@@ -57,7 +57,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
         let mut max_degree = 0;
         for &vo in vos {
             let vo_degree =
-                vo.get_expression().degree(&|query| -> Result<_, _> {
+                vo.get_expression()?.degree(&|query| -> Result<_, _> {
                     match query.oracle_type {
                         OracleType::Witness => {
                             match witness_oracles_mapping.get(&query.label) {

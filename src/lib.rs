@@ -1035,7 +1035,7 @@ where
 
         let mut quotient_eval = F::zero();
         for (vo_index, vo) in vos.iter().enumerate() {
-            let vo_evaluation = vo.get_expression().evaluate(
+            let vo_evaluation = vo.get_expression()?.evaluate(
                 &|x| Ok(x),
                 &|query| {
                     let challenge = query.rotation.compute_evaluation_point(

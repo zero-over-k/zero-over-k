@@ -1,5 +1,7 @@
 use crate::multiproof::error::Error as MultiproofError;
 use crate::piop::error::Error as IOPError;
+use crate::vo::error::Error as VOError;
+
 /// A `enum` specifying the possible failure modes of the `SNARK`.
 #[derive(Debug)]
 pub enum Error<E> {
@@ -7,6 +9,8 @@ pub enum Error<E> {
     IndexTooLarge,
     /// There was an error in the underlying holographic IOP.
     IOPError(IOPError),
+    /// There was an error in an underlying Virtual Oracle.
+    VOError(VOError),
     /// There was an error in the underlying polynomial commitment.
     PolynomialCommitmentError(E),
     /// Prover sent commitments to more or less chunks of quotient than needed
@@ -21,6 +25,12 @@ pub enum Error<E> {
 impl<E> From<IOPError> for Error<E> {
     fn from(err: IOPError) -> Self {
         Error::IOPError(err)
+    }
+}
+
+impl<E> From<VOError> for Error<E> {
+    fn from(err: VOError) -> Self {
+        Error::VOError(err)
     }
 }
 

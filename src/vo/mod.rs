@@ -1,3 +1,4 @@
+use self::error::Error as VOError;
 use self::expression::Expression;
 use crate::oracles::query::OracleQuery;
 use ark_ff::PrimeField;
@@ -16,16 +17,14 @@ pub mod virtual_expression;
 
 /// Trait for specifying Virtual Oracle that should be included in batched zero over K check
 pub trait VirtualOracle<F: PrimeField> {
-    // NOTE: after introducing query mapping in configure we don't need queries anymore
-    // fn get_queries(&self) -> &[OracleQuery];
-
     /// Returns expression that combines concrete oracles
-    fn get_expression(&self) -> &Expression<F>;
+    fn get_expression(&self) -> Result<&Expression<F>, VOError>;
 }
 
 // Note: LookupVirtualOracle is very lightweight such that different use-cases
 // can be built on top of this prover
 
+// TODO Error handling
 /// Lookup virtual oracle is defined as array of tuples: (expression, table_query) For now "right"
 /// side is querying just fixed oracle, for more information see:
 /// https://github.com/zcash/halo2/issues/534
