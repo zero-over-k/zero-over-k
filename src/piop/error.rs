@@ -1,4 +1,5 @@
 use crate::oracles::rotation::Rotation;
+use crate::vo::error::Error as VOError;
 
 #[derive(Debug, PartialEq)]
 pub enum Error {
@@ -41,4 +42,12 @@ pub enum Error {
     InstanceTableNotAllowed(String),
     /// Rotations of challenge result in the same point.
     RepeatedRotation(Rotation),
+    /// Virtual Oracle error
+    VOError(VOError),
+}
+
+impl From<VOError> for Error {
+    fn from(err: VOError) -> Self {
+        Error::VOError(err)
+    }
 }

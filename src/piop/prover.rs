@@ -196,8 +196,8 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
                     &preprocessed.table_oracles,
                     index.usable_rows,
                     lookup_index,
-                    lookup_vo.get_expressions(),
-                    lookup_vo.get_table_queries(),
+                    lookup_vo.get_expressions()?,
+                    lookup_vo.get_table_queries()?,
                     lookup_aggregation_msg.theta,
                     &state.domain,
                     &index.extended_coset_domain,
@@ -327,7 +327,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
 
         for i in 0..vk.index_info.extended_coset_domain.size() {
             for (vo_index, vo) in state.vos.iter().enumerate() {
-                let vo_evaluation = vo.get_expression().evaluate(
+                let vo_evaluation = vo.get_expression()?.evaluate(
                     &Self::ident,
                     &|query| match query.oracle_type {
                         OracleType::Witness => {

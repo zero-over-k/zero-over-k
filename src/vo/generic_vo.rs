@@ -77,13 +77,6 @@ impl<F: PrimeField> GenericVO<F> {
 }
 
 impl<F: PrimeField> VirtualOracle<F> for GenericVO<F> {
-    // fn get_queries(&self) -> &[OracleQuery] {
-    //     match &self.queries {
-    //         Some(queries) => &queries,
-    //         None => panic!("Queries are not initialized"),
-    //     }
-    // }
-
     fn get_expression(&self) -> Result<&Expression<F>, VOError> {
         match &self.expression {
             Some(expr) => Ok(&expr),

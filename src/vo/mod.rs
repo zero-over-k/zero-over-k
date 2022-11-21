@@ -24,12 +24,11 @@ pub trait VirtualOracle<F: PrimeField> {
 // Note: LookupVirtualOracle is very lightweight such that different use-cases
 // can be built on top of this prover
 
-// TODO Error handling
 /// Lookup virtual oracle is defined as array of tuples: (expression, table_query) For now "right"
 /// side is querying just fixed oracle, for more information see:
 /// https://github.com/zcash/halo2/issues/534
 pub trait LookupVirtualOracle<F: PrimeField> {
-    fn get_expressions(&self) -> &[Expression<F>];
+    fn get_expressions(&self) -> Result<&[Expression<F>], VOError>;
 
-    fn get_table_queries(&self) -> &[OracleQuery];
+    fn get_table_queries(&self) -> Result<&[OracleQuery], VOError>;
 }
