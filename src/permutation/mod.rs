@@ -5,6 +5,7 @@ use ark_std::rand::RngCore;
 use crate::{
     commitment::HomomorphicCommitment,
     data_structures::PermutationInfo,
+    error::Error,
     oracles::{
         fixed::{FixedProverOracle, FixedVerifierOracle},
         rotation::{Rotation, Sign},
@@ -12,6 +13,7 @@ use crate::{
         witness::{WitnessProverOracle, WitnessVerifierOracle},
     },
     permutation::grand_product::GrandProductArgument,
+    piop::error::Error as PiopError,
 };
 
 pub mod grand_product;
@@ -159,7 +161,7 @@ impl<F: PrimeField> PermutationArgument<F> {
         gamma: F,
         domain: &GeneralEvaluationDomain<F>,
         alpha_powers: &[F], // quotient separation challenges
-    ) -> F {
+    ) -> Result<F, PiopError> {
         assert_eq!(witness_oracles.len(), permutation_oracles.len());
         assert_eq!(witness_oracles.len(), self.deltas.len());
 
@@ -186,7 +188,8 @@ impl<F: PrimeField> PermutationArgument<F> {
         let mut permutation_eval = alpha_powers[0]
             * l_0_coset_evals[omega_index]
             * (F::one()
-                - agg_polys[0].query_in_coset(omega_index, Rotation::curr()));
+                - agg_polys[0]
+                    .query_in_coset(omega_index, Rotation::curr())?);
         let mut alpha_shift = 1;
 
         for (i, ((ws, sigmas), ds)) in oracle_chunks
@@ -207,7 +210,7 @@ impl<F: PrimeField> PermutationArgument<F> {
                     domain_size,
                     omega,
                     omega_index,
-                );
+                )?;
         }
 
         alpha_shift += agg_polys.len();
@@ -216,22 +219,22 @@ impl<F: PrimeField> PermutationArgument<F> {
             permutation_eval += alpha_powers[i + alpha_shift]
                 * l_0_coset_evals[omega_index]
                 * (agg_polys[i + 1]
-                    .query_in_coset(omega_index, Rotation::curr())
+                    .query_in_coset(omega_index, Rotation::curr())?
                     - agg_polys[i].query_in_coset(
                         omega_index,
                         Rotation::new(self.usable_rows, Sign::Plus),
-                    ));
+                    )?);
         }
 
         let z_last_eval = agg_polys
             .last()
             .unwrap()
-            .query_in_coset(omega_index, Rotation::curr());
+            .query_in_coset(omega_index, Rotation::curr())?;
         permutation_eval += alpha_powers.last().unwrap().clone()
             * q_last_coset_evals[omega_index]
             * (z_last_eval * z_last_eval - z_last_eval);
 
-        permutation_eval
+        Ok(permutation_eval)
     }
 
     pub fn open_argument<PC: HomomorphicCommitment<F>>(
@@ -247,7 +250,7 @@ impl<F: PrimeField> PermutationArgument<F> {
         domain: &GeneralEvaluationDomain<F>,
         evaluation_challenge: F,
         alpha_powers: &[F], // quotient separation challenges
-    ) -> F {
+    ) -> Result<F, Error<PC::Error>> {
         assert_eq!(witness_oracles.len(), permutation_oracles.len());
         assert_eq!(witness_oracles.len(), self.deltas.len());
 
@@ -271,7 +274,7 @@ impl<F: PrimeField> PermutationArgument<F> {
 
         let mut permutation_eval = alpha_powers[0]
             * l_0_eval
-            * (F::one() - agg_polys[0].query(&evaluation_challenge));
+            * (F::one() - agg_polys[0].query(&evaluation_challenge)?);
         let mut alpha_shift = 1;
 
         // //let mut permutation_eval = F::zero();
@@ -292,7 +295,7 @@ impl<F: PrimeField> PermutationArgument<F> {
                     gamma,
                     domain,
                     evaluation_challenge,
-                );
+                )?;
         }
 
         alpha_shift += agg_polys.len();
@@ -300,20 +303,20 @@ impl<F: PrimeField> PermutationArgument<F> {
         for i in 0..agg_polys.len() - 1 {
             permutation_eval += alpha_powers[i + alpha_shift]
                 * l_0_eval
-                * (agg_polys[i + 1].query(&evaluation_challenge)
+                * (agg_polys[i + 1].query(&evaluation_challenge)?
                     - agg_polys[i].query(
                         &(domain.element(self.usable_rows)
                             * evaluation_challenge),
-                    ));
+                    )?);
         }
 
         let z_last_eval =
-            agg_polys.last().unwrap().query(&evaluation_challenge);
+            agg_polys.last().unwrap().query(&evaluation_challenge)?;
         permutation_eval += alpha_powers.last().unwrap().clone()
             * q_last_eval
             * (z_last_eval * z_last_eval - z_last_eval);
 
-        permutation_eval
+        Ok(permutation_eval)
     }
 }
 
@@ -586,20 +589,22 @@ mod test {
         let mut permutation_coset_evals =
             Vec::<F>::with_capacity(extended_coset_domain.size());
         for i in 0..extended_coset_domain.size() {
-            let pe = permutation_argument.instantiate_argument_at_omega_i(
-                &l_0_coset_evals,
-                &l_u_coset_evals,
-                &q_blind,
-                &witness_oracles,
-                &permutation_oracles,
-                &z_polys,
-                i,
-                extended_coset_domain.element(i),
-                beta,
-                gamma,
-                &domain,
-                &powers_of_alpha,
-            );
+            let pe = permutation_argument
+                .instantiate_argument_at_omega_i(
+                    &l_0_coset_evals,
+                    &l_u_coset_evals,
+                    &q_blind,
+                    &witness_oracles,
+                    &permutation_oracles,
+                    &z_polys,
+                    i,
+                    extended_coset_domain.element(i),
+                    beta,
+                    gamma,
+                    &domain,
+                    &powers_of_alpha,
+                )
+                .unwrap();
 
             permutation_coset_evals.push(pe);
         }
@@ -737,20 +742,22 @@ mod test {
         let permutation_oracles = [sigma_1, sigma_2];
         let z_polys = [z_poly_0, z_poly_1];
 
-        let permutation_eval = permutation_argument.open_argument(
-            l_0_eval,
-            l_u_eval,
-            &q_blind,
-            &z_polys,
-            &permutation_oracles,
-            witness_oracles.as_slice(),
-            // &deltas,
-            beta,
-            gamma,
-            &domain,
-            evaluation_challenge,
-            &powers_of_alpha,
-        );
+        let permutation_eval = permutation_argument
+            .open_argument(
+                l_0_eval,
+                l_u_eval,
+                &q_blind,
+                &z_polys,
+                &permutation_oracles,
+                witness_oracles.as_slice(),
+                // &deltas,
+                beta,
+                gamma,
+                &domain,
+                evaluation_challenge,
+                &powers_of_alpha,
+            )
+            .unwrap();
 
         assert_eq!(permutation_eval, q_eval * zh_eval);
     }

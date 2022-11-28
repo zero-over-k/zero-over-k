@@ -271,12 +271,14 @@ mod test {
             &mut fixed_oracles,
         );
 
-        lookup_vo.configure(
-            &mut witness_oracles,
-            &mut instance_oracles,
-            &mut fixed_oracles,
-            &mut table_oracles,
-        );
+        lookup_vo
+            .configure(
+                &mut witness_oracles,
+                &mut instance_oracles,
+                &mut fixed_oracles,
+                &mut table_oracles,
+            )
+            .unwrap();
 
         let vos: Vec<&dyn VirtualOracle<F>> = vec![&mul_vo];
         let lookups: Vec<&dyn LookupVirtualOracle<F>> = vec![&lookup_vo];
@@ -423,12 +425,14 @@ mod test {
             &mut fixed_oracles,
         );
 
-        lookup_vo.configure(
-            &mut ver_wtns_oracles,
-            &mut instance_oracles,
-            &mut fixed_oracles,
-            &mut table_oracles,
-        );
+        lookup_vo
+            .configure(
+                &mut ver_wtns_oracles,
+                &mut instance_oracles,
+                &mut fixed_oracles,
+                &mut table_oracles,
+            )
+            .unwrap();
 
         let vos: Vec<&dyn VirtualOracle<F>> = vec![&mul_vo];
         let lookups: Vec<&dyn LookupVirtualOracle<F>> = vec![&lookup_vo];
@@ -448,10 +452,10 @@ mod test {
         .unwrap();
 
         let preprocessed = VerifierPreprocessedInput {
-            fixed_oracles: fixed_oracles,
-            table_oracles: table_oracles,
+            fixed_oracles,
+            table_oracles,
             permutation_oracles: vec![],
-            q_blind: q_blind,
+            q_blind,
         };
 
         // Since we mutate fixed oracles by adding evals at challenge for specific proof

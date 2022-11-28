@@ -1,10 +1,11 @@
-use super::{
-    expression::Expression, query::VirtualQuery,
-    virtual_expression::VirtualExpression, LookupVirtualOracle,
-};
 use crate::oracles::{
     query::{OracleQuery, OracleType},
     traits::{FixedOracle, InstanceOracle, WitnessOracle},
+};
+use crate::piop::error::Error as PiopError;
+use crate::vo::{
+    error::Error as VOError, expression::Expression, query::VirtualQuery,
+    virtual_expression::VirtualExpression, LookupVirtualOracle,
 };
 use ark_ff::PrimeField;
 
@@ -40,7 +41,7 @@ impl<F: PrimeField> GenericLookupVO<F> {
         instance_oracles: &mut [impl InstanceOracle<F>],
         fixed_oracles: &mut [impl FixedOracle<F>],
         table_oracles: &mut [impl FixedOracle<F>],
-    ) {
+    ) -> Result<(), PiopError> {
         for query in &self.virtual_queries {
             match query.oracle_type {
                 crate::oracles::query::OracleType::Witness => {
@@ -62,12 +63,18 @@ impl<F: PrimeField> GenericLookupVO<F> {
             Vec::<OracleQuery>::with_capacity(self.virtual_table_queries.len());
         for query in &self.virtual_table_queries {
             match query.oracle_type {
-                OracleType::Witness => panic!(
-                    "Witness query is not allowed to serve as table query"
-                ), //see: https:github.com/zcash/halo2/issues/534
-                OracleType::Instance => panic!(
-                    "Instance query is not allowed to serve as table query"
-                ), //see: https:github.com/zcash/halo2/issues/534
+                OracleType::Witness => {
+                    return Err(PiopError::WitnessTableNotAllowed(
+                        format!("VirtualQuery index: {}", query.index)
+                            .to_string(),
+                    ))
+                }
+                OracleType::Instance => {
+                    return Err(PiopError::InstanceTableNotAllowed(
+                        format!("VirtualQuery index: {}", query.index)
+                            .to_string(),
+                    ))
+                }
                 OracleType::Fixed => {
                     table_oracles[query.index]
                         .register_rotation(query.rotation);
@@ -94,21 +101,22 @@ impl<F: PrimeField> GenericLookupVO<F> {
 
         self.expressions = Some(expressions);
         self.table_queries = Some(table_queries);
+        Ok(())
     }
 }
 
 impl<F: PrimeField> LookupVirtualOracle<F> for GenericLookupVO<F> {
-    fn get_expressions(&self) -> &[Expression<F>] {
+    fn get_expressions(&self) -> Result<&[Expression<F>], VOError> {
         match &self.expressions {
-            Some(expressions) => &expressions,
-            None => panic!("table queries are not defined"),
+            Some(expressions) => Ok(&expressions),
+            None => Err(VOError::UninitializedLookupExpr),
         }
     }
 
-    fn get_table_queries(&self) -> &[OracleQuery] {
+    fn get_table_queries(&self) -> Result<&[OracleQuery], VOError> {
         match &self.table_queries {
-            Some(queries) => &queries,
-            None => panic!("table queries are not defined"),
+            Some(queries) => Ok(&queries),
+            None => Err(VOError::UninitializedLookupTableQuery),
         }
     }
 }

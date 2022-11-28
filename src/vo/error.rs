@@ -1,9 +1,12 @@
 use std::num::ParseIntError;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Error {
     PointLabelError(String),
     IntError(ParseIntError),
+    UninitializedExpr,
+    UninitializedLookupExpr,
+    UninitializedLookupTableQuery,
 }
 
 impl Error {

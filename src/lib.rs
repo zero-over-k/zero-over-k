@@ -18,6 +18,7 @@ use data_structures::{
 use error::Error;
 use multiproof::piop::Multiopen;
 use oracles::instance::{InstanceProverOracle, InstanceVerifierOracle};
+use piop::error::Error as PiopError;
 
 use oracles::traits::{ConcreteOracle, Instantiable};
 use oracles::witness::{WitnessProverOracle, WitnessVerifierOracle};
@@ -167,7 +168,7 @@ where
             preprocessed,
             &pk.vk.index_info,
             zk_rng,
-        );
+        )?;
 
         let lookup_polys_to_open = lookup_polys
             .iter()
@@ -311,7 +312,7 @@ where
         );
 
         let witness_evals: Vec<F> =
-            evaluate_query_set(witness_oracles, &witness_query_set);
+            evaluate_query_set(witness_oracles, &witness_query_set)?;
 
         // fs_rng.absorb(&to_bytes![witness_evals].unwrap());
         // Compute fixed evals
@@ -324,7 +325,7 @@ where
         );
 
         let fixed_oracle_evals: Vec<F> =
-            evaluate_query_set(&preprocessed.fixed_oracles, &fixed_query_set);
+            evaluate_query_set(&preprocessed.fixed_oracles, &fixed_query_set)?;
 
         // Compute table evals
         let table_query_set = PIOPforPolyIdentity::<F, PC>::get_query_set(
@@ -335,44 +336,40 @@ where
         );
 
         let table_oracle_evals: Vec<F> =
-            evaluate_query_set(&preprocessed.table_oracles, &table_query_set);
+            evaluate_query_set(&preprocessed.table_oracles, &table_query_set)?;
 
         // Compute lookup evals
         // For each lookup argument we will always put it in same order:
         // a' at x, a' at w^-1x, s' at x and z at x, a at wx
         let omega = domain.element(1);
         let omega_inv = omega.inverse().unwrap();
-        let lookup_evals: Vec<F> = lookup_polys
-            .iter()
-            .map(|(_, _, a_prime, s_prime)| {
-                let a_prime_at_x = a_prime.query(&verifier_second_msg.xi);
-                let a_prime_at_minus_w_x =
-                    a_prime.query(&(verifier_second_msg.xi * omega_inv));
+        let mut lookup_evals = Vec::with_capacity(3 * lookup_polys.len());
+        for (_, _, a_prime, s_prime) in lookup_polys.iter() {
+            let a_prime_at_x = a_prime.query(&verifier_second_msg.xi)?;
+            let a_prime_at_minus_w_x =
+                a_prime.query(&(verifier_second_msg.xi * omega_inv))?;
 
-                let s_prime_at_x = s_prime.query(&verifier_second_msg.xi);
+            let s_prime_at_x = s_prime.query(&verifier_second_msg.xi)?;
+            lookup_evals.extend(vec![
+                a_prime_at_x,
+                a_prime_at_minus_w_x,
+                s_prime_at_x,
+            ]);
+        }
 
-                vec![a_prime_at_x, a_prime_at_minus_w_x, s_prime_at_x]
-            })
-            .flatten()
-            .collect();
-
-        let lookup_z_evals: Vec<F> = lookup_z_polys
-            .iter()
-            .map(|z| {
-                let z_at_x = z.query(&verifier_second_msg.xi);
-                let z_at_omega_x = z.query(&(verifier_second_msg.xi * omega));
-
-                vec![z_at_x, z_at_omega_x]
-            })
-            .flatten()
-            .collect();
+        let mut lookup_z_evals = Vec::with_capacity(2 * lookup_z_polys.len());
+        for z in lookup_z_polys.iter() {
+            let z_at_x = z.query(&verifier_second_msg.xi)?;
+            let z_at_omega_x = z.query(&(verifier_second_msg.xi * omega))?;
+            lookup_z_evals.extend(vec![z_at_x, z_at_omega_x]);
+        }
 
         // Compute quotient chunk evals
         // There are no rotations for q_i-s so we can just query at evaluation point
         let quotient_chunks_evals: Vec<F> = quotient_chunk_oracles
             .iter()
             .map(|q_i| q_i.query(&verifier_second_msg.xi))
-            .collect();
+            .collect::<Result<Vec<F>, PiopError>>()?;
 
         // Compute permutation oracle evals
         // There are no rotations for sigma_i-s so we can just query at evaluation point
@@ -380,7 +377,7 @@ where
             .permutation_oracles
             .iter()
             .map(|sigma_i| sigma_i.query(&verifier_second_msg.xi))
-            .collect();
+            .collect::<Result<Vec<F>, PiopError>>()?;
 
         // Compute z polys oracle evals
         let z_query_set = PIOPforPolyIdentity::<F, PC>::get_query_set(
@@ -390,7 +387,7 @@ where
             &omegas,
         );
 
-        let z_evals = evaluate_query_set(&z_polys, &z_query_set);
+        let z_evals = evaluate_query_set(&z_polys, &z_query_set)?;
 
         // compute q_blind eval
         let q_blind_eval = preprocessed
@@ -706,7 +703,12 @@ where
             match witness_oracles_mapping.get(poly_label) {
                 Some(index) => witness_oracles[*index]
                     .register_eval_at_challenge(*point, evaluation),
-                None => panic!("Missing poly: {}", poly_label),
+                None => {
+                    return Err(PiopError::MissingWitnessOracle(
+                        poly_label.clone(),
+                    )
+                    .into())
+                }
             };
         }
 
@@ -726,7 +728,12 @@ where
             match fixed_oracles_mapping.get(poly_label) {
                 Some(index) => preprocessed.fixed_oracles[*index]
                     .register_eval_at_challenge(*point, evaluation),
-                None => panic!("Missing poly: {}", poly_label),
+                None => {
+                    return Err(PiopError::MissingFixedOracle(
+                        poly_label.clone(),
+                    )
+                    .into())
+                }
             };
         }
 
@@ -746,7 +753,12 @@ where
             match table_oracles_mapping.get(poly_label) {
                 Some(index) => preprocessed.table_oracles[*index]
                     .register_eval_at_challenge(*point, evaluation),
-                None => panic!("Missing poly: {}", poly_label),
+                None => {
+                    return Err(PiopError::MissingLookupTableOracle(
+                        poly_label.clone(),
+                    )
+                    .into())
+                }
             };
         }
 
@@ -806,7 +818,8 @@ where
                 |(
                     lookup_index,
                     ((lookup_vo, permuted_commitments), permuted_evals),
-                )| {
+                )|
+                 -> Result<_, Error<PC::Error>> {
                     let (a, s) =
                 LookupArgument::construct_a_and_s_unpermuted_polys_verifier(
                     &witness_oracles_mapping,
@@ -818,12 +831,12 @@ where
                     &preprocessed.fixed_oracles,
                     &preprocessed.table_oracles,
                     lookup_index,
-                    lookup_vo.get_expressions(),
-                    lookup_vo.get_table_queries(),
+                    lookup_vo.get_expressions()?,
+                    lookup_vo.get_table_queries()?,
                     verifier_lookup_aggregation_msg.theta,
                     verifier_second_msg.xi,
                     &omegas,
-                );
+                )?;
 
                     let a_prime = WitnessVerifierOracle::<F, PC> {
                         label: format!("lookup_a_prime_{}_poly", lookup_index)
@@ -855,10 +868,10 @@ where
                         should_permute: false,
                     };
 
-                    (a, s, a_prime, s_prime)
+                    Ok((a, s, a_prime, s_prime))
                 },
             )
-            .collect();
+            .collect::<Result<_, _>>()?;
 
         let lookup_polys_to_check_in_opening = lookup_polys
             .iter()
@@ -951,7 +964,12 @@ where
             match z_mapping.get(poly_label) {
                 Some(index) => z_polys[*index]
                     .register_eval_at_challenge(*point, evaluation),
-                None => panic!("Missing poly: {}", poly_label),
+                None => {
+                    return Err(PiopError::MissingPermutationOracle(
+                        poly_label.clone(),
+                    )
+                    .into())
+                }
             };
         }
 
@@ -1017,8 +1035,8 @@ where
 
         let mut quotient_eval = F::zero();
         for (vo_index, vo) in vos.iter().enumerate() {
-            let vo_evaluation = vo.get_expression().evaluate(
-                &|x: F| x,
+            let vo_evaluation = vo.get_expression()?.evaluate(
+                &|x| Ok(x),
                 &|query| {
                     let challenge = query.rotation.compute_evaluation_point(
                         verifier_second_msg.xi,
@@ -1027,29 +1045,45 @@ where
                     match query.oracle_type {
                         OracleType::Witness => {
                             match witness_oracles_mapping.get(&query.label) {
-                                Some(index) => witness_oracles[*index].query(&challenge),
-                                None => panic!("Witness oracle with label add_label not found") //TODO: Introduce new Error here,
+                                Some(index) => {
+                                    witness_oracles[*index].query(&challenge)
+                                }
+                                None => Err(PiopError::MissingWitnessOracle(
+                                    query.label.clone(),
+                                )),
                             }
-                        },
+                        }
                         OracleType::Instance => {
                             match instance_oracles_mapping.get(&query.label) {
-                                Some(index) => instance_oracles[*index].query(&challenge),
-                                None => panic!("Instance oracle with label {} not found", query.label) //TODO: Introduce new Error here,
+                                Some(index) => {
+                                    instance_oracles[*index].query(&challenge)
+                                }
+                                None => Err(PiopError::MissingInstanceOracle(
+                                    query.label.clone(),
+                                )),
                             }
-                        },
+                        }
                         OracleType::Fixed => {
                             match fixed_oracles_mapping.get(&query.label) {
-                                Some(index) => preprocessed.fixed_oracles[*index].query(&challenge),
-                                None => panic!("Fixed oracle with label add_label not found") //TODO: Introduce new Error here,
+                                Some(index) => preprocessed.fixed_oracles
+                                    [*index]
+                                    .query(&challenge),
+                                None => Err(PiopError::MissingFixedOracle(
+                                    query.label.clone(),
+                                )),
                             }
-                        },
+                        }
                     }
                 },
-                &|x: F| -x,
-                &|x: F, y: F| x + y,
-                &|x: F, y: F| x * y,
-                &|x: F, y: F| x * y,
-            );
+                &|x| x.and_then(|x_val| Ok(-x_val)),
+                &|x, y| {
+                    x.and_then(|x_val| y.and_then(|y_val| Ok(x_val + y_val)))
+                },
+                &|x, y| {
+                    x.and_then(|x_val| y.and_then(|y_val| Ok(x_val * y_val)))
+                },
+                &|x, y| x.and_then(|x_val| Ok(x_val * y)),
+            )?;
 
             quotient_eval += powers_of_alpha[vo_index] * vo_evaluation;
         }
@@ -1069,7 +1103,7 @@ where
                 &domain,
                 verifier_second_msg.xi,
                 &permutation_alphas,
-            )
+            )?
         } else {
             F::zero()
         };
@@ -1095,7 +1129,7 @@ where
                 &verifier_second_msg.xi,
                 &domain,
                 alpha_powers,
-            )
+            )?
         }
 
         let x_n = verifier_second_msg.xi.pow([domain_size as u64, 0, 0, 0]);
@@ -1108,7 +1142,7 @@ where
         for (&x_i, t_i) in
             powers_of_x.iter().zip(quotient_chunk_oracles.clone())
         {
-            t_part += x_i * t_i.query(&verifier_second_msg.xi);
+            t_part += x_i * t_i.query(&verifier_second_msg.xi)?;
         }
 
         t_part *= vanishing_polynomial.evaluate(&verifier_second_msg.xi);

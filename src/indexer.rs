@@ -16,6 +16,7 @@ use crate::{
         traits::{FixedOracle, InstanceOracle, WitnessOracle},
     },
     permutation::PermutationArgument,
+    piop::error::Error as PiopError,
     util::compute_vanishing_poly_over_coset,
     vo::{LookupVirtualOracle, VirtualOracle},
 };
@@ -52,48 +53,45 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
         vos: &[&dyn VirtualOracle<F>],
         domain_size: usize,
         z_h_degree: usize,
-    ) -> usize {
+    ) -> Result<usize, Error<PC::Error>> {
         let mut max_degree = 0;
         for &vo in vos {
             let vo_degree =
-                vo.get_expression().degree(&|query| {
+                vo.get_expression()?.degree(&|query| -> Result<_, _> {
                     match query.oracle_type {
                         OracleType::Witness => {
                             match witness_oracles_mapping.get(&query.label) {
-                                Some(index) => witness_oracles[*index]
-                                    .get_degree(domain_size),
-                                None => panic!(
-                                    "Witness oracle with label {} not found",
-                                    query.label
-                                ), //TODO: Introduce new Error here,
+                                Some(index) => Ok(witness_oracles[*index]
+                                    .get_degree(domain_size)),
+                                None => Err(PiopError::MissingWitnessOracle(
+                                    query.label.clone(),
+                                )),
                             }
                         }
                         OracleType::Instance => {
                             match instance_oracles_mapping.get(&query.label) {
-                                Some(index) => instance_oracles[*index]
-                                    .get_degree(domain_size),
-                                None => panic!(
-                                    "Instance oracle with label {} not found",
-                                    query.label
-                                ), //TODO: Introduce new Error here,
+                                Some(index) => Ok(instance_oracles[*index]
+                                    .get_degree(domain_size)),
+                                None => Err(PiopError::MissingInstanceOracle(
+                                    query.label.clone(),
+                                )),
                             }
                         }
                         OracleType::Fixed => {
                             match fixed_oracles_mapping.get(&query.label) {
-                                Some(index) => fixed_oracles[*index]
-                                    .get_degree(domain_size),
-                                None => panic!(
-                                    "Fixed oracle with label {} not found",
-                                    query.label
-                                ), //TODO: Introduce new Error here,
+                                Some(index) => Ok(fixed_oracles[*index]
+                                    .get_degree(domain_size)),
+                                None => Err(PiopError::MissingFixedOracle(
+                                    query.label.clone(),
+                                )),
                             }
                         }
                     }
                 });
-            max_degree = max(max_degree, vo_degree);
+            max_degree = max(max_degree, vo_degree?);
         }
 
-        max_degree - z_h_degree
+        Ok(max_degree - z_h_degree)
     }
 
     fn compute_zh_evals(
@@ -175,7 +173,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
             vos,
             domain.size(),
             zH.degree(),
-        );
+        )?;
 
         // TODO: we can introduce next power of 2 check here instead of creating domain and then dividing
         let extended_coset_domain =

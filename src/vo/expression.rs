@@ -1,4 +1,5 @@
 use crate::oracles::query::OracleQuery;
+use crate::piop::error::Error;
 use ark_ff::PrimeField;
 use std::ops::{Add, Mul, Neg, Sub};
 
@@ -13,17 +14,20 @@ pub enum Expression<F> {
 }
 
 impl<F: PrimeField> Expression<F> {
-    pub fn degree(&self, oracle_fn: &impl Fn(&OracleQuery) -> usize) -> usize {
+    pub fn degree(
+        &self,
+        oracle_fn: &impl Fn(&OracleQuery) -> Result<usize, Error>,
+    ) -> Result<usize, Error> {
         match self {
-            Expression::Constant(_) => 0,
+            Expression::Constant(_) => Ok(0usize),
             Expression::Oracle(query) => oracle_fn(query),
             Expression::Negated(expr) => expr.degree(oracle_fn),
-            Expression::Sum(lsh_expr, rhs_expr) => std::cmp::max(
-                lsh_expr.degree(oracle_fn),
-                rhs_expr.degree(oracle_fn),
-            ),
+            Expression::Sum(lsh_expr, rhs_expr) => Ok(std::cmp::max(
+                lsh_expr.degree(oracle_fn)?,
+                rhs_expr.degree(oracle_fn)?,
+            )),
             Expression::Product(lsh_expr, rhs_expr) => {
-                lsh_expr.degree(oracle_fn) + rhs_expr.degree(oracle_fn)
+                Ok(lsh_expr.degree(oracle_fn)? + rhs_expr.degree(oracle_fn)?)
             }
             Expression::Scaled(expr, _) => expr.degree(oracle_fn),
         }

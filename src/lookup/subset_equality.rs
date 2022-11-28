@@ -9,12 +9,14 @@ use ark_std::rand::Rng;
 
 use crate::{
     commitment::HomomorphicCommitment,
+    error::Error,
     oracles::{
         fixed::{FixedProverOracle, FixedVerifierOracle},
         rotation::Rotation,
         traits::{ConcreteOracle, Instantiable},
         witness::{WitnessProverOracle, WitnessVerifierOracle},
     },
+    piop::error::Error as PiopError,
 };
 
 pub struct SubsetEqualityArgument<F: PrimeField> {
@@ -64,7 +66,7 @@ impl<F: PrimeField> SubsetEqualityArgument<F> {
             evals_at_coset_of_extended_domain: Some(
                 extended_coset_domain.coset_fft(&poly),
             ),
-            poly: poly,
+            poly,
             evals: z_evals,
             queried_rotations: BTreeSet::from([
                 Rotation::curr(),
@@ -91,21 +93,24 @@ impl<F: PrimeField> SubsetEqualityArgument<F> {
         gamma: F,
         omega_index: usize,
         alpha_powers: &Vec<F>,
-    ) -> F {
+    ) -> Result<F, PiopError> {
         assert_eq!(alpha_powers.len(), 3);
 
         let mut num = F::zero();
 
-        let a_x = a.query_in_coset(omega_index, Rotation::curr());
-        let a_prime_x = a_prime.query_in_coset(omega_index, Rotation::curr());
+        let a_x = a.query_in_coset(omega_index, Rotation::curr())?;
+        let a_prime_x =
+            a_prime.query_in_coset(omega_index, Rotation::curr())?;
 
-        let s_x = s.query_in_coset(omega_index, Rotation::curr());
-        let s_prime_x = s_prime.query_in_coset(omega_index, Rotation::curr());
+        let s_x = s.query_in_coset(omega_index, Rotation::curr())?;
+        let s_prime_x =
+            s_prime.query_in_coset(omega_index, Rotation::curr())?;
 
-        let z_x = z.query_in_coset(omega_index, Rotation::curr());
-        let z_wx = z.query_in_coset(omega_index, Rotation::next());
+        let z_x = z.query_in_coset(omega_index, Rotation::curr())?;
+        let z_wx = z.query_in_coset(omega_index, Rotation::next())?;
 
-        let q_blind_x = q_blind.query_in_coset(omega_index, Rotation::curr());
+        let q_blind_x =
+            q_blind.query_in_coset(omega_index, Rotation::curr())?;
 
         num += alpha_powers[0] * l0_coset_evals[omega_index] * (F::one() - z_x);
 
@@ -125,7 +130,7 @@ impl<F: PrimeField> SubsetEqualityArgument<F> {
             * q_last_coset_evals[omega_index]
             * (z_x * z_x - z_x);
 
-        num
+        Ok(num)
     }
 
     pub fn open_argument<PC: HomomorphicCommitment<F>>(
@@ -142,26 +147,26 @@ impl<F: PrimeField> SubsetEqualityArgument<F> {
         evaluation_challenge: &F,
         domain: &GeneralEvaluationDomain<F>,
         alpha_powers: &Vec<F>,
-    ) -> F {
+    ) -> Result<F, Error<PC::Error>> {
         assert_eq!(alpha_powers.len(), 3);
         let shifted_evaluation_challenge =
             domain.element(1) * evaluation_challenge;
 
         let mut opening = F::zero();
 
-        let a_xi = a.query(&evaluation_challenge);
-        let a_prime_xi = a_prime.query(&evaluation_challenge);
+        let a_xi = a.query(&evaluation_challenge)?;
+        let a_prime_xi = a_prime.query(&evaluation_challenge)?;
 
-        let s_xi = s.query(&evaluation_challenge);
-        let s_prime_xi = s_prime.query(&evaluation_challenge);
+        let s_xi = s.query(&evaluation_challenge)?;
+        let s_prime_xi = s_prime.query(&evaluation_challenge)?;
 
-        let z_xi = z.query(&evaluation_challenge);
-        let z_wxi = z.query(&shifted_evaluation_challenge);
+        let z_xi = z.query(&evaluation_challenge)?;
+        let z_wxi = z.query(&shifted_evaluation_challenge)?;
 
         opening += alpha_powers[0] * l0_eval * (F::one() - z_xi);
 
         let zk_part =
-            F::one() - (q_last_eval + q_blind.query(evaluation_challenge));
+            F::one() - (q_last_eval + q_blind.query(evaluation_challenge)?);
         let lhs = z_wxi * (a_prime_xi + beta) * (s_prime_xi + gamma);
         let rhs = z_xi * (a_xi + beta) * (s_xi + gamma);
 
@@ -169,7 +174,7 @@ impl<F: PrimeField> SubsetEqualityArgument<F> {
 
         opening += alpha_powers[2] * q_last_eval * (z_xi * z_xi - z_xi);
 
-        opening
+        Ok(opening)
     }
 }
 
@@ -358,7 +363,8 @@ mod test {
                 gamma,
                 i,
                 &alpha_powers,
-            );
+            )
+            .unwrap();
 
             num_evals.push(ni);
         }
@@ -469,7 +475,8 @@ mod test {
             &evaluation_challenge,
             &domain,
             &alpha_powers,
-        );
+        )
+        .unwrap();
 
         assert_eq!(
             opening,

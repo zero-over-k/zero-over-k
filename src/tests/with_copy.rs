@@ -506,20 +506,22 @@ mod copy_constraint_tests {
         let mut permutation_coset_evals =
             Vec::<F>::with_capacity(extended_coset_domain.size());
         for i in 0..extended_coset_domain.size() {
-            let q_i = permutation_argument.instantiate_argument_at_omega_i(
-                &l0_coset_evals,
-                &lu_coset_evals,
-                &q_blind,
-                &witness_oracles,
-                &permutation_oracles,
-                &agg_polys,
-                i,
-                extended_coset_domain.element(i),
-                beta,
-                gamma,
-                &domain,
-                &powers_of_alpha,
-            );
+            let q_i = permutation_argument
+                .instantiate_argument_at_omega_i(
+                    &l0_coset_evals,
+                    &lu_coset_evals,
+                    &q_blind,
+                    &witness_oracles,
+                    &permutation_oracles,
+                    &agg_polys,
+                    i,
+                    extended_coset_domain.element(i),
+                    beta,
+                    gamma,
+                    &domain,
+                    &powers_of_alpha,
+                )
+                .unwrap();
 
             permutation_coset_evals.push(q_i);
         }
@@ -707,19 +709,21 @@ mod copy_constraint_tests {
         let permutation_oracles = [sigma_1, sigma_2, sigma_3];
         let z_polys = [z_poly_0, z_poly_1, z_poly_2];
 
-        let permutation_eval = permutation_argument.open_argument(
-            l_0_eval,
-            l_u_eval,
-            &q_blind,
-            &z_polys,
-            &permutation_oracles,
-            &witness_oracles,
-            beta,
-            gamma,
-            &domain,
-            evaluation_challenge,
-            &powers_of_alpha,
-        );
+        let permutation_eval = permutation_argument
+            .open_argument(
+                l_0_eval,
+                l_u_eval,
+                &q_blind,
+                &z_polys,
+                &permutation_oracles,
+                &witness_oracles,
+                beta,
+                gamma,
+                &domain,
+                evaluation_challenge,
+                &powers_of_alpha,
+            )
+            .unwrap();
 
         assert_eq!(permutation_eval, q_eval * zh_eval);
     }
@@ -1336,7 +1340,7 @@ mod copy_constraint_tests {
             fixed_oracles: selector_oracles.clone(),
             table_oracles: vec![],
             permutation_oracles: sigma_oracles.clone(),
-            q_blind: q_blind,
+            q_blind,
         };
 
         // We clone because fixed oracles must be mutable in order to add evals at challenge
