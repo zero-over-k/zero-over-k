@@ -36,7 +36,7 @@ pub struct LookupArgument<F: PrimeField> {
 
 impl<F: PrimeField> LookupArgument<F> {
     // Aux funcs for `evaluate`
-    const fn ident(x: F) -> Result<F, PiopError> {
+    fn ident(x: F) -> Result<F, PiopError> {
         Ok(x)
     }
     // }
