@@ -144,7 +144,11 @@ mod test {
     use ark_std::rand::RngCore;
 
     use crate::vo::generic_vo::GenericVO;
-    use crate::vo::precompiled::tests::{run_prover, run_verifier, test_init};
+    use crate::vo::precompiled::tests::{
+        run_prover,
+        run_verifier,
+        test_init,
+    };
 
     use itertools::izip;
 

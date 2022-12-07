@@ -19,9 +19,9 @@ pub enum VirtualExpression<F> {
 impl<F: PrimeField> VirtualExpression<F> {
     pub fn to_expression(
         &self,
-        witness_oracles: &[impl ConcreteOracle<F>],
-        instance_oracles: &[impl ConcreteOracle<F>],
-        fixed_oracles: &[impl ConcreteOracle<F>],
+        witness_oracles: &[&mut impl ConcreteOracle<F>],
+        instance_oracles: &[&mut impl ConcreteOracle<F>],
+        fixed_oracles: &[&mut impl ConcreteOracle<F>],
     ) -> Expression<F> {
         match self {
             VirtualExpression::Constant(f) => Expression::Constant(*f),

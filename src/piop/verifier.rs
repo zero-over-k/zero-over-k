@@ -120,7 +120,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
     }
 
     pub fn get_query_set(
-        oracles: &[impl QuerySetProvider<F>],
+        oracles: &[&impl QuerySetProvider<F>],
         evaluation_challenge_label: &str,
         evaluation_challenge: F,
         omegas: &Vec<F>,

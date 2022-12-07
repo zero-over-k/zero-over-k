@@ -28,57 +28,25 @@ impl<F: PrimeField> PrecompiledVO<F> for PrecompiledMul {
 #[cfg(test)]
 mod test {
     use super::PrecompiledMul;
-    use std::collections::{BTreeMap, BTreeSet};
-
-    use ark_bls12_381::{Bls12_381, Fr};
+    use crate::vo::precompiled::tests::{run_prover, run_verifier, test_init};
+    use ark_bls12_381::Fr;
     use ark_ff::Zero;
     use ark_poly::Polynomial;
     use ark_poly::{
         univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
         UVPolynomial,
     };
-
-    use ark_std::test_rng;
-    use rand_chacha::ChaChaRng;
-
-    use crate::data_structures::{
-        PermutationInfo, ProverKey, ProverPreprocessedInput,
-        VerifierPreprocessedInput,
-    };
-    use crate::indexer::Indexer;
-
-    use crate::oracles::fixed::{FixedProverOracle, FixedVerifierOracle};
-    use crate::oracles::instance::{
-        InstanceProverOracle, InstanceVerifierOracle,
-    };
-
-    use crate::oracles::witness::{WitnessProverOracle, WitnessVerifierOracle};
-    use crate::rng::SimpleHashFiatShamirRng;
     use crate::vo::generic_vo::GenericVO;
     use crate::vo::precompiled::PrecompiledVO;
-    use crate::PIL;
-    use blake2::Blake2s;
-
-    use crate::commitment::{HomomorphicCommitment, KZG10};
-    use crate::vo::VirtualOracle;
 
     type F = Fr;
-    type FS = SimpleHashFiatShamirRng<Blake2s, ChaChaRng>;
-    type PC = KZG10<Bls12_381>;
-
-    type PilInstance = PIL<F, PC, FS>;
 
     #[test]
     fn test_simple_mul() {
+        // Initialize context
         let domain_size = 16;
+        let (_, cs_keys, mut rng) = test_init(domain_size);
         let poly_degree = domain_size - 1;
-        let max_degree = poly_degree;
-        let mut rng = test_rng();
-
-        let srs = PilInstance::universal_setup(max_degree, &mut rng).unwrap();
-
-        let (ck, verifier_key) = PilInstance::prepare_keys(&srs).unwrap();
-
         let domain = GeneralEvaluationDomain::<F>::new(domain_size).unwrap();
 
         let a_poly = DensePolynomial::<F>::rand(poly_degree, &mut rng);
@@ -104,140 +72,48 @@ mod test {
             );
         }
 
-        let a = WitnessProverOracle::new("a", a_poly, &a_evals, false);
-        let b = WitnessProverOracle::new("b", b_poly, &b_evals, false);
-        let c = InstanceProverOracle::new("c", c_poly.clone(), &c_evals);
-
-        let mut mul_vo =
+        let mul_vo =
             GenericVO::<F>::init(PrecompiledMul::get_expr_and_queries());
 
-        let mut witness_oracles = [a, b];
-        let mut instance_oracles = [c];
-        let mut fixed_oracles: [FixedProverOracle<F>; 0] = [];
+        let witness_labels = vec!["a", "b"];
+        let witness_evals = vec![a_evals, b_evals];
+        let witness: Vec<(_, &[F])> = witness_evals
+            .iter()
+            .zip(witness_labels.clone().into_iter())
+            .map(|(evals, label)| (label, evals.as_slice()))
+            .collect();
 
-        mul_vo.configure(
-            &mut witness_oracles,
-            &mut instance_oracles,
-            &mut fixed_oracles,
-        );
+        let instance = vec![
+            ("c", c_evals.as_slice()),
+        ];
+        let fixed: Vec<(String, &[F])> = vec![];
 
-        let vos: Vec<&dyn VirtualOracle<F>> = vec![&mul_vo];
-
-        let vk = Indexer::index(
-            &verifier_key,
-            &vos,
-            vec![],
-            &witness_oracles,
-            &instance_oracles,
-            &fixed_oracles,
+        let proof = run_prover(
             domain,
-            &domain.vanishing_polynomial().into(),
-            PermutationInfo::dummy(),
-            0,
-        )
-        .unwrap();
-
-        let pk = ProverKey::from_ck_and_vk(&ck, &vk);
-
-        let q_blind = FixedProverOracle {
-            label: "q_blind".to_string(),
-            poly: DensePolynomial::zero(),
-            evals: vec![],
-            evals_at_coset_of_extended_domain: None,
-            queried_rotations: BTreeSet::default(),
-        };
-
-        let preprocessed = ProverPreprocessedInput::new(
-            &vec![],
-            &vec![],
-            &vec![],
-            &q_blind,
-            &vk.index_info,
+            cs_keys.0.clone(),
+            cs_keys.1.clone(),
+            witness.clone(),
+            fixed.clone(),
+            instance.clone(),
+            mul_vo.clone(),
+            &mut rng,
         );
 
-        let proof = PilInstance::prove(
-            &pk,
-            &preprocessed,
-            &mut witness_oracles,
-            &mut instance_oracles,
-            &vos,
-            domain_size,
-            &domain.vanishing_polynomial().into(),
+        let res = run_verifier(
+            domain,
+            cs_keys.0,
+            cs_keys.1,
+            witness_labels,
+            fixed,
+            instance,
+            mul_vo.clone(),
+            proof,
             &mut rng,
-        )
-        .unwrap();
+        );
+
+        assert_eq!(res, ());
 
         // println!("{}", proof.info());
         // println!("{}", proof.cumulative_info());
-
-        // Verifier
-        // Repeat just to make sure some change from prover does not affect this
-        let a_ver = WitnessVerifierOracle::<F, PC>::new("a", false);
-        let b_ver = WitnessVerifierOracle::<F, PC>::new("b", false);
-        let c = InstanceVerifierOracle::new("c", c_poly.clone(), &c_evals);
-
-        let mut ver_wtns_oracles = [a_ver, b_ver];
-        let mut instance_oracles = [c];
-        let mut fixed_oracles: [FixedVerifierOracle<F, PC>; 0] = [];
-
-        let mut mul_vo =
-            GenericVO::<F>::init(PrecompiledMul::get_expr_and_queries());
-
-        mul_vo.configure(
-            &mut ver_wtns_oracles,
-            &mut instance_oracles,
-            &mut fixed_oracles,
-        );
-
-        let vos: Vec<&dyn VirtualOracle<F>> = vec![&mul_vo];
-
-        // Repeat but this time provide verifier witness oracles
-        let mut vk = Indexer::index(
-            &verifier_key,
-            &vos,
-            vec![],
-            &mut ver_wtns_oracles,
-            &instance_oracles,
-            &fixed_oracles,
-            domain,
-            &domain.vanishing_polynomial().into(),
-            PermutationInfo::dummy(),
-            0,
-        )
-        .unwrap();
-
-        let q_blind = FixedVerifierOracle {
-            label: "q_blind".to_string(),
-            queried_rotations: BTreeSet::default(),
-            evals_at_challenges: BTreeMap::default(),
-            commitment: Some(PC::zero_comm()),
-        };
-
-        let preprocessed = VerifierPreprocessedInput {
-            fixed_oracles: vec![],
-            table_oracles: vec![],
-            permutation_oracles: vec![],
-            q_blind,
-        };
-
-        // Since we mutate fixed oracles by adding evals at challenge for specific proof
-        // preprocessed input is cloned in order to enable preserving original preprocessed
-        // Second option is just to "reset" preprocessed after verification ends
-        let mut pp_clone = preprocessed.clone();
-
-        let res = PilInstance::verify(
-            &mut vk,
-            &mut pp_clone,
-            proof,
-            &mut ver_wtns_oracles,
-            &mut instance_oracles,
-            &vos,
-            domain_size,
-            &domain.vanishing_polynomial().into(),
-            &mut rng,
-        )
-        .unwrap();
-
-        assert_eq!(res, ());
     }
 }

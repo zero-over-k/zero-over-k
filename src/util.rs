@@ -35,7 +35,7 @@ where
 /// Evaluate the given polynomials at `query_set`.
 /// We can't use arkworks evaluate_query_set because iterating throw evaluations and collecting it into just evals is reordering array
 pub fn evaluate_query_set<'a, F: PrimeField>(
-    polys: &[impl Instantiable<F>],
+    polys: &[&impl Instantiable<F>],
     query_set: &QuerySet<F>,
 ) -> Result<Vec<F>, PiopError> {
     let oracles =

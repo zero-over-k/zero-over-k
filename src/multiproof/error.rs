@@ -1,4 +1,4 @@
-use crate::{oracles::rotation::Rotation, piop::error::Error as PiopError};
+use crate::piop::error::Error as PiopError;
 #[derive(Debug)]
 pub enum Error<E> {
     /// There was an error in the underlying polynomial commitment.

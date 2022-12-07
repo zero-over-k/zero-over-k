@@ -188,41 +188,19 @@ mod test {
 
         let a_poly =
             DensePolynomial::from_coefficients_slice(&domain.ifft(&a_evals));
-        let a = WitnessProverOracle {
-            label: "a".to_string(),
-            poly: a_poly,
-            evals_at_coset_of_extended_domain: None,
-            queried_rotations: BTreeSet::new(),
-            should_permute: false,
-            evals: a_evals,
-        };
-
         let b_poly =
             DensePolynomial::from_coefficients_slice(&domain.ifft(&b_evals));
-        let b = WitnessProverOracle {
-            label: "b".to_string(),
-            poly: b_poly,
-            evals_at_coset_of_extended_domain: None,
-            queried_rotations: BTreeSet::new(),
-            should_permute: false,
-            evals: b_evals.to_vec(),
-        };
-
         let c_poly =
             DensePolynomial::from_coefficients_slice(&domain.ifft(&c_evals));
-        let c = WitnessProverOracle {
-            label: "c".to_string(),
-            poly: c_poly,
-            evals_at_coset_of_extended_domain: None,
-            queried_rotations: BTreeSet::new(),
-            should_permute: false,
-            evals: c_evals,
-        };
+
+        let mut a = WitnessProverOracle::<F>::new("a", a_poly.clone(), &a_evals, false);
+        let mut b = WitnessProverOracle::<F>::new("b", b_poly.clone(), &b_evals, false);
+        let mut c = WitnessProverOracle::<F>::new("c", c_poly.clone(), &c_evals, false);
 
         let q_poly = DensePolynomial::from_coefficients_slice(
             &domain.ifft(&selector_evals),
         );
-        let q = FixedProverOracle {
+        let mut q = FixedProverOracle {
             label: "q".to_string(),
             poly: q_poly.clone(),
             evals_at_coset_of_extended_domain: None,
@@ -255,9 +233,9 @@ mod test {
             evals: table_evals,
         };
 
-        let mut witness_oracles = [a, b, c];
-        let mut instance_oracles: [InstanceProverOracle<F>; 0] = [];
-        let mut fixed_oracles = [q];
+        let mut witness_oracles: &mut [&mut WitnessProverOracle<F>] = &mut [&mut a, &mut b, &mut c];
+        let mut instance_oracles: &mut [&mut InstanceProverOracle<F>] = &mut [];
+        let mut fixed_oracles: &mut [&mut FixedProverOracle<F>] = &mut [&mut q];
         let mut table_oracles = [t];
 
         let mut mul_vo = GenericVO::<F>::init(get_vo_expression_and_queries());
@@ -299,8 +277,8 @@ mod test {
 
         let pk = ProverKey::from_ck_and_vk(&ck, &vk);
 
-        let preprocessed = ProverPreprocessedInput::new(
-            &fixed_oracles.to_vec(),
+        let mut preprocessed = ProverPreprocessedInput::new(
+            &mut fixed_oracles,
             &vec![],
             &table_oracles.to_vec(),
             &q_blind,
@@ -309,7 +287,7 @@ mod test {
 
         let proof = PilInstance::prove(
             &pk,
-            &preprocessed,
+            &mut preprocessed,
             &mut witness_oracles,
             &mut instance_oracles,
             &vos,
@@ -323,29 +301,9 @@ mod test {
         println!("{}", proof.cumulative_info());
 
         //Verifier
-        let a_ver = WitnessVerifierOracle::<F, PC> {
-            label: "a".to_string(),
-            queried_rotations: BTreeSet::default(),
-            should_permute: false,
-            evals_at_challenges: BTreeMap::default(),
-            commitment: None,
-        };
-
-        let b_ver = WitnessVerifierOracle {
-            label: "b".to_string(),
-            queried_rotations: BTreeSet::default(),
-            should_permute: false,
-            evals_at_challenges: BTreeMap::default(),
-            commitment: None,
-        };
-
-        let c_ver = WitnessVerifierOracle {
-            label: "c".to_string(),
-            queried_rotations: BTreeSet::default(),
-            should_permute: false,
-            evals_at_challenges: BTreeMap::default(),
-            commitment: None,
-        };
+        let mut a_ver = WitnessVerifierOracle::new("a", false);
+        let mut b_ver = WitnessVerifierOracle::new("b", false);
+        let mut c_ver = WitnessVerifierOracle::new("c", false);
 
         let labeled_selectors: Vec<LabeledPolynomial<F, DensePolynomial<F>>> =
             [(q_poly.clone(), "q")]
@@ -363,7 +321,7 @@ mod test {
         let (selector_commitments, _) =
             PC::commit(&ck, labeled_selectors.iter(), None).unwrap();
 
-        let mut fixed_oracles: Vec<_> = selector_commitments
+        let mut fixed_oracles_raw: Vec<_> = selector_commitments
             .iter()
             .map(|cmt| FixedVerifierOracle::<F, PC> {
                 label: cmt.label().clone(),
@@ -372,6 +330,10 @@ mod test {
                 commitment: Some(cmt.commitment().clone()),
             })
             .collect();
+        let mut fixed_oracles_v: Vec<&mut FixedVerifierOracle<F, PC>> = fixed_oracles_raw
+            .iter_mut()
+            .collect();
+        let mut fixed_oracles: &mut [&mut FixedVerifierOracle<F, PC>] = fixed_oracles_v.iter_mut().into_slice();
 
         let labeled_table_oracles: Vec<
             LabeledPolynomial<F, DensePolynomial<F>>,
@@ -411,8 +373,8 @@ mod test {
             commitment: Some(q_blind_commitment[0].commitment().clone()),
         };
 
-        let mut ver_wtns_oracles = [a_ver, b_ver, c_ver];
-        let mut instance_oracles: [InstanceVerifierOracle<F>; 0] = [];
+        let mut ver_wtns_oracles: &mut [&mut WitnessVerifierOracle<F, PC>] = &mut [&mut a_ver, &mut b_ver, &mut c_ver];
+        let mut instance_oracles: &mut [&mut InstanceVerifierOracle<F>] = &mut [];
 
         let mut mul_vo = GenericVO::<F>::init(get_vo_expression_and_queries());
 
@@ -451,7 +413,7 @@ mod test {
         )
         .unwrap();
 
-        let preprocessed = VerifierPreprocessedInput {
+        let mut preprocessed = VerifierPreprocessedInput {
             fixed_oracles,
             table_oracles,
             permutation_oracles: vec![],
@@ -461,11 +423,11 @@ mod test {
         // Since we mutate fixed oracles by adding evals at challenge for specific proof
         // preprocessed input is cloned in order to enable preserving original preprocessed
         // Second option is just to "reset" preprocessed after verification ends
-        let mut pp_clone = preprocessed.clone();
+        //let mut pp_clone = preprocessed.clone();
 
         let res = PilInstance::verify(
             &mut vk,
-            &mut pp_clone,
+            &mut preprocessed,
             proof,
             &mut ver_wtns_oracles,
             &mut instance_oracles,
