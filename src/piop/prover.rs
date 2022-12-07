@@ -24,7 +24,7 @@ use crate::{
         witness::WitnessProverOracle,
     },
     permutation::PermutationArgument,
-    piop::error::Error,
+    piop::error::Error as PiopError,
     piop::{verifier::VerifierFirstMsg, PIOPforPolyIdentity},
     vo::VirtualOracle,
 };
@@ -61,6 +61,29 @@ pub struct ProverState<'a, F: PrimeField> {
 }
 
 impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
+    // Aux funcs for `evaluate`
+    const fn ident(x: F) -> Result<F, PiopError> {
+        Ok(x)
+    }
+    fn neg(x: Result<F, PiopError>) -> Result<F, PiopError> {
+        x.and_then(|x_val| Ok(-x_val))
+    }
+    fn add(
+        x: Result<F, PiopError>,
+        y: Result<F, PiopError>,
+    ) -> Result<F, PiopError> {
+        x.and_then(|x_val| y.and_then(|y_val| Ok(x_val + y_val)))
+    }
+    fn mul(
+        x: Result<F, PiopError>,
+        y: Result<F, PiopError>,
+    ) -> Result<F, PiopError> {
+        x.and_then(|x_val| y.and_then(|y_val| Ok(x_val * y_val)))
+    }
+    fn scale(x: Result<F, PiopError>, y: F) -> Result<F, PiopError> {
+        x.and_then(|x_val| Ok(x_val * y))
+    }
+
     pub fn init_prover<'a>(
         witness_oracles: &'a mut [&mut WitnessProverOracle<F>],
         instance_oracles: &'a [&mut InstanceProverOracle<F>],
@@ -158,17 +181,20 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
         preprocessed: &mut ProverPreprocessedInput<F, PC>,
         index: &Index<F>,
         zk_rng: &mut R,
-    ) -> Vec<(
-        WitnessProverOracle<F>,
-        WitnessProverOracle<F>,
-        WitnessProverOracle<F>,
-        WitnessProverOracle<F>,
-    )> {
+    ) -> Result<
+        Vec<(
+            WitnessProverOracle<F>,
+            WitnessProverOracle<F>,
+            WitnessProverOracle<F>,
+            WitnessProverOracle<F>,
+        )>,
+        PiopError,
+    > {
         let lookup_polys: Vec<_> = index
             .lookups
             .iter()
             .enumerate()
-            .map(|(lookup_index, lookup_vo)| {
+            .map(|(lookup_index, lookup_vo)| -> Result<_, PiopError> {
                 LookupArgument::construct_a_and_s_polys_prover(
                     &state.witness_oracles_mapping,
                     &state.instance_oracles_mapping,
@@ -180,19 +206,19 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
                     &preprocessed.table_oracles,
                     index.usable_rows,
                     lookup_index,
-                    lookup_vo.get_expressions(),
-                    lookup_vo.get_table_queries(),
+                    lookup_vo.get_expressions()?,
+                    lookup_vo.get_table_queries()?,
                     lookup_aggregation_msg.theta,
                     &state.domain,
                     &index.extended_coset_domain,
                     zk_rng,
                 )
             })
-            .collect();
+            .collect::<Result<_, _>>()?;
 
         // In order: (a, s, a_prime, s_prime)
         state.lookup_polys = Some(lookup_polys.clone());
-        lookup_polys
+        Ok(lookup_polys)
     }
 
     pub fn prover_lookup_subset_equality_round<R: Rng>(
@@ -238,7 +264,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
         state: &mut ProverState<F>,
         vk: &VerifierKey<F, PC>,
         preprocessed: &ProverPreprocessedInput<F, PC>,
-    ) -> Result<Vec<WitnessProverOracle<F>>, Error> {
+    ) -> Result<Vec<WitnessProverOracle<F>>, PiopError> {
         let powers_of_alpha: Vec<F> = successors(Some(F::one()), |alpha_i| {
             Some(*alpha_i * verifier_msg.alpha)
         })
@@ -311,37 +337,53 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
 
         for i in 0..vk.index_info.extended_coset_domain.size() {
             for (vo_index, vo) in state.vos.iter().enumerate() {
-                let vo_evaluation = vo.get_expression().evaluate(
-                    &|x: F| x,
-                    &|query| {
-                        match query.oracle_type {
-                            OracleType::Witness => {
-                                match state.witness_oracles_mapping.get(&query.label) {
-                                    Some(index) => state.witness_oracles[*index].query_in_coset(i, query.rotation),
-                                    None => panic!("Witness oracle with label add_label not found") //TODO: Introduce new Error here,
-                                }
-                            },
-                            OracleType::Instance => {
-                                match state.instance_oracles_mapping.get(&query.label) {
-                                    Some(index) => state.instance_oracles[*index].query_in_coset(i, query.rotation),
-                                    None => panic!("Instance oracle with label add_label not found") //TODO: Introduce new Error here,
-                                }
-                            },
-                            OracleType::Fixed => {
-                                match state.fixed_oracles_mapping.get(&query.label) {
-                                    Some(index) => preprocessed.fixed_oracles[*index].query_in_coset(i, query.rotation),
-                                    None => panic!("Fixed oracle with label add_label not found") //TODO: Introduce new Error here,
-                                }
-                            },
+                let vo_evaluation = vo.get_expression()?.evaluate(
+                    &Self::ident,
+                    &|query| match query.oracle_type {
+                        OracleType::Witness => {
+                            match state
+                                .witness_oracles_mapping
+                                .get(&query.label)
+                            {
+                                Some(index) => state.witness_oracles[*index]
+                                    .query_in_coset(i, query.rotation),
+                                None => Err(PiopError::MissingWitnessOracle(
+                                    query.label.clone(),
+                                )),
+                            }
+                        }
+                        OracleType::Instance => {
+                            match state
+                                .instance_oracles_mapping
+                                .get(&query.label)
+                            {
+                                Some(index) => state.instance_oracles[*index]
+                                    .query_in_coset(i, query.rotation),
+                                None => Err(PiopError::MissingInstanceOracle(
+                                    query.label.clone(),
+                                )),
+                            }
+                        }
+                        OracleType::Fixed => {
+                            match state.fixed_oracles_mapping.get(&query.label)
+                            {
+                                Some(index) => preprocessed.fixed_oracles
+                                    [*index]
+                                    .query_in_coset(i, query.rotation),
+                                None => Err(PiopError::MissingFixedOracle(
+                                    query.label.clone(),
+                                )),
+                            }
                         }
                     },
-                    &|x: F| -x,
-                    &|x: F, y: F| x + y,
-                    &|x: F, y: F| x * y,
-                    &|x: F, y: F| x * y,
+                    &Self::neg,
+                    &Self::add,
+                    &Self::mul,
+                    &Self::scale,
                 );
 
-                numerator_evals[i] += powers_of_alpha[vo_index] * vo_evaluation;
+                numerator_evals[i] +=
+                    powers_of_alpha[vo_index] * vo_evaluation?;
             }
 
             // Permutation argument
@@ -362,7 +404,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
                         verifier_permutation_msg.gamma,
                         &state.domain,
                         &permutation_alphas,
-                    )
+                    )?
             } else {
                 F::zero()
             };
@@ -388,7 +430,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
                         verifier_permutation_msg.gamma,
                         i,
                         alpha_powers,
-                    )
+                    )?
             }
         }
 

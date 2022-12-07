@@ -5,6 +5,7 @@ use ark_poly::EvaluationDomain;
 use ark_poly_commit::QuerySet;
 
 use crate::oracles::traits::Instantiable;
+use crate::piop::error::Error as PiopError;
 
 pub fn compute_vanishing_poly_over_coset<F, D>(
     domain: D,        // domain to evaluate over
@@ -36,7 +37,7 @@ where
 pub fn evaluate_query_set<'a, F: PrimeField>(
     polys: &[&impl Instantiable<F>],
     query_set: &QuerySet<F>,
-) -> Vec<F> {
+) -> Result<Vec<F>, PiopError> {
     let oracles =
         BTreeMap::from_iter(polys.into_iter().map(|p| (p.get_label(), p)));
     let mut evaluations = vec![];
@@ -48,7 +49,7 @@ pub fn evaluate_query_set<'a, F: PrimeField>(
             )
             .as_str(),
         );
-        evaluations.push(oracle.query(&point));
+        evaluations.push(oracle.query(&point)?);
     }
-    evaluations
+    Ok(evaluations)
 }

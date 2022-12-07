@@ -7,7 +7,7 @@ use ark_poly::{
 };
 use ark_poly_commit::LabeledPolynomial;
 
-use crate::commitment::HomomorphicCommitment;
+use crate::{commitment::HomomorphicCommitment, piop::error::Error};
 
 use super::{
     rotation::Rotation,
@@ -57,8 +57,8 @@ impl<F: PrimeField> ConcreteOracle<F> for WitnessProverOracle<F> {
         self.queried_rotations.insert(rotation);
     }
 
-    fn query(&self, challenge: &F) -> F {
-        self.poly.evaluate(challenge)
+    fn query(&self, challenge: &F) -> Result<F, Error> {
+        Ok(self.poly.evaluate(challenge))
     }
 
     fn get_label(&self) -> String {
@@ -92,10 +92,10 @@ impl<F: PrimeField> Instantiable<F> for WitnessProverOracle<F> {
         &self.poly
     }
 
-    fn get_extended_coset_evals(&self) -> &Vec<F> {
+    fn get_extended_coset_evals(&self) -> Result<&Vec<F>, Error> {
         match &self.evals_at_coset_of_extended_domain {
-            Some(evals) => evals,
-            None => panic!("Extended coset evals for oracle with label {} of type witness are not provided", self.label),
+            Some(evals) => Ok(evals),
+            None => Err(Error::MissingCosetWitnessEval(self.label.clone())),
         }
     }
 
@@ -162,13 +162,10 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> ConcreteOracle<F>
         self.queried_rotations.insert(rotation);
     }
 
-    fn query(&self, challenge: &F) -> F {
+    fn query(&self, challenge: &F) -> Result<F, Error> {
         match self.evals_at_challenges.get(&challenge) {
-            Some(eval) => *eval,
-            None => panic!(
-                "No eval at challenge: {} of oracle {} with type witness",
-                challenge, self.label
-            ),
+            Some(eval) => Ok(*eval),
+            None => Err(Error::MissingConcreteEval(self.label.clone())),
         }
     }
 
@@ -188,10 +185,10 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> CommittedOracle<F, PC>
         self.commitment = Some(c);
     }
 
-    fn get_commitment(&self) -> &<PC>::Commitment {
+    fn get_commitment(&self) -> Result<&<PC>::Commitment, Error> {
         match &self.commitment {
-            Some(c) => c,
-            None => panic!("Commitment not provided"),
+            Some(c) => Ok(c),
+            None => Err(Error::MissingWitnessCommitment(self.label.clone())),
         }
     }
 }

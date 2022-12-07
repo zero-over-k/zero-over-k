@@ -126,7 +126,7 @@ mod test {
 
         let mut table_oracles = vec![t1, t2, t3];
 
-        simple_lookup_vo.configure(
+        let _ = simple_lookup_vo.configure(
             &mut witness_oracles,
             &mut instance_oracles,
             &mut fixed_oracles,

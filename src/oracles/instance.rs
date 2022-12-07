@@ -1,5 +1,6 @@
 use std::collections::BTreeSet;
 
+use crate::piop::error::Error;
 use ark_ff::PrimeField;
 use ark_poly::{
     univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
@@ -45,8 +46,8 @@ impl<F: PrimeField> ConcreteOracle<F> for InstanceProverOracle<F> {
         self.queried_rotations.insert(rotation);
     }
 
-    fn query(&self, challenge: &F) -> F {
-        self.poly.evaluate(&challenge)
+    fn query(&self, challenge: &F) -> Result<F, Error> {
+        Ok(self.poly.evaluate(challenge))
     }
 
     fn get_label(&self) -> String {
@@ -80,10 +81,10 @@ impl<F: PrimeField> Instantiable<F> for InstanceProverOracle<F> {
         &self.poly
     }
 
-    fn get_extended_coset_evals(&self) -> &Vec<F> {
+    fn get_extended_coset_evals(&self) -> Result<&Vec<F>, Error> {
         match &self.evals_at_coset_of_extended_domain {
-            Some(evals) => evals,
-            None => panic!("Extended coset evals for oracle with label {} of type instance are not provided", self.label),
+            Some(evals) => Ok(evals),
+            None => Err(Error::MissingCosetInstanceEval(self.label.clone())),
         }
     }
 
@@ -123,12 +124,8 @@ impl<F: PrimeField> ConcreteOracle<F> for InstanceVerifierOracle<F> {
         self.queried_rotations.insert(rotation);
     }
 
-    fn get_degree(&self, domain_size: usize) -> usize {
-        domain_size - 1
-    }
-
-    fn query(&self, challenge: &F) -> F {
-        self.poly.evaluate(&challenge)
+    fn query(&self, challenge: &F) -> Result<F, Error> {
+        Ok(self.poly.evaluate(challenge))
     }
 
     fn get_label(&self) -> String {

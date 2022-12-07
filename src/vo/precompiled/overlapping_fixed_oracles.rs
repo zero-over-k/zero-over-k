@@ -274,11 +274,6 @@ mod tests {
             q_blind,
         };
 
-        // Since we mutate fixed oracles by adding evals at challenge for specific proof
-        // preprocessed input is cloned in order to enable preserving original preprocessed
-        // Second option is just to "reset" preprocessed after verification ends
-        //let mut pp_clone = preprocessed.clone();
-
         let res = PilInstance::verify(
             &mut vk,
             &mut preprocessed,

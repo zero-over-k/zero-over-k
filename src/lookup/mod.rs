@@ -1,5 +1,6 @@
 use crate::{
     commitment::HomomorphicCommitment,
+    error::Error,
     lookup::{
         permute::permute_for_lookup, subset_equality::SubsetEqualityArgument,
     },
@@ -11,6 +12,7 @@ use crate::{
         traits::{ConcreteOracle, Instantiable},
         witness::{WitnessProverOracle, WitnessVerifierOracle},
     },
+    piop::error::Error as PiopError,
     vo::expression::Expression,
 };
 use ark_ff::PrimeField;
@@ -33,6 +35,29 @@ pub struct LookupArgument<F: PrimeField> {
 }
 
 impl<F: PrimeField> LookupArgument<F> {
+    // Aux funcs for `evaluate`
+    const fn ident(x: F) -> Result<F, PiopError> {
+        Ok(x)
+    }
+    // }
+    fn neg(x: Result<F, PiopError>) -> Result<F, PiopError> {
+        x.and_then(|x_val| Ok(-x_val))
+    }
+    fn add(
+        x: Result<F, PiopError>,
+        y: Result<F, PiopError>,
+    ) -> Result<F, PiopError> {
+        x.and_then(|x_val| y.and_then(|y_val| Ok(x_val + y_val)))
+    }
+    fn mul(
+        x: Result<F, PiopError>,
+        y: Result<F, PiopError>,
+    ) -> Result<F, PiopError> {
+        x.and_then(|x_val| y.and_then(|y_val| Ok(x_val * y_val)))
+    }
+    fn scale(x: Result<F, PiopError>, y: F) -> Result<F, PiopError> {
+        x.and_then(|x_val| Ok(x_val * y))
+    }
     /*
        In subset equality argument we have q_blind * z(wX) * A'(X) * S'(X) = 4n - 4
        Then - n for vanishing gives 3n - 4, but still we have to work in 4n
@@ -56,12 +81,15 @@ impl<F: PrimeField> LookupArgument<F> {
         domain: &GeneralEvaluationDomain<F>,
         extended_coset_domain: &GeneralEvaluationDomain<F>,
         zk_rng: &mut R,
-    ) -> (
-        WitnessProverOracle<F>,
-        WitnessProverOracle<F>,
-        WitnessProverOracle<F>,
-        WitnessProverOracle<F>,
-    ) {
+    ) -> Result<
+        (
+            WitnessProverOracle<F>,
+            WitnessProverOracle<F>,
+            WitnessProverOracle<F>,
+            WitnessProverOracle<F>,
+        ),
+        PiopError,
+    > {
         // When working on prover we want to construct A, A', S and S' as WitnessProverOracles
         // We need both polys and coset evals for them, one approach is to compute polynomials and then to do coset fft
         // But it's faster if we evaluate expression 2 times, one in coset and one in just domain
@@ -85,86 +113,123 @@ impl<F: PrimeField> LookupArgument<F> {
             Vec::<F>::with_capacity(extended_coset_domain.size());
 
         for i in 0..domain.size() {
-            let expressions_at_i = lookup_expressions.iter().map(|lookup_expr| {
-                lookup_expr.evaluate(
-                    &|x: F| x,
-                    &|query| {
-                        match query.oracle_type {
+            let expressions_at_i =
+                lookup_expressions.iter().map(|lookup_expr| {
+                    lookup_expr.evaluate(
+                        &Self::ident,
+                        &|query| match query.oracle_type {
                             OracleType::Witness => {
-                                match witness_oracles_mapping.get(&query.label) {
-                                    Some(index) => witness_oracles[*index].query_at_omega_in_original_domain(i, query.rotation),
-                                    None => panic!("Witness oracle with label add_label not found")
+                                match witness_oracles_mapping.get(&query.label)
+                                {
+                                    Some(index) => Ok(witness_oracles[*index]
+                                        .query_at_omega_in_original_domain(
+                                            i,
+                                            query.rotation,
+                                        )),
+                                    None => {
+                                        Err(PiopError::MissingWitnessOracle(
+                                            query.label.clone(),
+                                        ))
+                                    }
                                 }
-                            },
+                            }
                             OracleType::Instance => {
-                                match instance_oracles_mapping.get(&query.label) {
-                                    Some(index) => instance_oracles[*index].query_at_omega_in_original_domain(i, query.rotation),
-                                    None => panic!("Instance oracle with label add_label not found")
+                                match instance_oracles_mapping.get(&query.label)
+                                {
+                                    Some(index) => Ok(instance_oracles[*index]
+                                        .query_at_omega_in_original_domain(
+                                            i,
+                                            query.rotation,
+                                        )),
+                                    None => {
+                                        Err(PiopError::MissingInstanceOracle(
+                                            query.label.clone(),
+                                        ))
+                                    }
                                 }
-                            },
+                            }
                             OracleType::Fixed => {
                                 match fixed_oracles_mapping.get(&query.label) {
-                                    Some(index) => fixed_oracles[*index].query_at_omega_in_original_domain(i, query.rotation),
-                                    None => panic!("Fixed oracle with label add_label not found")
+                                    Some(index) => Ok(fixed_oracles[*index]
+                                        .query_at_omega_in_original_domain(
+                                            i,
+                                            query.rotation,
+                                        )),
+                                    None => Err(PiopError::MissingFixedOracle(
+                                        query.label.clone(),
+                                    )),
                                 }
-                            },
-                        }
-                    },
-                    &|x: F| -x,
-                    &|x: F, y: F| x + y,
-                    &|x: F, y: F| x * y,
-                    &|x: F, y: F| x * y,
-                )
-            });
+                            }
+                        },
+                        &Self::neg,
+                        &Self::add,
+                        &Self::mul,
+                        &Self::scale,
+                    )
+                });
 
             let mut agg = F::zero();
             for (expr_i, theta_i) in
                 expressions_at_i.zip(powers_of_theta.iter())
             {
-                agg += expr_i * theta_i
+                agg += expr_i? * theta_i
             }
 
             a_original_domain_evals.push(agg);
         }
 
         for i in 0..extended_coset_domain.size() {
-            let expressions_at_i = lookup_expressions.iter().map(|lookup_expr| {
-                lookup_expr.evaluate(
-                    &|x: F| x,
-                    &|query| {
-                        match query.oracle_type {
+            let expressions_at_i =
+                lookup_expressions.iter().map(|lookup_expr| {
+                    lookup_expr.evaluate(
+                        &Self::ident,
+                        &|query| match query.oracle_type {
                             OracleType::Witness => {
-                                match witness_oracles_mapping.get(&query.label) {
-                                    Some(index) => witness_oracles[*index].query_in_coset(i, query.rotation),
-                                    None => panic!("Witness oracle with label {} not found", query.label)
+                                match witness_oracles_mapping.get(&query.label)
+                                {
+                                    Some(index) => witness_oracles[*index]
+                                        .query_in_coset(i, query.rotation),
+                                    None => {
+                                        Err(PiopError::MissingWitnessOracle(
+                                            query.label.clone(),
+                                        ))
+                                    }
                                 }
-                            },
+                            }
                             OracleType::Instance => {
-                                match instance_oracles_mapping.get(&query.label) {
-                                    Some(index) => instance_oracles[*index].query_in_coset(i, query.rotation),
-                                    None => panic!("Instance oracle with label {} not found", query.label)
+                                match instance_oracles_mapping.get(&query.label)
+                                {
+                                    Some(index) => instance_oracles[*index]
+                                        .query_in_coset(i, query.rotation),
+                                    None => {
+                                        Err(PiopError::MissingInstanceOracle(
+                                            query.label.clone(),
+                                        ))
+                                    }
                                 }
-                            },
+                            }
                             OracleType::Fixed => {
                                 match fixed_oracles_mapping.get(&query.label) {
-                                    Some(index) => fixed_oracles[*index].query_in_coset(i, query.rotation),
-                                    None => panic!("Fixed oracle with label {} not found", query.label)
+                                    Some(index) => fixed_oracles[*index]
+                                        .query_in_coset(i, query.rotation),
+                                    None => Err(PiopError::MissingFixedOracle(
+                                        query.label.clone(),
+                                    )),
                                 }
-                            },
-                        }
-                    },
-                    &|x: F| -x,
-                    &|x: F, y: F| x + y,
-                    &|x: F, y: F| x * y,
-                    &|x: F, y: F| x * y,
-                )
-            });
+                            }
+                        },
+                        &Self::neg,
+                        &Self::add,
+                        &Self::mul,
+                        &Self::scale,
+                    )
+                });
 
             let mut agg = F::zero();
             for (expr_i, theta_i) in
                 expressions_at_i.zip(powers_of_theta.iter())
             {
-                agg += expr_i * theta_i
+                agg += expr_i? * theta_i
             }
 
             a_extended_coset_domain_evals.push(agg);
@@ -197,63 +262,78 @@ impl<F: PrimeField> LookupArgument<F> {
             Vec::<F>::with_capacity(extended_coset_domain.size());
 
         for i in 0..domain.size() {
-            let table_evals_at_i = table_queries.iter().map(|table_query| {
-                match table_query.oracle_type {
-                    OracleType::Witness => {
-                        panic!("Witness not allowed as table query")
-                    }
-                    OracleType::Instance => {
-                        panic!("Instance not allowed as table query")
-                    }
-                    OracleType::Fixed => {
-                        match table_oracles_mapping.get(&table_query.label) {
-                            Some(index) => table_oracles[*index].evals[i],
-                            None => panic!(
-                                "Fixed oracle with label {} not found",
-                                table_query.label
-                            ),
+            let table_evals_at_i = table_queries.iter().map(
+                |table_query| -> Result<_, PiopError> {
+                    match table_query.oracle_type {
+                        OracleType::Witness => {
+                            Err(PiopError::WitnessTableNotAllowed(
+                                table_query.label.clone(),
+                            ))
+                        }
+                        OracleType::Instance => {
+                            Err(PiopError::InstanceTableNotAllowed(
+                                table_query.label.clone(),
+                            ))
+                        }
+                        OracleType::Fixed => {
+                            match table_oracles_mapping.get(&table_query.label)
+                            {
+                                Some(index) => {
+                                    Ok(table_oracles[*index].evals[i])
+                                }
+                                None => Err(PiopError::MissingFixedOracle(
+                                    table_query.label.clone(),
+                                )
+                                .into()),
+                            }
                         }
                     }
-                }
-            });
+                },
+            );
 
             let mut agg = F::zero();
             for (expr_i, theta_i) in
                 table_evals_at_i.zip(powers_of_theta.iter())
             {
-                agg += expr_i * theta_i
+                agg += expr_i? * theta_i
             }
 
             s_original_domain_evals.push(agg);
         }
 
         for i in 0..extended_coset_domain.size() {
-            let table_evals_at_i = table_queries.iter().map(|table_query| {
-                match table_query.oracle_type {
-                    OracleType::Witness => {
-                        panic!("Witness not allowed as table query")
-                    }
-                    OracleType::Instance => {
-                        panic!("Instance not allowed as table query")
-                    }
-                    OracleType::Fixed => {
-                        match table_oracles_mapping.get(&table_query.label) {
-                            Some(index) => table_oracles[*index]
-                                .query_in_coset(i, Rotation::curr()),
-                            None => panic!(
-                                "Fixed oracle with label {} not found",
-                                table_query.label
-                            ),
+            let table_evals_at_i = table_queries.iter().map(
+                |table_query| -> Result<_, PiopError> {
+                    match table_query.oracle_type {
+                        OracleType::Witness => {
+                            Err(PiopError::WitnessTableNotAllowed(
+                                table_query.label.clone(),
+                            ))
+                        }
+                        OracleType::Instance => {
+                            Err(PiopError::InstanceTableNotAllowed(
+                                table_query.label.clone(),
+                            ))
+                        }
+                        OracleType::Fixed => {
+                            match table_oracles_mapping.get(&table_query.label)
+                            {
+                                Some(index) => table_oracles[*index]
+                                    .query_in_coset(i, Rotation::curr()),
+                                None => Err(PiopError::MissingFixedOracle(
+                                    table_query.label.clone(),
+                                )),
+                            }
                         }
                     }
-                }
-            });
+                },
+            );
 
             let mut agg = F::zero();
             for (expr_i, theta_i) in
                 table_evals_at_i.zip(powers_of_theta.iter())
             {
-                agg += expr_i * theta_i
+                agg += expr_i? * theta_i
             }
 
             s_extended_coset_domain_evals.push(agg);
@@ -323,7 +403,7 @@ impl<F: PrimeField> LookupArgument<F> {
             should_permute: false,
         };
 
-        (a, s, a_prime, s_prime)
+        Ok((a, s, a_prime, s_prime))
     }
 
     pub fn construct_a_and_s_unpermuted_polys_verifier<
@@ -344,7 +424,10 @@ impl<F: PrimeField> LookupArgument<F> {
         theta: F,                // lookup aggregation expression,
         evaluation_challenge: F, // evaluation_challenge
         omegas: &Vec<F>,
-    ) -> (WitnessVerifierOracle<F, PC>, WitnessVerifierOracle<F, PC>) {
+    ) -> Result<
+        (WitnessVerifierOracle<F, PC>, WitnessVerifierOracle<F, PC>),
+        Error<PC::Error>,
+    > {
         assert_eq!(lookup_expressions.len(), table_queries.len());
         let lookup_arith = lookup_expressions.len();
 
@@ -355,7 +438,7 @@ impl<F: PrimeField> LookupArgument<F> {
 
         let expression_evals = lookup_expressions.iter().map(|lookup_expr| {
             lookup_expr.evaluate(
-                &|x: F| x,
+                &Self::ident,
                 &|query| match query.oracle_type {
                     OracleType::Witness => {
                         let evaluation_challenge =
@@ -366,43 +449,40 @@ impl<F: PrimeField> LookupArgument<F> {
                         match witness_oracles_mapping.get(&query.label) {
                             Some(index) => witness_oracles[*index]
                                 .query(&evaluation_challenge),
-                            None => panic!(
-                                "Witness oracle with label {} not found",
-                                query.label
-                            ),
+                            None => Err(PiopError::MissingWitnessOracle(
+                                query.label.clone(),
+                            )),
                         }
                     }
                     OracleType::Instance => {
                         match instance_oracles_mapping.get(&query.label) {
                             Some(index) => instance_oracles[*index]
                                 .query(&evaluation_challenge),
-                            None => panic!(
-                                "Instance oracle with label {} not found",
-                                query.label
-                            ),
+                            None => Err(PiopError::MissingInstanceOracle(
+                                query.label.clone(),
+                            )),
                         }
                     }
                     OracleType::Fixed => {
                         match fixed_oracles_mapping.get(&query.label) {
                             Some(index) => fixed_oracles[*index]
                                 .query(&evaluation_challenge),
-                            None => panic!(
-                                "Fixed oracle with label {} not found",
-                                query.label
-                            ),
+                            None => Err(PiopError::MissingFixedOracle(
+                                query.label.clone(),
+                            )),
                         }
                     }
                 },
-                &|x: F| -x,
-                &|x: F, y: F| x + y,
-                &|x: F, y: F| x * y,
-                &|x: F, y: F| x * y,
+                &Self::neg,
+                &Self::add,
+                &Self::mul,
+                &Self::scale,
             )
         });
 
         let mut agg = F::zero();
         for (expr_i, theta_i) in expression_evals.zip(powers_of_theta.iter()) {
-            agg += expr_i * theta_i
+            agg += expr_i? * theta_i
         }
 
         let a = WitnessVerifierOracle::<F, PC> {
@@ -413,32 +493,38 @@ impl<F: PrimeField> LookupArgument<F> {
             should_permute: false,
         };
 
-        let table_evals_at_xi = table_queries.iter().map(|table_query| {
-            match table_query.oracle_type {
-                OracleType::Witness => {
-                    panic!("Witness not allowed as table query")
-                }
-                OracleType::Instance => {
-                    panic!("Instance not allowed as table query")
-                }
-                OracleType::Fixed => {
-                    match table_oracles_mapping.get(&table_query.label) {
-                        Some(index) => {
-                            table_oracles[*index].query(&evaluation_challenge)
+        let table_evals_at_xi =
+            table_queries
+                .iter()
+                .map(|table_query| -> Result<F, PiopError> {
+                    match table_query.oracle_type {
+                        OracleType::Witness => {
+                            Err(PiopError::WitnessTableNotAllowed(
+                                table_query.label.clone(),
+                            ))
                         }
-                        None => panic!(
-                            "Fixed oracle with label {} not found",
-                            table_query.label
-                        ),
+                        OracleType::Instance => {
+                            Err(PiopError::InstanceTableNotAllowed(
+                                table_query.label.clone(),
+                            ))
+                        }
+                        OracleType::Fixed => {
+                            match table_oracles_mapping.get(&table_query.label)
+                            {
+                                Some(index) => table_oracles[*index]
+                                    .query(&evaluation_challenge),
+                                None => Err(PiopError::MissingFixedOracle(
+                                    table_query.label.clone(),
+                                )),
+                            }
+                        }
                     }
-                }
-            }
-        });
+                });
 
         let mut agg = F::zero();
         for (table_i, theta_i) in table_evals_at_xi.zip(powers_of_theta.iter())
         {
-            agg += table_i * theta_i
+            agg += table_i? * theta_i
         }
 
         let s = WitnessVerifierOracle::<F, PC> {
@@ -449,7 +535,7 @@ impl<F: PrimeField> LookupArgument<F> {
             should_permute: false,
         };
 
-        (a, s)
+        Ok((a, s))
     }
 
     pub fn instantiate_argument_at_omega_i(
@@ -465,7 +551,7 @@ impl<F: PrimeField> LookupArgument<F> {
         gamma: F,
         omega_index: usize,
         alpha_powers: &[F],
-    ) -> F {
+    ) -> Result<F, PiopError> {
         // we need 3 alphas for subset equality check
         // + 1 to check that A'(w^0) = S'(w^0)
         // + 1 to check well formation of A' and S'
@@ -486,15 +572,18 @@ impl<F: PrimeField> LookupArgument<F> {
             gamma,
             omega_index,
             &alpha_powers[0..3].to_vec(),
-        );
+        )?;
 
-        let a_prime_x = a_prime.query_in_coset(omega_index, Rotation::curr());
+        let a_prime_x =
+            a_prime.query_in_coset(omega_index, Rotation::curr())?;
         let a_prime_minus_wx =
-            a_prime.query_in_coset(omega_index, Rotation::prev());
+            a_prime.query_in_coset(omega_index, Rotation::prev())?;
 
-        let s_prime_x = s_prime.query_in_coset(omega_index, Rotation::curr());
+        let s_prime_x =
+            s_prime.query_in_coset(omega_index, Rotation::curr())?;
 
-        let q_blind_x = q_blind.query_in_coset(omega_index, Rotation::curr());
+        let q_blind_x =
+            q_blind.query_in_coset(omega_index, Rotation::curr())?;
 
         num += alpha_powers[3]
             * l0_coset_evals[omega_index]
@@ -509,7 +598,7 @@ impl<F: PrimeField> LookupArgument<F> {
             * a_s_equality_check
             * a_a_prev_equality_check;
 
-        num
+        Ok(num)
     }
 
     pub fn open_argument<PC: HomomorphicCommitment<F>>(
@@ -526,7 +615,7 @@ impl<F: PrimeField> LookupArgument<F> {
         evaluation_challenge: &F,
         domain: &GeneralEvaluationDomain<F>,
         alpha_powers: &[F],
-    ) -> F {
+    ) -> Result<F, Error<PC::Error>> {
         assert_eq!(alpha_powers.len(), 5);
 
         let mut opening = F::zero();
@@ -545,18 +634,18 @@ impl<F: PrimeField> LookupArgument<F> {
             evaluation_challenge,
             domain,
             &alpha_powers[..3].to_vec(),
-        );
+        )?;
 
         let negative_shifted_evaluation_challenge =
             domain.element(1).inverse().unwrap() * evaluation_challenge;
 
-        let a_prime_xi = a_prime.query(&evaluation_challenge);
+        let a_prime_xi = a_prime.query(&evaluation_challenge)?;
         let a_prime_minus_wxi =
-            a_prime.query(&negative_shifted_evaluation_challenge);
+            a_prime.query(&negative_shifted_evaluation_challenge)?;
 
-        let s_prime_xi = s_prime.query(&evaluation_challenge);
+        let s_prime_xi = s_prime.query(&evaluation_challenge)?;
 
-        let q_blind_xi = q_blind.query(&evaluation_challenge);
+        let q_blind_xi = q_blind.query(&evaluation_challenge)?;
 
         opening += alpha_powers[3] * l0_eval * (a_prime_xi - s_prime_xi);
 
@@ -569,7 +658,7 @@ impl<F: PrimeField> LookupArgument<F> {
             * a_s_equality_check
             * a_a_prev_equality_check;
 
-        opening
+        Ok(opening)
     }
 }
 
@@ -786,7 +875,8 @@ mod test {
                 gamma,
                 i,
                 &alpha_powers,
-            );
+            )
+            .unwrap();
 
             num_evals.push(ni);
         }
@@ -916,7 +1006,8 @@ mod test {
             &evaluation_challenge,
             &domain,
             &alpha_powers,
-        );
+        )
+        .unwrap();
 
         assert_eq!(
             opening,

@@ -532,7 +532,7 @@ mod copy_constraint_tests {
                 gamma,
                 &domain,
                 &powers_of_alpha,
-            );
+            ).unwrap();
 
             permutation_coset_evals.push(q_i);
         }
@@ -720,19 +720,21 @@ mod copy_constraint_tests {
         let permutation_oracles = [sigma_1, sigma_2, sigma_3];
         let z_polys = [z_poly_0, z_poly_1, z_poly_2];
 
-        let permutation_eval = permutation_argument.open_argument(
-            l_0_eval,
-            l_u_eval,
-            &q_blind,
-            &z_polys,
-            &permutation_oracles,
-            &witness_oracles,
-            beta,
-            gamma,
-            &domain,
-            evaluation_challenge,
-            &powers_of_alpha,
-        );
+        let permutation_eval = permutation_argument
+            .open_argument(
+                l_0_eval,
+                l_u_eval,
+                &q_blind,
+                &z_polys,
+                &permutation_oracles,
+                &witness_oracles,
+                beta,
+                gamma,
+                &domain,
+                evaluation_challenge,
+                &powers_of_alpha,
+            )
+            .unwrap();
 
         assert_eq!(permutation_eval, q_eval * zh_eval);
     }
@@ -1346,7 +1348,7 @@ mod copy_constraint_tests {
             fixed_oracles: selector_oracles,
             table_oracles: vec![],
             permutation_oracles: sigma_oracles.clone(),
-            q_blind: q_blind,
+            q_blind,
         };
 
         // We clone because fixed oracles must be mutable in order to add evals at challenge

@@ -1,14 +1,13 @@
-use super::piop::PIOPError;
-
+use crate::piop::error::Error as PiopError;
 #[derive(Debug)]
 pub enum Error<E> {
     /// There was an error in the underlying polynomial commitment.
     PolynomialCommitmentError(E),
 
-    /// There was an error in piop
-    PIOPError(PIOPError),
+    /// There was an error in PIOP.
+    PIOPError(PiopError),
 
-    /// Pairing was evaluated as false
+    /// Pairing check does not hold.
     OpeningCheckFailed,
 }
 
@@ -18,8 +17,10 @@ impl<E> Error<E> {
     pub fn from_pc_err(err: E) -> Self {
         Self::PolynomialCommitmentError(err)
     }
+}
 
-    pub fn from_piop_err(err: PIOPError) -> Self {
+impl<E> From<PiopError> for Error<E> {
+    fn from(err: PiopError) -> Self {
         Error::PIOPError(err)
     }
 }
