@@ -1218,7 +1218,6 @@ mod copy_constraint_tests {
             &mut instance_oracles,
             &vos,
             domain_size,
-            &domain.vanishing_polynomial().into(),
             &mut rng,
         )
         .unwrap();
@@ -1237,7 +1236,6 @@ mod copy_constraint_tests {
         let pi = InstanceVerifierOracle {
             label: "pi".to_string(),
             poly: pi_poly.clone(),
-            evals: pi_evals.clone(),
             queried_rotations: BTreeSet::new(),
         };
 

@@ -54,7 +54,6 @@ pub struct ProverState<'a, F: PrimeField> {
     pub(crate) oracles_to_copy: Vec<&'a WitnessProverOracle<F>>,
     pub(crate) vos: &'a [&'a dyn VirtualOracle<F>],
     pub(crate) domain: GeneralEvaluationDomain<F>,
-    pub(crate) vanishing_polynomial: DensePolynomial<F>,
     pub(crate) quotient_chunks: Option<Vec<WitnessProverOracle<F>>>,
 }
 
@@ -87,7 +86,6 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
         instance_oracles: &'a [InstanceProverOracle<F>],
         vos: &'a [&'a dyn VirtualOracle<F>],
         domain_size: usize,
-        vanishing_polynomial: &DensePolynomial<F>,
         preprocessed: &ProverPreprocessedInput<F, PC>,
     ) -> ProverState<'a, F> {
         let domain = GeneralEvaluationDomain::new(domain_size).unwrap();
@@ -133,7 +131,6 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
             oracles_to_copy,
             vos,
             domain,
-            vanishing_polynomial: vanishing_polynomial.clone(),
             quotient_chunks: None,
         }
     }

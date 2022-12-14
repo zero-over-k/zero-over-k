@@ -144,7 +144,6 @@ pub(crate) fn run_prover(
         &mut instance_oracles,
         &vos,
         domain.size(),
-        &domain.vanishing_polynomial().into(),
         rng,
     )
     .unwrap();
@@ -181,7 +180,7 @@ pub(crate) fn run_verifier(
         .map(|(label, evals)| {
             let poly =
                 DensePolynomial::from_coefficients_slice(&domain.ifft(&evals));
-            InstanceVerifierOracle::new(label, poly, &evals)
+            InstanceVerifierOracle::new(label, poly)
         })
         .collect();
 

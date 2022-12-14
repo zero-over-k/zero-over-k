@@ -67,7 +67,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng>
         fs_rng: &mut FS,
         zk_rng: &mut R,
     ) -> Result<Proof<F, PC>, Error<PC::Error>> {
-        let verifier_state = PIOP::init_verifier(evaluation_challenge);
+        let verifier_state = PIOP::init_verifier();
 
         let (verifier_state, verifier_first_msg) =
             PIOP::verifier_first_round(verifier_state, fs_rng);
@@ -137,7 +137,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng>
         fs_rng: &mut FS,
     ) -> Result<(), Error<PC::Error>> {
         let domain = GeneralEvaluationDomain::new(domain_size).unwrap();
-        let verifier_state = PIOP::init_verifier(evaluation_challenge);
+        let verifier_state = PIOP::init_verifier();
 
         let (verifier_state, verifier_first_msg) =
             PIOP::verifier_first_round(verifier_state, fs_rng);

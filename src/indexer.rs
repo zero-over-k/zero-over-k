@@ -97,7 +97,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
     fn compute_zh_evals(
         domain: &GeneralEvaluationDomain<F>,
         extended_coset_domain: &GeneralEvaluationDomain<F>,
-        zH: DensePolynomial<F>,
+        z_h: DensePolynomial<F>,
     ) -> Vec<F> {
         assert!(domain.size() <= extended_coset_domain.size());
         /*
@@ -107,7 +107,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
         let domain_size = domain.size();
         let vanish_dense: DensePolynomial<F> =
             domain.vanishing_polynomial().into();
-        let zh_inverses_over_coset = if vanish_dense == zH
+        let zh_inverses_over_coset = if vanish_dense == z_h
             && domain_size == extended_coset_domain.size()
         {
             let zh_eval = domain
@@ -115,7 +115,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
                 .inverse()
                 .unwrap();
             iter::repeat(zh_eval).take(domain_size).collect()
-        } else if vanish_dense == zH {
+        } else if vanish_dense == z_h {
             // extended_coset_domain must be bigger then original domain
             let mut zh_evals = compute_vanishing_poly_over_coset(
                 extended_coset_domain.clone(),
@@ -124,7 +124,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
             ark_ff::batch_inversion(&mut zh_evals);
             zh_evals
         } else {
-            let mut zh_evals = extended_coset_domain.coset_fft(&zH);
+            let mut zh_evals = extended_coset_domain.coset_fft(&z_h);
             ark_ff::batch_inversion(&mut zh_evals);
             zh_evals
         };
@@ -140,7 +140,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
         instance_oracles: &[impl InstanceOracle<F>],
         fixed_oracles: &[impl FixedOracle<F>],
         domain: GeneralEvaluationDomain<F>,
-        zH: &DensePolynomial<F>,
+        z_h: &DensePolynomial<F>,
         permutation_info: PermutationInfo<F>,
         usable_rows: usize,
     ) -> Result<VerifierKey<'a, F, PC>, Error<PC::Error>> {
@@ -172,7 +172,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
             &fixed_oracles_mapping,
             vos,
             domain.size(),
-            zH.degree(),
+            z_h.degree(),
         )?;
 
         // TODO: we can introduce next power of 2 check here instead of creating domain and then dividing
@@ -217,8 +217,11 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
             GeneralEvaluationDomain::<F>::new(scaling_factor * domain.size())
                 .unwrap();
 
-        let zh_inverses_over_coset =
-            Self::compute_zh_evals(&domain, &extended_coset_domain, zH.clone());
+        let zh_inverses_over_coset = Self::compute_zh_evals(
+            &domain,
+            &extended_coset_domain,
+            z_h.clone(),
+        );
 
         let index_info = Index {
             quotient_degree,

@@ -2,19 +2,13 @@ use crate::{
     commitment::HomomorphicCommitment, oracles::traits::QuerySetProvider,
 };
 use ark_ff::PrimeField;
-use ark_poly::{
-    univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
-};
 use ark_poly_commit::QuerySet;
 use ark_std::rand::RngCore;
 
 use super::PIOPforPolyIdentity;
 
 /// State of the verifier
-pub struct VerifierState<'a, F: PrimeField> {
-    pub(crate) domain: GeneralEvaluationDomain<F>,
-    pub(crate) vanishing_polynomial: &'a DensePolynomial<F>,
-
+pub struct VerifierState<F: PrimeField> {
     pub(crate) lookup_aggregation_msg:
         Option<VerifierLookupAggregationRound<F>>,
     pub(crate) permutation_msg: Option<VerifierPermutationMsg<F>>,
@@ -49,13 +43,8 @@ pub struct VerifierSecondMsg<F: PrimeField> {
 }
 
 impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
-    pub fn init_verifier(
-        domain_size: usize,
-        vanishing_polynomial: &DensePolynomial<F>,
-    ) -> VerifierState<F> {
+    pub fn init_verifier() -> VerifierState<F> {
         VerifierState {
-            domain: GeneralEvaluationDomain::new(domain_size).unwrap(),
-            vanishing_polynomial,
             lookup_aggregation_msg: None,
             permutation_msg: None,
             first_round_msg: None,
@@ -65,9 +54,9 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
 
     /// Output lookup aggregation challenge
     pub fn verifier_lookup_aggregation_round<'a, R: RngCore>(
-        mut state: VerifierState<'a, F>,
+        mut state: VerifierState<F>,
         rng: &mut R,
-    ) -> (VerifierLookupAggregationRound<F>, VerifierState<'a, F>) {
+    ) -> (VerifierLookupAggregationRound<F>, VerifierState<F>) {
         let theta = F::rand(rng);
 
         let msg = VerifierLookupAggregationRound { theta };
@@ -78,9 +67,9 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
 
     /// Output permutation challenges.
     pub fn verifier_permutation_round<'a, R: RngCore>(
-        mut state: VerifierState<'a, F>,
+        mut state: VerifierState<F>,
         rng: &mut R,
-    ) -> (VerifierPermutationMsg<F>, VerifierState<'a, F>) {
+    ) -> (VerifierPermutationMsg<F>, VerifierState<F>) {
         let beta = F::rand(rng);
         let gamma = F::rand(rng);
 
@@ -94,10 +83,10 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
     // ex. quotient round, multiopen challenge round, ...
 
     /// Output the first message.
-    pub fn verifier_first_round<'a, R: RngCore>(
-        mut state: VerifierState<'a, F>,
+    pub fn verifier_first_round<R: RngCore>(
+        mut state: VerifierState<F>,
         rng: &mut R,
-    ) -> (VerifierFirstMsg<F>, VerifierState<'a, F>) {
+    ) -> (VerifierFirstMsg<F>, VerifierState<F>) {
         let alpha = F::rand(rng);
 
         let msg = VerifierFirstMsg { alpha };
@@ -107,10 +96,10 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
     }
 
     /// Output the second message.
-    pub fn verifier_second_round<'a, R: RngCore>(
-        mut state: VerifierState<'a, F>,
+    pub fn verifier_second_round<R: RngCore>(
+        mut state: VerifierState<F>,
         rng: &mut R,
-    ) -> (VerifierSecondMsg<F>, VerifierState<'a, F>) {
+    ) -> (VerifierSecondMsg<F>, VerifierState<F>) {
         let xi = F::rand(rng);
 
         let msg = VerifierSecondMsg { xi, label: "xi" };

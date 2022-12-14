@@ -314,7 +314,6 @@ mod test {
             &mut instance_oracles,
             &vos,
             domain_size,
-            &domain.vanishing_polynomial().into(),
             &mut rng,
         )
         .unwrap();

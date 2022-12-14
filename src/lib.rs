@@ -90,7 +90,6 @@ where
         instance_oracles: &'a mut [InstanceProverOracle<F>],
         vos: &[&'a dyn VirtualOracle<F>], // TODO: this should be in index
         domain_size: usize,
-        vanishing_polynomial: &DensePolynomial<F>,
         zk_rng: &mut R,
     ) -> Result<Proof<F, PC>, Error<PC::Error>> {
         let mut fs_rng =
@@ -132,14 +131,10 @@ where
             instance_oracles,
             vos,
             domain_size,
-            vanishing_polynomial,
             preprocessed,
         );
 
-        let verifier_init_state = PIOPforPolyIdentity::<F, PC>::init_verifier(
-            domain_size,
-            vanishing_polynomial,
-        );
+        let verifier_init_state = PIOPforPolyIdentity::<F, PC>::init_verifier();
 
         let (verifier_lookup_aggregation_msg, verifier_state) =
             PIOPforPolyIdentity::<F, PC>::verifier_lookup_aggregation_round(
@@ -576,10 +571,7 @@ where
         vanishing_polynomial: &DensePolynomial<F>,
         _zk_rng: &mut R,
     ) -> Result<(), Error<PC::Error>> {
-        let verifier_init_state = PIOPforPolyIdentity::<F, PC>::init_verifier(
-            domain_size,
-            vanishing_polynomial,
-        );
+        let verifier_init_state = PIOPforPolyIdentity::<F, PC>::init_verifier();
 
         let mut fs_rng =
             FS::initialize(&to_bytes![&Self::PROTOCOL_NAME].unwrap()); // TODO: add &pk.vk, &public oracles to transcript, fixed evals

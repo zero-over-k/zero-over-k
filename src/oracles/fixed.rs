@@ -82,12 +82,6 @@ impl<F: PrimeField> Clone for FixedProverOracle<F> {
     }
 }
 
-// impl<F: PrimeField> FixedProverOracle<F> {
-//     pub fn register_eval_at_challenge(&mut self, challenge: F, eval: F) {
-//         let _ = self.evals_at_challenges.insert(challenge, eval);
-//     }
-// }
-
 impl<F: PrimeField> ConcreteOracle<F> for FixedProverOracle<F> {
     fn register_rotation(&mut self, rotation: Rotation) {
         self.queried_rotations.insert(rotation);
@@ -140,21 +134,6 @@ impl<F: PrimeField> Instantiable<F> for FixedProverOracle<F> {
     }
 }
 
-// impl<F: PrimeField> CommittedOracle<F, PC>
-//     for FixedProverOracle<F>
-// {
-//     fn register_commitment(&mut self, c: <PC>::Commitment) {
-//         self.commitment = Some(c);
-//     }
-
-//     fn get_commitment(&self) -> &<PC>::Commitment {
-//         match &self.commitment {
-//             Some(c) => c,
-//             None => panic!("Commitment missing"),
-//         }
-//     }
-// }
-
 impl<F: PrimeField> QuerySetProvider<F> for FixedProverOracle<F> {}
 
 pub struct FixedVerifierOracle<F: PrimeField, PC: HomomorphicCommitment<F>> {
@@ -179,9 +158,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> FixedVerifierOracle<F, PC> {
     }
 
     /// Creates a new FixedVerifierOracle from a LabeledCommitment
-    pub(crate) fn from_commitment(
-        comm: LabeledCommitment<PC::Commitment>,
-    ) -> Self {
+    pub fn from_commitment(comm: LabeledCommitment<PC::Commitment>) -> Self {
         Self::new(comm.label(), Some(comm.commitment().clone()))
     }
 }

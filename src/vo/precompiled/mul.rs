@@ -162,7 +162,6 @@ mod test {
             &mut instance_oracles,
             &vos,
             domain_size,
-            &domain.vanishing_polynomial().into(),
             &mut rng,
         )
         .unwrap();
@@ -174,7 +173,7 @@ mod test {
         // Repeat just to make sure some change from prover does not affect this
         let a_ver = WitnessVerifierOracle::<F, PC>::new("a", false);
         let b_ver = WitnessVerifierOracle::<F, PC>::new("b", false);
-        let c = InstanceVerifierOracle::new("c", c_poly.clone(), &c_evals);
+        let c = InstanceVerifierOracle::new("c", c_poly.clone());
 
         let mut ver_wtns_oracles = [a_ver, b_ver];
         let mut instance_oracles = [c];
