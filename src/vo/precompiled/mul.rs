@@ -234,9 +234,8 @@ mod test {
             domain_size,
             &domain.vanishing_polynomial().into(),
             &mut rng,
-        )
-        .unwrap();
+        );
 
-        assert_eq!(res, ());
+        assert_eq!(res.is_ok(), true);
     }
 }

@@ -17,6 +17,7 @@ use crate::data_structures::{
     PermutationInfo, Proof, ProverKey, ProverPreprocessedInput,
     VerifierPreprocessedInput,
 };
+use crate::error::Error;
 use crate::indexer::Indexer;
 use crate::oracles::fixed::{FixedProverOracle, FixedVerifierOracle};
 use crate::oracles::instance::{InstanceProverOracle, InstanceVerifierOracle};
@@ -168,7 +169,8 @@ pub(crate) fn run_verifier(
     mut vo: GenericVO<F>,
     proof: Proof<F, PC>,
     rng: &mut StdRng,
-) {
+) -> Result<(), Error<<PC as PolynomialCommitment<F, DensePolynomial<F>>>::Error>>
+{
     // 1. Generate Verifier Oracles
     let mut witness_ver_oracles: Vec<_> = witness_labels
         .into_iter()
@@ -243,8 +245,7 @@ pub(crate) fn run_verifier(
         domain.size(),
         &domain.vanishing_polynomial().into(),
         rng,
-    )
-    .unwrap();
+    );
 
     res
 }

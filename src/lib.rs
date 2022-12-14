@@ -926,7 +926,7 @@ where
                 }
 
                 WitnessVerifierOracle::<F, PC> {
-                    label: format!("agg_permutation_{}", i).to_string(),
+                    label: format!("agg_permutation_{}", i),
                     queried_rotations,
                     evals_at_challenges: BTreeMap::default(),
                     commitment: Some(zi.clone()),
@@ -967,7 +967,7 @@ where
 
         preprocessed.q_blind.register_eval_at_challenge(
             verifier_second_msg.xi,
-            proof.q_blind_eval.clone(),
+            proof.q_blind_eval,
         );
 
         // END CHALLENGE => EVALS MAPPING
@@ -1067,14 +1067,10 @@ where
                         }
                     }
                 },
-                &|x| x.and_then(|x_val| Ok(-x_val)),
-                &|x, y| {
-                    x.and_then(|x_val| y.and_then(|y_val| Ok(x_val + y_val)))
-                },
-                &|x, y| {
-                    x.and_then(|x_val| y.and_then(|y_val| Ok(x_val * y_val)))
-                },
-                &|x, y| x.and_then(|x_val| Ok(x_val * y)),
+                &|x| x.map(|x_val| -x_val),
+                &|x, y| x.and_then(|x_val| y.map(|y_val| x_val + y_val)),
+                &|x, y| x.and_then(|x_val| y.map(|y_val| x_val * y_val)),
+                &|x, y| x.map(|x_val| x_val * y),
             )?;
 
             quotient_eval += powers_of_alpha[vo_index] * vo_evaluation;
@@ -1082,7 +1078,7 @@ where
 
         // Permutation argument
         // If there are no oracles to enforce copy constraints on, we just return zero
-        quotient_eval += if oracles_to_copy.len() > 0 {
+        quotient_eval += if !oracles_to_copy.is_empty() {
             vk.index_info.permutation_argument.open_argument(
                 l0_eval,
                 lu_eval,
@@ -1163,9 +1159,9 @@ where
                 .map(|o| o as &dyn CommittedOracle<F, PC>)
                 .collect();
 
-        oracles.extend_from_slice(&preprocessed_oracles.as_slice());
+        oracles.extend_from_slice(preprocessed_oracles.as_slice());
 
-        let res = Multiopen::<F, PC, FS>::verify(
+        Multiopen::<F, PC, FS>::verify(
             &vk.verifier_key,
             proof.multiopen_proof,
             &oracles,
@@ -1173,8 +1169,6 @@ where
             domain_size,
             &mut fs_rng,
         )
-        .map_err(Error::from_multiproof_err)?;
-
-        Ok(res)
+        .map_err(Error::from_multiproof_err)
     }
 }

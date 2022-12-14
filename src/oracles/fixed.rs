@@ -53,7 +53,7 @@ impl<F: PrimeField> FixedProverOracle<F> {
         let poly =
             DensePolynomial::from_coefficients_slice(&domain.ifft(evals));
         Self {
-            label: label.clone(),
+            label,
             evals: evals.clone(),
             evals_at_coset_of_extended_domain: Some(
                 extended_coset_domain.coset_fft(&poly),
