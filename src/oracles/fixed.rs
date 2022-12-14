@@ -46,7 +46,7 @@ impl<F: PrimeField> FixedProverOracle<F> {
     /// Creates new FixedProverOracle from evaluations over a domain
     pub fn from_evals_and_domains(
         label: String,
-        evals: &Vec<F>,
+        evals: &[F],
         domain: &GeneralEvaluationDomain<F>,
         extended_coset_domain: &GeneralEvaluationDomain<F>,
     ) -> Self {
@@ -54,7 +54,7 @@ impl<F: PrimeField> FixedProverOracle<F> {
             DensePolynomial::from_coefficients_slice(&domain.ifft(evals));
         Self {
             label,
-            evals: evals.clone(),
+            evals: evals.to_vec(),
             evals_at_coset_of_extended_domain: Some(
                 extended_coset_domain.coset_fft(&poly),
             ),
@@ -205,7 +205,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> ConcreteOracle<F>
     }
 
     fn query(&self, challenge: &F) -> Result<F, Error> {
-        match self.evals_at_challenges.get(&challenge) {
+        match self.evals_at_challenges.get(challenge) {
             Some(eval) => Ok(*eval),
             None => Err(Error::MissingConcreteEval(self.label.clone())),
         }

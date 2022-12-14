@@ -300,9 +300,9 @@ mod test {
         let pk = ProverKey::from_ck_and_vk(&ck, &vk);
 
         let preprocessed = ProverPreprocessedInput::new(
-            &fixed_oracles.to_vec(),
-            &vec![],
-            &table_oracles.to_vec(),
+            fixed_oracles.as_ref(),
+            &[],
+            table_oracles.as_ref(),
             &q_blind,
             &vk.index_info,
         );
@@ -347,7 +347,7 @@ mod test {
         };
 
         let labeled_selectors: Vec<LabeledPolynomial<F, DensePolynomial<F>>> =
-            [(q_poly.clone(), "q")]
+            [(q_poly, "q")]
                 .iter()
                 .map(|(poly, label)| {
                     LabeledPolynomial::new(
@@ -368,13 +368,13 @@ mod test {
                 label: cmt.label().clone(),
                 queried_rotations: BTreeSet::default(),
                 evals_at_challenges: BTreeMap::default(),
-                commitment: Some(cmt.commitment().clone()),
+                commitment: Some(*cmt.commitment()),
             })
             .collect();
 
         let labeled_table_oracles: Vec<
             LabeledPolynomial<F, DensePolynomial<F>>,
-        > = [(table_poly.clone(), "t")]
+        > = [(table_poly, "t")]
             .iter()
             .map(|(poly, label)| {
                 LabeledPolynomial::new(
@@ -395,7 +395,7 @@ mod test {
                 label: cmt.label().clone(),
                 queried_rotations: BTreeSet::default(),
                 evals_at_challenges: BTreeMap::default(),
-                commitment: Some(cmt.commitment().clone()),
+                commitment: Some(*cmt.commitment()),
             })
             .collect();
 
@@ -407,7 +407,7 @@ mod test {
             label: "q_blind".into(),
             queried_rotations: BTreeSet::from([Rotation::curr()]),
             evals_at_challenges: BTreeMap::default(),
-            commitment: Some(q_blind_commitment[0].commitment().clone()),
+            commitment: Some(*q_blind_commitment[0].commitment()),
         };
 
         let mut ver_wtns_oracles = [a_ver, b_ver, c_ver];
@@ -436,11 +436,11 @@ mod test {
         let vos: Vec<&dyn VirtualOracle<F>> = vec![&mul_vo];
         let lookups: Vec<&dyn LookupVirtualOracle<F>> = vec![&lookup_vo];
 
-        let mut vk = Indexer::<F, PC>::index(
+        let vk = Indexer::<F, PC>::index(
             &verifier_key,
             &vos,
             lookups,
-            &mut ver_wtns_oracles,
+            &ver_wtns_oracles,
             &instance_oracles,
             &fixed_oracles,
             domain,
@@ -460,10 +460,10 @@ mod test {
         // Since we mutate fixed oracles by adding evals at challenge for specific proof
         // preprocessed input is cloned in order to enable preserving original preprocessed
         // Second option is just to "reset" preprocessed after verification ends
-        let mut pp_clone = preprocessed.clone();
+        let mut pp_clone = preprocessed;
 
         let res = PilInstance::verify(
-            &mut vk,
+            &vk,
             &mut pp_clone,
             proof,
             &mut ver_wtns_oracles,
@@ -472,9 +472,8 @@ mod test {
             domain_size,
             &domain.vanishing_polynomial().into(),
             &mut rng,
-        )
-        .unwrap();
+        );
 
-        assert_eq!(res, ());
+        assert!(res.is_ok())
     }
 }

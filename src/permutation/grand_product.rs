@@ -93,7 +93,7 @@ impl<F: PrimeField> GrandProductArgument<F> {
 
         // NOTE: Maybe consider another type for Z polys which will always have evals and should_permute field will be removed
         WitnessProverOracle {
-            label: format!("agg_permutation_{}", chunk_index).to_string(),
+            label: format!("agg_permutation_{}", chunk_index),
             poly: z_poly,
             evals_at_coset_of_extended_domain,
             queried_rotations,

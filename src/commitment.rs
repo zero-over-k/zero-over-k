@@ -47,7 +47,7 @@ pub type KZG10Commitment<E> = <KZG10<E> as PolynomialCommitment<
     DensePolynomial<<E as PairingEngine>::Fr>,
 >>::Commitment;
 
-impl<'a, E> HomomorphicCommitment<E::Fr> for KZG10<E>
+impl<E> HomomorphicCommitment<E::Fr> for KZG10<E>
 where
     E: PairingEngine,
 {

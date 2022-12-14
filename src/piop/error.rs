@@ -1,7 +1,7 @@
 use crate::oracles::rotation::Rotation;
 use crate::vo::error::Error as VOError;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum Error {
     /// Missing commiment.
     MissingWitnessCommitment(String),

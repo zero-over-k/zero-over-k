@@ -157,7 +157,7 @@ mod copy_constraint_tests {
         let dummy = F::from(999u64);
 
         let fill_dummy = |evals: &mut Vec<F>| {
-            let dummys = vec![dummy.clone(); domain_size - evals.len()];
+            let dummys = vec![dummy; domain_size - evals.len()];
             evals.extend_from_slice(&dummys);
         };
 
@@ -836,7 +836,7 @@ mod copy_constraint_tests {
         let dummy = F::from(999u64);
 
         let fill_dummy = |evals: &mut Vec<F>| {
-            let dummys = vec![dummy.clone(); domain_size - evals.len()];
+            let dummys = vec![dummy; domain_size - evals.len()];
             evals.extend_from_slice(&dummys);
         };
 
@@ -1048,7 +1048,7 @@ mod copy_constraint_tests {
         // Witness oracles
         let a = WitnessProverOracle {
             label: "a".to_string(),
-            poly: a_poly.clone(),
+            poly: a_poly,
             evals_at_coset_of_extended_domain: None,
             queried_rotations: BTreeSet::default(),
             should_permute: true,
@@ -1057,7 +1057,7 @@ mod copy_constraint_tests {
 
         let b = WitnessProverOracle {
             label: "b".to_string(),
-            poly: b_poly.clone(),
+            poly: b_poly,
             evals_at_coset_of_extended_domain: None,
             queried_rotations: BTreeSet::default(),
             should_permute: true,
@@ -1066,7 +1066,7 @@ mod copy_constraint_tests {
 
         let c = WitnessProverOracle {
             label: "c".to_string(),
-            poly: c_poly.clone(),
+            poly: c_poly,
             evals_at_coset_of_extended_domain: None,
             queried_rotations: BTreeSet::default(),
             should_permute: true,
@@ -1077,7 +1077,7 @@ mod copy_constraint_tests {
         let pi = InstanceProverOracle {
             label: "pi".to_string(),
             poly: pi_poly.clone(),
-            evals: pi_evals.clone(),
+            evals: pi_evals,
             evals_at_coset_of_extended_domain: None,
             queried_rotations: BTreeSet::default(),
         };
@@ -1086,7 +1086,7 @@ mod copy_constraint_tests {
         let qm = FixedProverOracle {
             label: "qm".to_string(),
             poly: qm_poly.clone(),
-            evals: qm_evals.clone(),
+            evals: qm_evals,
             evals_at_coset_of_extended_domain: None,
             queried_rotations: BTreeSet::default(),
         };
@@ -1094,7 +1094,7 @@ mod copy_constraint_tests {
         let ql = FixedProverOracle {
             label: "ql".to_string(),
             poly: ql_poly.clone(),
-            evals: ql_evals.clone(),
+            evals: ql_evals,
             evals_at_coset_of_extended_domain: None,
             queried_rotations: BTreeSet::default(),
         };
@@ -1102,7 +1102,7 @@ mod copy_constraint_tests {
         let qr = FixedProverOracle {
             label: "qr".to_string(),
             poly: qr_poly.clone(),
-            evals: qr_evals.clone(),
+            evals: qr_evals,
             evals_at_coset_of_extended_domain: None,
             queried_rotations: BTreeSet::default(),
         };
@@ -1110,7 +1110,7 @@ mod copy_constraint_tests {
         let qo = FixedProverOracle {
             label: "qo".to_string(),
             poly: qo_poly.clone(),
-            evals: qo_evals.clone(),
+            evals: qo_evals,
             evals_at_coset_of_extended_domain: None,
             queried_rotations: BTreeSet::default(),
         };
@@ -1159,7 +1159,7 @@ mod copy_constraint_tests {
 
         let q_blind = FixedProverOracle {
             label: "q_blind".to_string(),
-            poly: q_blind_poly.clone(),
+            poly: q_blind_poly,
             evals_at_coset_of_extended_domain: None,
             evals: q_blind_evals.to_vec(),
             queried_rotations: BTreeSet::from([Rotation::curr()]),
@@ -1204,9 +1204,9 @@ mod copy_constraint_tests {
         let pk = ProverKey::from_ck_and_vk(&ck, &vk);
 
         let preprocessed = ProverPreprocessedInput::new(
-            &fixed_oracles.to_vec(),
-            &permutation_oracles.to_vec(),
-            &vec![],
+            fixed_oracles.as_ref(),
+            permutation_oracles.as_ref(),
+            &[],
             &q_blind,
             &vk.index_info,
         );
@@ -1235,7 +1235,7 @@ mod copy_constraint_tests {
 
         let pi = InstanceVerifierOracle {
             label: "pi".to_string(),
-            poly: pi_poly.clone(),
+            poly: pi_poly,
             queried_rotations: BTreeSet::new(),
         };
 
@@ -1243,10 +1243,10 @@ mod copy_constraint_tests {
 
         let labeled_selectors: Vec<LabeledPolynomial<F, DensePolynomial<F>>> =
             [
-                (qm_poly.clone(), "qm"),
-                (ql_poly.clone(), "ql"),
-                (qr_poly.clone(), "qr"),
-                (qo_poly.clone(), "qo"),
+                (qm_poly, "qm"),
+                (ql_poly, "ql"),
+                (qr_poly, "qr"),
+                (qo_poly, "qo"),
                 (DensePolynomial::zero(), "qc"),
             ]
             .iter()
@@ -1269,14 +1269,14 @@ mod copy_constraint_tests {
                 label: cmt.label().clone(),
                 queried_rotations: BTreeSet::default(),
                 evals_at_challenges: BTreeMap::default(),
-                commitment: Some(cmt.commitment().clone()),
+                commitment: Some(*cmt.commitment()),
             })
             .collect();
 
         let labeled_sigmas: Vec<LabeledPolynomial<F, DensePolynomial<F>>> = [
-            (sigma_1_poly.clone(), "sigma_1"),
-            (sigma_2_poly.clone(), "sigma_2"),
-            (sigma_3_poly.clone(), "sigma_3"),
+            (sigma_1_poly, "sigma_1"),
+            (sigma_2_poly, "sigma_2"),
+            (sigma_3_poly, "sigma_3"),
         ]
         .iter()
         .map(|(poly, label)| {
@@ -1293,7 +1293,7 @@ mod copy_constraint_tests {
                 label: cmt.label().clone(),
                 queried_rotations: BTreeSet::from([Rotation::curr()]),
                 evals_at_challenges: BTreeMap::default(),
-                commitment: Some(cmt.commitment().clone()),
+                commitment: Some(*cmt.commitment()),
             })
             .collect();
 
@@ -1305,7 +1305,7 @@ mod copy_constraint_tests {
             label: "q_blind".into(),
             queried_rotations: BTreeSet::from([Rotation::curr()]),
             evals_at_challenges: BTreeMap::default(),
-            commitment: Some(q_blind_commitment[0].commitment().clone()),
+            commitment: Some(*q_blind_commitment[0].commitment()),
         };
 
         let mut plonk_vo =
@@ -1320,7 +1320,7 @@ mod copy_constraint_tests {
         let vos: Vec<&dyn VirtualOracle<F>> = vec![&plonk_vo];
 
         // Repeat but this time provide verifier witness oracles
-        let mut vk = Indexer::index(
+        let vk = Indexer::index(
             &verifier_key,
             &vos,
             vec![],
@@ -1337,17 +1337,17 @@ mod copy_constraint_tests {
         let verifier_pp = VerifierPreprocessedInput {
             fixed_oracles: selector_oracles.clone(),
             table_oracles: vec![],
-            permutation_oracles: sigma_oracles.clone(),
+            permutation_oracles: sigma_oracles,
             q_blind,
         };
 
         // We clone because fixed oracles must be mutable in order to add evals at challenge
         // Another option is to create reset method which will just reset challenge to eval mapping
         // This is anyway just mockup of frontend
-        let mut pp_clone = verifier_pp.clone();
+        let mut pp_clone = verifier_pp;
 
         let res = PilInstance::verify(
-            &mut vk,
+            &vk,
             &mut pp_clone,
             proof,
             &mut witness_ver_oracles,
@@ -1356,9 +1356,8 @@ mod copy_constraint_tests {
             domain_size,
             &domain.vanishing_polynomial().into(),
             &mut rng,
-        )
-        .unwrap();
+        );
 
-        assert_eq!(res, ());
+        assert!(res.is_ok())
     }
 }

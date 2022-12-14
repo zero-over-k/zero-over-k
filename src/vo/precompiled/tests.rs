@@ -72,8 +72,8 @@ pub(crate) fn run_prover(
         .into_iter()
         .map(|(label, evals)| {
             let poly =
-                DensePolynomial::from_coefficients_slice(&domain.ifft(&evals));
-            WitnessProverOracle::new(label, poly, &evals, false)
+                DensePolynomial::from_coefficients_slice(&domain.ifft(evals));
+            WitnessProverOracle::new(label, poly, evals, false)
         })
         .collect();
 
@@ -81,8 +81,8 @@ pub(crate) fn run_prover(
         .into_iter()
         .map(|(label, evals)| {
             let poly =
-                DensePolynomial::from_coefficients_slice(&domain.ifft(&evals));
-            FixedProverOracle::new(label, poly, &evals)
+                DensePolynomial::from_coefficients_slice(&domain.ifft(evals));
+            FixedProverOracle::new(label, poly, evals)
         })
         .collect();
 
@@ -90,8 +90,8 @@ pub(crate) fn run_prover(
         .into_iter()
         .map(|(label, evals)| {
             let poly =
-                DensePolynomial::from_coefficients_slice(&domain.ifft(&evals));
-            InstanceProverOracle::new(label, poly, &evals)
+                DensePolynomial::from_coefficients_slice(&domain.ifft(evals));
+            InstanceProverOracle::new(label, poly, evals)
         })
         .collect();
 
@@ -130,8 +130,8 @@ pub(crate) fn run_prover(
 
     let preprocessed = ProverPreprocessedInput::new(
         &fixed_oracles,
-        &vec![],
-        &vec![],
+        &[],
+        &[],
         &q_blind,
         &vk.index_info,
     );
@@ -181,7 +181,7 @@ pub(crate) fn run_verifier(
         .into_iter()
         .map(|(label, evals)| {
             let poly =
-                DensePolynomial::from_coefficients_slice(&domain.ifft(&evals));
+                DensePolynomial::from_coefficients_slice(&domain.ifft(evals));
             InstanceVerifierOracle::new(label, poly)
         })
         .collect();
@@ -190,7 +190,7 @@ pub(crate) fn run_verifier(
         .into_iter()
         .map(|(label, evals)| {
             let poly =
-                DensePolynomial::from_coefficients_slice(&domain.ifft(&evals));
+                DensePolynomial::from_coefficients_slice(&domain.ifft(evals));
             LabeledPolynomial::new(label.into(), poly, None, None)
         })
         .collect();
@@ -199,7 +199,7 @@ pub(crate) fn run_verifier(
 
     let mut fixed_oracles: Vec<_> = fixed_comm
         .into_iter()
-        .map(|comm| FixedVerifierOracle::from_commitment(comm))
+        .map(FixedVerifierOracle::from_commitment)
         .collect();
 
     // 2. Configure VO

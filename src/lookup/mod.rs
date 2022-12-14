@@ -41,22 +41,22 @@ impl<F: PrimeField> LookupArgument<F> {
     }
     // }
     fn neg(x: Result<F, PiopError>) -> Result<F, PiopError> {
-        x.and_then(|x_val| Ok(-x_val))
+        x.map(|x_val| -x_val)
     }
     fn add(
         x: Result<F, PiopError>,
         y: Result<F, PiopError>,
     ) -> Result<F, PiopError> {
-        x.and_then(|x_val| y.and_then(|y_val| Ok(x_val + y_val)))
+        x.and_then(|x_val| y.map(|y_val| x_val + y_val))
     }
     fn mul(
         x: Result<F, PiopError>,
         y: Result<F, PiopError>,
     ) -> Result<F, PiopError> {
-        x.and_then(|x_val| y.and_then(|y_val| Ok(x_val * y_val)))
+        x.and_then(|x_val| y.map(|y_val| x_val * y_val))
     }
     fn scale(x: Result<F, PiopError>, y: F) -> Result<F, PiopError> {
-        x.and_then(|x_val| Ok(x_val * y))
+        x.map(|x_val| x_val * y)
     }
     /*
        In subset equality argument we have q_blind * z(wX) * A'(X) * S'(X) = 4n - 4
@@ -236,7 +236,7 @@ impl<F: PrimeField> LookupArgument<F> {
         }
 
         let a = WitnessProverOracle {
-            label: format!("lookup_a_{}_poly", lookup_index).to_string(),
+            label: format!("lookup_a_{}_poly", lookup_index),
             poly: DensePolynomial::from_coefficients_slice(
                 &domain.ifft(&a_original_domain_evals),
             ),
@@ -283,8 +283,7 @@ impl<F: PrimeField> LookupArgument<F> {
                                 }
                                 None => Err(PiopError::MissingFixedOracle(
                                     table_query.label.clone(),
-                                )
-                                .into()),
+                                )),
                             }
                         }
                     }
@@ -340,7 +339,7 @@ impl<F: PrimeField> LookupArgument<F> {
         }
 
         let s = WitnessProverOracle {
-            label: format!("lookup_s_{}_poly", lookup_index).to_string(),
+            label: format!("lookup_s_{}_poly", lookup_index),
             poly: DensePolynomial::from_coefficients_slice(
                 &domain.ifft(&s_original_domain_evals),
             ),
@@ -376,7 +375,7 @@ impl<F: PrimeField> LookupArgument<F> {
             &domain.ifft(&a_prime_evals),
         );
         let a_prime = WitnessProverOracle {
-            label: format!("lookup_a_prime_{}_poly", lookup_index).to_string(),
+            label: format!("lookup_a_prime_{}_poly", lookup_index),
             evals_at_coset_of_extended_domain: Some(
                 extended_coset_domain.coset_fft(&a_prime_poly),
             ),
@@ -393,7 +392,7 @@ impl<F: PrimeField> LookupArgument<F> {
             &domain.ifft(&s_prime_evals),
         );
         let s_prime = WitnessProverOracle {
-            label: format!("lookup_s_prime_{}_poly", lookup_index).to_string(),
+            label: format!("lookup_s_prime_{}_poly", lookup_index),
             evals_at_coset_of_extended_domain: Some(
                 extended_coset_domain.coset_fft(&s_prime_poly),
             ),
@@ -486,7 +485,7 @@ impl<F: PrimeField> LookupArgument<F> {
         }
 
         let a = WitnessVerifierOracle::<F, PC> {
-            label: format!("lookup_a_{}_poly", lookup_index).to_string(),
+            label: format!("lookup_a_{}_poly", lookup_index),
             queried_rotations: BTreeSet::from([Rotation::curr()]),
             evals_at_challenges: BTreeMap::from([(evaluation_challenge, agg)]),
             commitment: None,
@@ -528,7 +527,7 @@ impl<F: PrimeField> LookupArgument<F> {
         }
 
         let s = WitnessVerifierOracle::<F, PC> {
-            label: format!("lookup_s_{}_poly", lookup_index).to_string(),
+            label: format!("lookup_s_{}_poly", lookup_index),
             queried_rotations: BTreeSet::from([Rotation::curr()]),
             evals_at_challenges: BTreeMap::from([(evaluation_challenge, agg)]),
             commitment: None,
@@ -639,13 +638,13 @@ impl<F: PrimeField> LookupArgument<F> {
         let negative_shifted_evaluation_challenge =
             domain.element(1).inverse().unwrap() * evaluation_challenge;
 
-        let a_prime_xi = a_prime.query(&evaluation_challenge)?;
+        let a_prime_xi = a_prime.query(evaluation_challenge)?;
         let a_prime_minus_wxi =
             a_prime.query(&negative_shifted_evaluation_challenge)?;
 
-        let s_prime_xi = s_prime.query(&evaluation_challenge)?;
+        let s_prime_xi = s_prime.query(evaluation_challenge)?;
 
-        let q_blind_xi = q_blind.query(&evaluation_challenge)?;
+        let q_blind_xi = q_blind.query(evaluation_challenge)?;
 
         opening += alpha_powers[3] * l0_eval * (a_prime_xi - s_prime_xi);
 

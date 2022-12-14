@@ -107,7 +107,9 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
         let domain_size = domain.size();
         let vanish_dense: DensePolynomial<F> =
             domain.vanishing_polynomial().into();
-        let zh_inverses_over_coset = if vanish_dense == z_h
+        
+
+        if vanish_dense == z_h
             && domain_size == extended_coset_domain.size()
         {
             let zh_eval = domain
@@ -118,7 +120,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
         } else if vanish_dense == z_h {
             // extended_coset_domain must be bigger then original domain
             let mut zh_evals = compute_vanishing_poly_over_coset(
-                extended_coset_domain.clone(),
+                *extended_coset_domain,
                 domain_size as u64,
             );
             ark_ff::batch_inversion(&mut zh_evals);
@@ -127,9 +129,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
             let mut zh_evals = extended_coset_domain.coset_fft(&z_h);
             ark_ff::batch_inversion(&mut zh_evals);
             zh_evals
-        };
-
-        zh_inverses_over_coset
+        }
     }
 
     pub fn index<'a>(
@@ -166,7 +166,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
         let quotient_degree: usize = Self::compute_quotient_degree(
             witness_oracles,
             instance_oracles,
-            &fixed_oracles,
+            fixed_oracles,
             &witness_oracles_mapping,
             &instance_oracles_mapping,
             &fixed_oracles_mapping,
@@ -203,7 +203,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
             scaling_factor
         };
 
-        let scaling_factor = if lookups.len() > 0 {
+        let scaling_factor = if !lookups.is_empty() {
             max(scaling_factor, LookupArgument::<F>::MINIMAL_SCALING_FACTOR)
         } else {
             scaling_factor

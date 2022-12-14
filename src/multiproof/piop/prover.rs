@@ -44,7 +44,7 @@ impl<F: PrimeField> PIOP<F> {
         for (&oracle, rand) in oracles.iter().zip(oracle_rands.iter()) {
             let oracles = opening_sets
                 .entry(oracle.get_queried_rotations().clone())
-                .or_insert(vec![]);
+                .or_default();
             oracles.push((oracle, rand))
         }
 
@@ -106,8 +106,7 @@ impl<F: PrimeField> PIOP<F> {
                             x1_powers[i] * oracle.query(&evaluation_point)?;
                     }
 
-                    if let Some(_) =
-                        q_i_evals_set.insert(evaluation_point, evaluation)
+                    if q_i_evals_set.insert(evaluation_point, evaluation).is_some()
                     {
                         return Err(PiopError::RepeatedRotation(*rotation));
                     }

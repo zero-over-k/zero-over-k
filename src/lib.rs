@@ -68,8 +68,8 @@ where
         max_degree: usize,
         rng: &mut R,
     ) -> Result<UniversalSRS<F, PC>, Error<PC::Error>> {
-        let srs = PC::setup(max_degree, None, rng).map_err(Error::from_pc_err);
-        srs
+        
+        PC::setup(max_degree, None, rng).map_err(Error::from_pc_err)
     }
 
     pub fn prepare_keys(
@@ -77,7 +77,7 @@ where
     ) -> Result<(PC::CommitterKey, PC::VerifierKey), Error<PC::Error>> {
         let supported_hiding_bound = 1; // we need to blind oracles for multiproof and opening in x3
         let (committer_key, verifier_key) =
-            PC::trim(&srs, srs.max_degree(), supported_hiding_bound, None)
+            PC::trim(srs, srs.max_degree(), supported_hiding_bound, None)
                 .map_err(Error::from_pc_err)?;
 
         Ok((committer_key, verifier_key))
@@ -167,17 +167,15 @@ where
 
         let lookup_polys_to_open = lookup_polys
             .iter()
-            .map(|(_, _, a_prime, s_prime)| vec![a_prime, s_prime])
-            .flatten();
+            .flat_map(|(_, _, a_prime, s_prime)| vec![a_prime, s_prime]);
 
         let lookup_prime_labeled: Vec<
             LabeledPolynomial<F, DensePolynomial<F>>,
         > = lookup_polys
             .iter()
-            .map(|(_, _, a_prime, s_prime)| {
+            .flat_map(|(_, _, a_prime, s_prime)| {
                 vec![a_prime.to_labeled(), s_prime.to_labeled()]
             })
-            .flatten()
             .collect();
 
         // commit to a_prime and s_prime for each lookup
@@ -267,7 +265,7 @@ where
                 &verifier_first_msg,
                 &mut prover_state,
                 &pk.vk,
-                &preprocessed,
+                preprocessed,
             )?;
 
         let quotient_chunks_labeled: Vec<
@@ -300,7 +298,7 @@ where
 
         // Compute witness evals
         let witness_query_set = PIOPforPolyIdentity::<F, PC>::get_query_set(
-            &witness_oracles,
+            witness_oracles,
             verifier_second_msg.label,
             verifier_second_msg.xi,
             &omegas,
@@ -408,7 +406,7 @@ where
             .map(|o| o as &dyn Instantiable<F>)
             .collect();
 
-        oracles.extend_from_slice(&preprocessed_oracles.as_slice());
+        oracles.extend_from_slice(preprocessed_oracles.as_slice());
 
         let oracle_rands: Vec<PC::Randomness> = wtns_rands
             .iter()
@@ -416,8 +414,7 @@ where
             .chain(lookup_z_rands.iter())
             .chain(quotient_rands.iter())
             .chain(z_rands.iter())
-            .chain(preprocessed.empty_rands_for_fixed.iter())
-            .map(|rand| rand.clone())
+            .chain(preprocessed.empty_rands_for_fixed.iter()).cloned()
             .collect();
 
         assert_eq!(oracles.len(), oracle_rands.len());
@@ -664,7 +661,7 @@ where
         // Quotient chunks are evaluated only in evaluation challenge
         let quotient_chunk_oracles = (0..num_of_quotient_chunks)
             .map(|i| WitnessVerifierOracle {
-                label: format!("quotient_chunk_{}", i).to_string(),
+                label: format!("quotient_chunk_{}", i),
                 queried_rotations: BTreeSet::from([Rotation::curr()]),
                 should_permute: false,
                 evals_at_challenges: BTreeMap::from([(
@@ -832,7 +829,7 @@ where
 
                     let a_prime = WitnessVerifierOracle::<F, PC> {
                         label: format!("lookup_a_prime_{}_poly", lookup_index)
-                            .to_string(),
+                            ,
                         queried_rotations: BTreeSet::from([
                             Rotation::curr(),
                             Rotation::prev(),
@@ -850,7 +847,7 @@ where
 
                     let s_prime = WitnessVerifierOracle::<F, PC> {
                         label: format!("lookup_s_prime_{}_poly", lookup_index)
-                            .to_string(),
+                            ,
                         queried_rotations: BTreeSet::from([Rotation::curr()]),
                         evals_at_challenges: BTreeMap::from([(
                             evaluation_challenge,
@@ -867,8 +864,7 @@ where
 
         let lookup_polys_to_check_in_opening = lookup_polys
             .iter()
-            .map(|(_, _, a_prime, s_prime)| vec![a_prime, s_prime])
-            .flatten();
+            .flat_map(|(_, _, a_prime, s_prime)| vec![a_prime, s_prime]);
 
         let lookup_z_evals_chunks = proof.lookup_z_evals.chunks(2);
         assert_eq!(
@@ -885,7 +881,7 @@ where
             .map(|(lookup_index, (z_commitment, evals))| {
                 WitnessVerifierOracle::<F, PC> {
                     label: format!("lookup_{}_agg_poly", lookup_index)
-                        .to_string(),
+                        ,
                     queried_rotations: BTreeSet::from([
                         Rotation::curr(),
                         Rotation::next(),
@@ -985,7 +981,7 @@ where
 
         // start from next of last power of alpha
         let permutation_begin_with =
-            powers_of_alpha.last().unwrap().clone() * verifier_first_msg.alpha;
+            *powers_of_alpha.last().unwrap() * verifier_first_msg.alpha;
         let permutation_alphas: Vec<F> =
             successors(Some(permutation_begin_with), |alpha_i| {
                 Some(*alpha_i * verifier_first_msg.alpha)
@@ -997,9 +993,9 @@ where
         // Again begin with last alpha after permutation argument
         let lookups_begin_with = if let Some(alpha) = permutation_alphas.last()
         {
-            alpha.clone()
+            *alpha
         } else {
-            powers_of_alpha.last().unwrap().clone()
+            *powers_of_alpha.last().unwrap()
         };
 
         let lookup_alphas: Vec<F> =

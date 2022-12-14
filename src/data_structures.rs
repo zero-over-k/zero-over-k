@@ -73,15 +73,15 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>>
     ProverPreprocessedInput<F, PC>
 {
     pub fn new(
-        fixed_oracles: &Vec<FixedProverOracle<F>>,
-        permutation_oracles: &Vec<FixedProverOracle<F>>,
-        table_oracles: &Vec<FixedProverOracle<F>>,
+        fixed_oracles: &[FixedProverOracle<F>],
+        permutation_oracles: &[FixedProverOracle<F>],
+        table_oracles: &[FixedProverOracle<F>],
         q_blind: &FixedProverOracle<F>,
         index_info: &Index<F>,
     ) -> Self {
-        let mut fixed_oracles = fixed_oracles.clone();
-        let mut permutation_oracles = permutation_oracles.clone();
-        let mut table_oracles = table_oracles.clone();
+        let fixed_oracles = &mut fixed_oracles.to_vec();
+        let permutation_oracles = &mut permutation_oracles.to_vec();
+        let table_oracles = &mut table_oracles.to_vec();
 
         for oracle in fixed_oracles.iter_mut() {
             oracle.compute_extended_evals(&index_info.extended_coset_domain);
@@ -106,9 +106,9 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>>
                     + table_oracles.len()
                     + 1 // for q_blind
             ],
-            fixed_oracles,
-            permutation_oracles,
-            table_oracles,
+            fixed_oracles: fixed_oracles.to_vec(),
+            permutation_oracles: permutation_oracles.to_vec(),
+            table_oracles: table_oracles.to_vec(),
             q_blind,
         }
     }
@@ -284,7 +284,6 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Proof<F, PC> {
             // multiopen
             self.multiopen_proof.q_evals.len()
         )
-        .to_string()
     }
 
     pub fn cumulative_info(&self) -> String {
@@ -321,6 +320,5 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Proof<F, PC> {
             ",
             num_of_commitments, num_of_field_elements
         )
-        .to_string()
     }
 }

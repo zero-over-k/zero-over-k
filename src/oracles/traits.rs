@@ -34,7 +34,7 @@ pub trait Instantiable<F: FftField>: ConcreteOracle<F> {
     fn get_extended_coset_evals(&self) -> Result<&Vec<F>, Error>;
     fn to_labeled(&self) -> LabeledPolynomial<F, DensePolynomial<F>>;
 
-    fn query_in_evals_form(&self, lagrange_evals: &Vec<F>) -> F {
+    fn query_in_evals_form(&self, lagrange_evals: &[F]) -> F {
         let mut eval = F::zero();
         for (&xi, &li) in self.evals().iter().zip(lagrange_evals.iter()) {
             eval += xi * li;
@@ -75,7 +75,7 @@ pub trait Instantiable<F: FftField>: ConcreteOracle<F> {
                 }
             }
         };
-        return Ok(eval);
+        Ok(eval)
     }
 
     fn query_at_omega_in_original_domain(
@@ -89,7 +89,7 @@ pub trait Instantiable<F: FftField>: ConcreteOracle<F> {
             return evals[omega_index];
         }
 
-        let eval = match &rotation.sign {
+        match &rotation.sign {
             Sign::Plus => evals[(omega_index + rotation.degree) % domain_size],
             // TODO: test negative rotations
             Sign::Minus => {
@@ -102,8 +102,7 @@ pub trait Instantiable<F: FftField>: ConcreteOracle<F> {
                     evals[domain_size - move_from_end]
                 }
             }
-        };
-        return eval;
+        }
     }
 }
 
@@ -127,7 +126,7 @@ pub trait QuerySetProvider<F: PrimeField>: ConcreteOracle<F> {
         &self,
         opening_challenge_label: &str,
         opening_challenge: F,
-        omegas: &Vec<F>,
+        omegas: &[F],
     ) -> QuerySet<F> {
         let mut query_set = QuerySet::new();
         for rotation in self.get_queried_rotations() {

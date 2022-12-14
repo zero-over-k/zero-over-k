@@ -38,7 +38,7 @@ pub fn permute_for_lookup<F: Field>(a: &[F], s: &[F]) -> (Vec<F>, Vec<F>) {
         }
     }
 
-    assert_eq!(unassigned_indices.is_empty(), true);
+    assert!(unassigned_indices.is_empty());
     (a_permuted, permuted_table)
 }
 
@@ -66,7 +66,7 @@ mod test {
         let mut a = convert_to_field(&a);
         let s = convert_to_field(&s);
 
-        let dummy_s = F::from(99 as u64);
+        let dummy_s = F::from(99_u64);
         let to_append = s.len() - a.len();
 
         let append_vec = vec![dummy_s; to_append];

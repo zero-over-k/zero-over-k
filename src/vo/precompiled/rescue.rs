@@ -142,6 +142,6 @@ mod test {
             &mut rng,
         );
 
-        assert_eq!(res.is_ok(), true);
+        assert!(res.is_ok());
     }
 }

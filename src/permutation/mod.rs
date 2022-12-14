@@ -114,7 +114,7 @@ impl<F: PrimeField> PermutationArgument<F> {
                 agg_polys[i - 1].evals()[self.usable_rows]
             };
 
-            let is_last = if i == num_of_chunks - 1 { true } else { false };
+            let is_last = i == num_of_chunks - 1;
 
             let agg_i = GrandProductArgument::<F>::construct_agg_poly(
                 i,
@@ -230,7 +230,7 @@ impl<F: PrimeField> PermutationArgument<F> {
             .last()
             .unwrap()
             .query_in_coset(omega_index, Rotation::curr())?;
-        permutation_eval += alpha_powers.last().unwrap().clone()
+        permutation_eval += *alpha_powers.last().unwrap()
             * q_last_coset_evals[omega_index]
             * (z_last_eval * z_last_eval - z_last_eval);
 
@@ -312,7 +312,7 @@ impl<F: PrimeField> PermutationArgument<F> {
 
         let z_last_eval =
             agg_polys.last().unwrap().query(&evaluation_challenge)?;
-        permutation_eval += alpha_powers.last().unwrap().clone()
+        permutation_eval += *alpha_powers.last().unwrap()
             * q_last_eval
             * (z_last_eval * z_last_eval - z_last_eval);
 

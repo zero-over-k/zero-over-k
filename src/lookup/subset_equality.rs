@@ -62,7 +62,7 @@ impl<F: PrimeField> SubsetEqualityArgument<F> {
             DensePolynomial::from_coefficients_slice(&domain.ifft(&z_evals));
 
         WitnessProverOracle {
-            label: format!("lookup_{}_agg_poly", lookup_index).to_string(),
+            label: format!("lookup_{}_agg_poly", lookup_index),
             evals_at_coset_of_extended_domain: Some(
                 extended_coset_domain.coset_fft(&poly),
             ),
@@ -154,13 +154,13 @@ impl<F: PrimeField> SubsetEqualityArgument<F> {
 
         let mut opening = F::zero();
 
-        let a_xi = a.query(&evaluation_challenge)?;
-        let a_prime_xi = a_prime.query(&evaluation_challenge)?;
+        let a_xi = a.query(evaluation_challenge)?;
+        let a_prime_xi = a_prime.query(evaluation_challenge)?;
 
-        let s_xi = s.query(&evaluation_challenge)?;
-        let s_prime_xi = s_prime.query(&evaluation_challenge)?;
+        let s_xi = s.query(evaluation_challenge)?;
+        let s_prime_xi = s_prime.query(evaluation_challenge)?;
 
-        let z_xi = z.query(&evaluation_challenge)?;
+        let z_xi = z.query(evaluation_challenge)?;
         let z_wxi = z.query(&shifted_evaluation_challenge)?;
 
         opening += alpha_powers[0] * l0_eval * (F::one() - z_xi);

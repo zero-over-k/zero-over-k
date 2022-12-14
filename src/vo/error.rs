@@ -1,6 +1,6 @@
 use std::num::ParseIntError;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum Error {
     PointLabelError(String),
     IntError(ParseIntError),

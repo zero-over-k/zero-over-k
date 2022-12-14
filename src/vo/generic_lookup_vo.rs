@@ -66,13 +66,13 @@ impl<F: PrimeField> GenericLookupVO<F> {
                 OracleType::Witness => {
                     return Err(PiopError::WitnessTableNotAllowed(
                         format!("VirtualQuery index: {}", query.index)
-                            .to_string(),
+                            ,
                     ))
                 }
                 OracleType::Instance => {
                     return Err(PiopError::InstanceTableNotAllowed(
                         format!("VirtualQuery index: {}", query.index)
-                            .to_string(),
+                            ,
                     ))
                 }
                 OracleType::Fixed => {
@@ -108,14 +108,14 @@ impl<F: PrimeField> GenericLookupVO<F> {
 impl<F: PrimeField> LookupVirtualOracle<F> for GenericLookupVO<F> {
     fn get_expressions(&self) -> Result<&[Expression<F>], VOError> {
         match &self.expressions {
-            Some(expressions) => Ok(&expressions),
+            Some(expressions) => Ok(expressions),
             None => Err(VOError::UninitializedLookupExpr),
         }
     }
 
     fn get_table_queries(&self) -> Result<&[OracleQuery], VOError> {
         match &self.table_queries {
-            Some(queries) => Ok(&queries),
+            Some(queries) => Ok(queries),
             None => Err(VOError::UninitializedLookupTableQuery),
         }
     }

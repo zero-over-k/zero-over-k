@@ -79,7 +79,7 @@ impl<F: PrimeField> GenericVO<F> {
 impl<F: PrimeField> VirtualOracle<F> for GenericVO<F> {
     fn get_expression(&self) -> Result<&Expression<F>, VOError> {
         match &self.expression {
-            Some(expr) => Ok(&expr),
+            Some(expr) => Ok(expr),
             None => Err(VOError::UninitializedExpr),
         }
     }
