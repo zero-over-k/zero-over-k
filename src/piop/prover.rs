@@ -29,6 +29,13 @@ use crate::{
 
 use super::verifier::{VerifierLookupAggregationRound, VerifierPermutationMsg};
 
+pub type LookupPolys<F> = Vec<(
+    WitnessProverOracle<F>,
+    WitnessProverOracle<F>,
+    WitnessProverOracle<F>,
+    WitnessProverOracle<F>,
+)>;
+
 // Note: To keep flexible vanishing polynomial should not be strictly domain.vanishing_polynomial
 // For example consider https://hackmd.io/1DaroFVfQwySwZPHMoMdBg?view where we remove some roots from Zh
 
@@ -42,14 +49,7 @@ pub struct ProverState<'a, F: PrimeField> {
     pub(crate) witness_oracles: &'a [WitnessProverOracle<F>],
     pub(crate) instance_oracles: &'a [InstanceProverOracle<F>],
     pub(crate) z_polys: Option<Vec<WitnessProverOracle<F>>>,
-    pub(crate) lookup_polys: Option<
-        Vec<(
-            WitnessProverOracle<F>,
-            WitnessProverOracle<F>,
-            WitnessProverOracle<F>,
-            WitnessProverOracle<F>,
-        )>,
-    >,
+    pub(crate) lookup_polys: Option<LookupPolys<F>>,
     pub(crate) lookup_z_polys: Option<Vec<WitnessProverOracle<F>>>,
     pub(crate) oracles_to_copy: Vec<&'a WitnessProverOracle<F>>,
     pub(crate) vos: &'a [&'a dyn VirtualOracle<F>],
@@ -169,15 +169,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
         preprocessed: &ProverPreprocessedInput<F, PC>,
         index: &Index<F>,
         zk_rng: &mut R,
-    ) -> Result<
-        Vec<(
-            WitnessProverOracle<F>,
-            WitnessProverOracle<F>,
-            WitnessProverOracle<F>,
-            WitnessProverOracle<F>,
-        )>,
-        PiopError,
-    > {
+    ) -> Result<LookupPolys<F>, PiopError> {
         let lookup_polys: Vec<_> = index
             .lookups
             .iter()
@@ -212,12 +204,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
     pub fn prover_lookup_subset_equality_round<R: Rng>(
         permutation_msg: &VerifierPermutationMsg<F>,
         // In order: (a, s, a_prime, s_prime)
-        lookup_polys: &Vec<(
-            WitnessProverOracle<F>,
-            WitnessProverOracle<F>,
-            WitnessProverOracle<F>,
-            WitnessProverOracle<F>,
-        )>,
+        lookup_polys: &LookupPolys<F>,
         state: &mut ProverState<F>,
         index: &Index<F>,
         zk_rng: &mut R,
