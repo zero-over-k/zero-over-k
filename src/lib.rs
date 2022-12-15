@@ -1094,15 +1094,11 @@ where
             .zip(lookup_z_polys.iter())
             .zip(lookup_alpha_chunks.iter())
         {
-            let (a, s, a_prime, s_prime) = lookup_oracles;
             quotient_eval += LookupArgument::open_argument(
                 &l0_eval,
                 lu_eval,
                 &preprocessed.q_blind,
-                a,
-                s,
-                a_prime,
-                s_prime,
+                &lookup_oracles,
                 z,
                 verifier_permutation_msg.beta,
                 verifier_permutation_msg.gamma,

@@ -19,7 +19,7 @@ use crate::{
         query::OracleType,
         rotation::Rotation,
         traits::{ConcreteOracle, Instantiable},
-        witness::WitnessProverOracle,
+        witness::{WitnessProverOracle, WitnessVerifierOracle},
     },
     permutation::PermutationArgument,
     piop::error::Error as PiopError,
@@ -29,12 +29,19 @@ use crate::{
 
 use super::verifier::{VerifierLookupAggregationRound, VerifierPermutationMsg};
 
-pub type LookupPolys<F> = Vec<(
+pub type LookupProverOracles<F> = (
     WitnessProverOracle<F>,
     WitnessProverOracle<F>,
     WitnessProverOracle<F>,
     WitnessProverOracle<F>,
-)>;
+);
+
+pub type LookupVerifierOracles<F, PC> = (
+    WitnessVerifierOracle<F, PC>,
+    WitnessVerifierOracle<F, PC>,
+    WitnessVerifierOracle<F, PC>,
+    WitnessVerifierOracle<F, PC>,
+);
 
 // Note: To keep flexible vanishing polynomial should not be strictly domain.vanishing_polynomial
 // For example consider https://hackmd.io/1DaroFVfQwySwZPHMoMdBg?view where we remove some roots from Zh
@@ -49,7 +56,7 @@ pub struct ProverState<'a, F: PrimeField> {
     pub(crate) witness_oracles: &'a [WitnessProverOracle<F>],
     pub(crate) instance_oracles: &'a [InstanceProverOracle<F>],
     pub(crate) z_polys: Option<Vec<WitnessProverOracle<F>>>,
-    pub(crate) lookup_polys: Option<LookupPolys<F>>,
+    pub(crate) lookup_polys: Option<Vec<LookupProverOracles<F>>>,
     pub(crate) lookup_z_polys: Option<Vec<WitnessProverOracle<F>>>,
     pub(crate) oracles_to_copy: Vec<&'a WitnessProverOracle<F>>,
     pub(crate) vos: &'a [&'a dyn VirtualOracle<F>],
@@ -169,7 +176,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
         preprocessed: &ProverPreprocessedInput<F, PC>,
         index: &Index<F>,
         zk_rng: &mut R,
-    ) -> Result<LookupPolys<F>, PiopError> {
+    ) -> Result<Vec<LookupProverOracles<F>>, PiopError> {
         let lookup_polys: Vec<_> = index
             .lookups
             .iter()
@@ -204,7 +211,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
     pub fn prover_lookup_subset_equality_round<R: Rng>(
         permutation_msg: &VerifierPermutationMsg<F>,
         // In order: (a, s, a_prime, s_prime)
-        lookup_polys: &LookupPolys<F>,
+        lookup_polys: &[LookupProverOracles<F>],
         state: &mut ProverState<F>,
         index: &Index<F>,
         zk_rng: &mut R,
@@ -212,12 +219,9 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
         let lookup_z_polys: Vec<_> = lookup_polys
             .iter()
             .enumerate()
-            .map(|(lookup_index, (a, s, a_prime, s_prime))| {
+            .map(|(lookup_index, lookup_polys)| {
                 SubsetEqualityArgument::construct_agg_poly(
-                    a,
-                    s,
-                    a_prime,
-                    s_prime,
+                    lookup_polys,
                     permutation_msg.beta,
                     permutation_msg.gamma,
                     lookup_index,
@@ -389,17 +393,12 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
                 .zip(lookup_z_polys.iter())
                 .zip(lookup_alpha_chunks.iter())
             {
-                let (a, s, a_prime, s_prime) = lookup_oracles;
-
                 *numerator_eval +=
                     LookupArgument::instantiate_argument_at_omega_i(
                         &l0_coset_evals,
                         &lu_coset_evals,
                         &preprocessed.q_blind,
-                        a,
-                        s,
-                        a_prime,
-                        s_prime,
+                        &lookup_oracles,
                         z,
                         verifier_permutation_msg.beta,
                         verifier_permutation_msg.gamma,

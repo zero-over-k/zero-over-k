@@ -12,7 +12,10 @@ use crate::{
         traits::{ConcreteOracle, Instantiable},
         witness::{WitnessProverOracle, WitnessVerifierOracle},
     },
-    piop::error::Error as PiopError,
+    piop::{
+        error::Error as PiopError,
+        prover::{LookupProverOracles, LookupVerifierOracles},
+    },
     vo::expression::Expression,
 };
 use ark_ff::PrimeField;
@@ -541,10 +544,7 @@ impl<F: PrimeField> LookupArgument<F> {
         l0_coset_evals: &Vec<F>,
         q_last_coset_evals: &Vec<F>,
         q_blind: &FixedProverOracle<F>,
-        a: &WitnessProverOracle<F>,
-        s: &WitnessProverOracle<F>,
-        a_prime: &WitnessProverOracle<F>,
-        s_prime: &WitnessProverOracle<F>,
+        lookup_oracles: &LookupProverOracles<F>,
         z: &WitnessProverOracle<F>,
         beta: F,
         gamma: F,
@@ -555,6 +555,7 @@ impl<F: PrimeField> LookupArgument<F> {
         // + 1 to check that A'(w^0) = S'(w^0)
         // + 1 to check well formation of A' and S'
         assert_eq!(alpha_powers.len(), 5);
+        let (_, _, a_prime, s_prime) = lookup_oracles;
 
         let mut num = F::zero();
 
@@ -562,10 +563,7 @@ impl<F: PrimeField> LookupArgument<F> {
             l0_coset_evals,
             q_last_coset_evals,
             q_blind,
-            a,
-            s,
-            a_prime,
-            s_prime,
+            lookup_oracles,
             z,
             beta,
             gamma,
@@ -604,10 +602,7 @@ impl<F: PrimeField> LookupArgument<F> {
         l0_eval: &F,
         q_last_eval: F,
         q_blind: &FixedVerifierOracle<F, PC>,
-        a: &WitnessVerifierOracle<F, PC>,
-        s: &WitnessVerifierOracle<F, PC>,
-        a_prime: &WitnessVerifierOracle<F, PC>,
-        s_prime: &WitnessVerifierOracle<F, PC>,
+        lookup_oracles: &LookupVerifierOracles<F, PC>,
         z: &WitnessVerifierOracle<F, PC>,
         beta: F,
         gamma: F,
@@ -617,16 +612,14 @@ impl<F: PrimeField> LookupArgument<F> {
     ) -> Result<F, Error<PC::Error>> {
         assert_eq!(alpha_powers.len(), 5);
 
+        let (_, _, a_prime, s_prime) = lookup_oracles;
         let mut opening = F::zero();
 
         opening += SubsetEqualityArgument::open_argument(
             l0_eval,
             q_last_eval,
             q_blind,
-            a,
-            s,
-            a_prime,
-            s_prime,
+            lookup_oracles,
             z,
             beta,
             gamma,
@@ -801,11 +794,9 @@ mod test {
         let beta = F::rand(&mut rng);
         let gamma = F::rand(&mut rng);
 
+        let lookup_oracles = (a, s, a_prime, s_prime);
         let z = SubsetEqualityArgument::construct_agg_poly(
-            &a,
-            &s,
-            &a_prime,
-            &s_prime,
+            &lookup_oracles,
             beta,
             gamma,
             0,
@@ -865,10 +856,7 @@ mod test {
                 &l0_coset_evals,
                 &lu_coset_evals,
                 &q_blind,
-                &a,
-                &s,
-                &a_prime,
-                &s_prime,
+                &lookup_oracles,
                 &z,
                 beta,
                 gamma,
@@ -991,14 +979,12 @@ mod test {
         let l0_eval = l0.evaluate(&evaluation_challenge);
         let lu_eval = lu.evaluate(&evaluation_challenge);
 
+        let lookup_oracles = (a, s, a_prime, s_prime);
         let opening = LookupArgument::open_argument::<PC>(
             &l0_eval,
             lu_eval,
             &q_blind,
-            &a,
-            &s,
-            &a_prime,
-            &s_prime,
+            &lookup_oracles,
             &z,
             beta,
             gamma,

@@ -43,6 +43,7 @@ pub struct Indexer<F: PrimeField, PC: HomomorphicCommitment<F>> {
 }
 
 impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
+    #[allow(clippy::too_many_arguments)]
     fn compute_quotient_degree(
         witness_oracles: &[impl WitnessOracle<F>],
         instance_oracles: &[impl InstanceOracle<F>],
@@ -107,11 +108,8 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
         let domain_size = domain.size();
         let vanish_dense: DensePolynomial<F> =
             domain.vanishing_polynomial().into();
-        
 
-        if vanish_dense == z_h
-            && domain_size == extended_coset_domain.size()
-        {
+        if vanish_dense == z_h && domain_size == extended_coset_domain.size() {
             let zh_eval = domain
                 .evaluate_vanishing_polynomial(F::multiplicative_generator())
                 .inverse()
@@ -132,6 +130,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn index<'a>(
         vk: &PC::VerifierKey,
         vos: &[&dyn VirtualOracle<F>],
