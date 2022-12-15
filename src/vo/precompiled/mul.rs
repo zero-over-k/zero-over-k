@@ -191,11 +191,11 @@ mod test {
         let vos: Vec<&dyn VirtualOracle<F>> = vec![&mul_vo];
 
         // Repeat but this time provide verifier witness oracles
-        let mut vk = Indexer::index(
+        let vk = Indexer::index(
             &verifier_key,
             &vos,
             vec![],
-            &mut ver_wtns_oracles,
+            &ver_wtns_oracles,
             &instance_oracles,
             &fixed_oracles,
             domain,
@@ -225,7 +225,7 @@ mod test {
         let mut pp_clone = preprocessed;
 
         let res = PilInstance::verify(
-            &mut vk,
+            &vk,
             &mut pp_clone,
             proof,
             &mut ver_wtns_oracles,

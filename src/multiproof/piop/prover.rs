@@ -17,12 +17,19 @@ use crate::oracles::traits::Instantiable;
 
 use crate::piop::error::Error as PiopError;
 
+pub type OpeningSet<'a, F, R> =
+    BTreeMap<BTreeSet<Rotation>, Vec<(&'a dyn Instantiable<F>, &'a R)>>;
+
+pub type FirstRound<'a, F, PC> = (
+    LabeledPolynomial<F, DensePolynomial<F>>,
+    ProverState<'a, F, PC>,
+);
+
+pub type ThirdRound<F, R> = (LabeledPolynomial<F, DensePolynomial<F>>, R);
+
 pub struct ProverState<'a, F: PrimeField, PC: HomomorphicCommitment<F>> {
     num_of_oracles: usize,
-    opening_sets: BTreeMap<
-        BTreeSet<Rotation>,
-        Vec<(&'a dyn Instantiable<F>, &'a PC::Randomness)>,
-    >,
+    opening_sets: OpeningSet<'a, F, PC::Randomness>,
     domain: GeneralEvaluationDomain<F>,
     q_polys: Option<Vec<LabeledPolynomial<F, DensePolynomial<F>>>>,
     q_rands: Option<Vec<PC::Randomness>>,
@@ -66,13 +73,7 @@ impl<F: PrimeField> PIOP<F> {
         mut state: ProverState<'a, F, PC>,
         evaluation_challenge: F,
         verifier_first_msg: &VerifierFirstMsg<F>,
-    ) -> Result<
-        (
-            LabeledPolynomial<F, DensePolynomial<F>>,
-            ProverState<'a, F, PC>,
-        ),
-        MpError<PC::Error>,
-    > {
+    ) -> Result<FirstRound<'a, F, PC>, MpError<PC::Error>> {
         // Max number of oracles in one opening set are all oracles
         let x1_powers: Vec<F> = successors(Some(F::one()), |x1_i| {
             Some(*x1_i * verifier_first_msg.x1)
@@ -106,7 +107,9 @@ impl<F: PrimeField> PIOP<F> {
                             x1_powers[i] * oracle.query(&evaluation_point)?;
                     }
 
-                    if q_i_evals_set.insert(evaluation_point, evaluation).is_some()
+                    if q_i_evals_set
+                        .insert(evaluation_point, evaluation)
+                        .is_some()
                     {
                         return Err(PiopError::RepeatedRotation(*rotation));
                     }
@@ -201,10 +204,7 @@ impl<F: PrimeField> PIOP<F> {
         state: &'a ProverState<'a, F, PC>,
         verifier_third_msg: &VerifierThirdMsg<F>,
         f_agg_poly_rand: &PC::Randomness,
-    ) -> Result<
-        (LabeledPolynomial<F, DensePolynomial<F>>, PC::Randomness),
-        MpError<PC::Error>,
-    > {
+    ) -> Result<ThirdRound<F, PC::Randomness>, MpError<PC::Error>> {
         let q_polys =
             state.q_polys.as_ref().expect("Q polys should be in state");
 

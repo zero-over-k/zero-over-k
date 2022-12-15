@@ -57,6 +57,7 @@ pub fn test_init(
 }
 
 /// Run a prover to test a VO without using copy constraints or lookups
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn run_prover(
     domain: GeneralEvaluationDomain<F>,
     ck: CommKey,
@@ -213,7 +214,7 @@ pub(crate) fn run_verifier(
 
     let vos: Vec<&dyn VirtualOracle<F>> = vec![&vo];
 
-    let mut vk = Indexer::index(
+    let vk = Indexer::index(
         &cs_vk,
         &vos,
         vec![],
@@ -236,7 +237,7 @@ pub(crate) fn run_verifier(
     // 4. Verify proof
 
     let res = PilInstance::verify(
-        &mut vk,
+        &vk,
         &mut verifier_pp,
         proof,
         &mut witness_ver_oracles,

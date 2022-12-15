@@ -16,6 +16,7 @@ use crate::{
     piop::error::Error as PiopError,
 };
 
+#[allow(clippy::type_complexity)]
 pub mod grand_product;
 
 #[derive(Clone)]

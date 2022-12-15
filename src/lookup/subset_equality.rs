@@ -82,15 +82,15 @@ impl<F: PrimeField> SubsetEqualityArgument<F> {
     /// 2. Subset equality check
     /// 3. Z(w^u) = 0 or 1
     pub fn instantiate_argument_at_omega_i(
-        l0_coset_evals: &Vec<F>,
-        q_last_coset_evals: &Vec<F>,
+        l0_coset_evals: &[F],
+        q_last_coset_evals: &[F],
         q_blind: &FixedProverOracle<F>,
         lookup_oracles: &LookupProverOracles<F>,
         z: &WitnessProverOracle<F>,
         beta: F,
         gamma: F,
         omega_index: usize,
-        alpha_powers: &Vec<F>,
+        alpha_powers: &[F],
     ) -> Result<F, PiopError> {
         assert_eq!(alpha_powers.len(), 3);
         let (a, s, a_prime, s_prime) = lookup_oracles;
@@ -142,7 +142,7 @@ impl<F: PrimeField> SubsetEqualityArgument<F> {
         gamma: F,
         evaluation_challenge: &F,
         domain: &GeneralEvaluationDomain<F>,
-        alpha_powers: &Vec<F>,
+        alpha_powers: &[F],
     ) -> Result<F, Error<PC::Error>> {
         assert_eq!(alpha_powers.len(), 3);
         let (a, s, a_prime, s_prime) = lookup_oracles;

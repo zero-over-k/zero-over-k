@@ -128,6 +128,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng>
         Ok(proof)
     }
 
+    #[allow(clippy::type_complexity)]
     pub fn verify(
         vk: &PC::VerifierKey,
         proof: Proof<F, PC>,

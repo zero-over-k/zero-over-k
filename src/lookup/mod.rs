@@ -84,15 +84,7 @@ impl<F: PrimeField> LookupArgument<F> {
         domain: &GeneralEvaluationDomain<F>,
         extended_coset_domain: &GeneralEvaluationDomain<F>,
         zk_rng: &mut R,
-    ) -> Result<
-        (
-            WitnessProverOracle<F>,
-            WitnessProverOracle<F>,
-            WitnessProverOracle<F>,
-            WitnessProverOracle<F>,
-        ),
-        PiopError,
-    > {
+    ) -> Result<LookupProverOracles<F>, PiopError> {
         // When working on prover we want to construct A, A', S and S' as WitnessProverOracles
         // We need both polys and coset evals for them, one approach is to compute polynomials and then to do coset fft
         // But it's faster if we evaluate expression 2 times, one in coset and one in just domain
@@ -408,6 +400,7 @@ impl<F: PrimeField> LookupArgument<F> {
         Ok((a, s, a_prime, s_prime))
     }
 
+    #[allow(clippy::type_complexity)]
     pub fn construct_a_and_s_unpermuted_polys_verifier<
         'a,
         PC: HomomorphicCommitment<F>,
@@ -425,7 +418,7 @@ impl<F: PrimeField> LookupArgument<F> {
         table_queries: &[OracleQuery],
         theta: F,                // lookup aggregation expression,
         evaluation_challenge: F, // evaluation_challenge
-        omegas: &Vec<F>,
+        omegas: &[F],
     ) -> Result<
         (WitnessVerifierOracle<F, PC>, WitnessVerifierOracle<F, PC>),
         Error<PC::Error>,
@@ -541,8 +534,8 @@ impl<F: PrimeField> LookupArgument<F> {
     }
 
     pub fn instantiate_argument_at_omega_i(
-        l0_coset_evals: &Vec<F>,
-        q_last_coset_evals: &Vec<F>,
+        l0_coset_evals: &[F],
+        q_last_coset_evals: &[F],
         q_blind: &FixedProverOracle<F>,
         lookup_oracles: &LookupProverOracles<F>,
         z: &WitnessProverOracle<F>,
@@ -568,7 +561,7 @@ impl<F: PrimeField> LookupArgument<F> {
             beta,
             gamma,
             omega_index,
-            &alpha_powers[0..3].to_vec(),
+            &alpha_powers[0..3],
         )?;
 
         let a_prime_x =
@@ -625,7 +618,7 @@ impl<F: PrimeField> LookupArgument<F> {
             gamma,
             evaluation_challenge,
             domain,
-            &alpha_powers[..3].to_vec(),
+            &alpha_powers[..3],
         )?;
 
         let negative_shifted_evaluation_challenge =

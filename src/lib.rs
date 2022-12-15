@@ -44,6 +44,7 @@ mod util;
 pub mod vo;
 
 pub mod indexer;
+#[allow(clippy::too_many_arguments)]
 pub mod lookup;
 pub mod multiproof;
 pub mod permutation;
@@ -1098,7 +1099,7 @@ where
                 &l0_eval,
                 lu_eval,
                 &preprocessed.q_blind,
-                &lookup_oracles,
+                lookup_oracles,
                 z,
                 verifier_permutation_msg.beta,
                 verifier_permutation_msg.gamma,

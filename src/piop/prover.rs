@@ -30,17 +30,17 @@ use crate::{
 use super::verifier::{VerifierLookupAggregationRound, VerifierPermutationMsg};
 
 pub type LookupProverOracles<F> = (
-    WitnessProverOracle<F>,
-    WitnessProverOracle<F>,
-    WitnessProverOracle<F>,
-    WitnessProverOracle<F>,
+    WitnessProverOracle<F>, //a
+    WitnessProverOracle<F>, //s
+    WitnessProverOracle<F>, //a_prime
+    WitnessProverOracle<F>, //s_prime
 );
 
 pub type LookupVerifierOracles<F, PC> = (
-    WitnessVerifierOracle<F, PC>,
-    WitnessVerifierOracle<F, PC>,
-    WitnessVerifierOracle<F, PC>,
-    WitnessVerifierOracle<F, PC>,
+    WitnessVerifierOracle<F, PC>, //a
+    WitnessVerifierOracle<F, PC>, //s
+    WitnessVerifierOracle<F, PC>, //a_prime
+    WitnessVerifierOracle<F, PC>, //s_prime
 );
 
 // Note: To keep flexible vanishing polynomial should not be strictly domain.vanishing_polynomial
@@ -398,7 +398,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
                         &l0_coset_evals,
                         &lu_coset_evals,
                         &preprocessed.q_blind,
-                        &lookup_oracles,
+                        lookup_oracles,
                         z,
                         verifier_permutation_msg.beta,
                         verifier_permutation_msg.gamma,
