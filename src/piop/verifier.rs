@@ -53,7 +53,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
     }
 
     /// Output lookup aggregation challenge
-    pub fn verifier_lookup_aggregation_round<'a, R: RngCore>(
+    pub fn verifier_lookup_aggregation_round<R: RngCore>(
         mut state: VerifierState<F>,
         rng: &mut R,
     ) -> (VerifierLookupAggregationRound<F>, VerifierState<F>) {
@@ -66,7 +66,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
     }
 
     /// Output permutation challenges.
-    pub fn verifier_permutation_round<'a, R: RngCore>(
+    pub fn verifier_permutation_round<R: RngCore>(
         mut state: VerifierState<F>,
         rng: &mut R,
     ) -> (VerifierPermutationMsg<F>, VerifierState<F>) {
