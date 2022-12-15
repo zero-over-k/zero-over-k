@@ -67,7 +67,7 @@ pub struct ProverState<'a, F: PrimeField> {
 
 impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
     // Aux funcs for `evaluate`
-    const fn ident(x: F) -> Result<F, PiopError> {
+    fn ident(x: F) -> Result<F, PiopError> {
         Ok(x)
     }
     fn neg(x: Result<F, PiopError>) -> Result<F, PiopError> {
