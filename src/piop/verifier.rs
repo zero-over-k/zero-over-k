@@ -112,7 +112,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
         oracles: &[impl QuerySetProvider<F>],
         evaluation_challenge_label: &str,
         evaluation_challenge: F,
-        omegas: &Vec<F>,
+        omegas: &[F],
     ) -> QuerySet<F> {
         let mut query_set = QuerySet::new();
 
