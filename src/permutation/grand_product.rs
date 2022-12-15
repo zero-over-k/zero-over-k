@@ -28,6 +28,7 @@ pub struct GrandProductArgument<F: PrimeField> {
 
 impl<F: PrimeField> GrandProductArgument<F> {
     /// Given oracles constructs Z(X) polynomial that prover commits to
+    #[allow(clippy::too_many_arguments)]
     pub fn construct_agg_poly<R: RngCore>(
         chunk_index: usize,
         is_last: bool,
@@ -105,7 +106,7 @@ impl<F: PrimeField> GrandProductArgument<F> {
     /// Instantiates argument at specific root of unity
     pub fn instantiate_argument_at_omega_i(
         // q_last is 1 in u and everywhere else it's 0, so it can be treated as Lu(X)
-        q_last_coset_evals: &Vec<F>,
+        q_last_coset_evals: &[F],
         q_blind: &FixedProverOracle<F>,
         z: &WitnessProverOracle<F>,
         permutation_oracles: &[FixedProverOracle<F>],

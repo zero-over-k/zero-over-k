@@ -17,6 +17,7 @@ use crate::{
 };
 
 #[allow(clippy::type_complexity)]
+#[allow(clippy::too_many_arguments)]
 pub mod grand_product;
 
 #[derive(Clone)]
@@ -82,6 +83,7 @@ impl<F: PrimeField> PermutationArgument<F> {
         2 * num_of_z_polys + 1 + 1 - 1
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn construct_agg_polys<R: RngCore>(
         &self,
         witness_oracles: &[&WitnessProverOracle<F>], // Only oracles that are included in permutation
@@ -148,10 +150,11 @@ impl<F: PrimeField> PermutationArgument<F> {
         3. all stitches z_agg[i-1][u] = z_agg_[i][0]
         4. z_agg[u] = 0/1
     */
+    #[allow(clippy::too_many_arguments)]
     pub fn instantiate_argument_at_omega_i(
         &self,
-        l_0_coset_evals: &Vec<F>, // lagrange poly should not be fixed column, it's not committed since it can be evaluated in O(log(N))
-        q_last_coset_evals: &Vec<F>, // q_last is 1 only at index u, so it can also be treated as Lu(X)
+        l_0_coset_evals: &[F], // lagrange poly should not be fixed column, it's not committed since it can be evaluated in O(log(N))
+        q_last_coset_evals: &[F], // q_last is 1 only at index u, so it can also be treated as Lu(X)
         q_blind: &FixedProverOracle<F>,
         witness_oracles: &[&WitnessProverOracle<F>], // Only oracles that are included in permutation
         permutation_oracles: &[FixedProverOracle<F>],
@@ -238,6 +241,7 @@ impl<F: PrimeField> PermutationArgument<F> {
         Ok(permutation_eval)
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn open_argument<PC: HomomorphicCommitment<F>>(
         &self,
         l_0_eval: F,

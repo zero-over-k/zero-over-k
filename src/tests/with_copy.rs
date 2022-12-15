@@ -471,8 +471,8 @@ mod copy_constraint_tests {
         let lu_coset_evals = extended_coset_domain.coset_fft(&lu);
 
         let mut q_blind_evals = vec![F::one(); domain.size()];
-        for i in 0..=u {
-            q_blind_evals[i] = F::zero();
+        for no_blind in q_blind_evals.iter_mut().take(u + 1) {
+            *no_blind = F::zero();
         }
 
         let q_blind_poly = DensePolynomial::<F>::from_coefficients_slice(
@@ -1149,8 +1149,8 @@ mod copy_constraint_tests {
         };
 
         let mut q_blind_evals = vec![F::one(); domain.size()];
-        for i in 0..=u {
-            q_blind_evals[i] = F::zero();
+        for no_blind in q_blind_evals.iter_mut().take(u + 1) {
+            *no_blind = F::zero();
         }
 
         let q_blind_poly = DensePolynomial::<F>::from_coefficients_slice(

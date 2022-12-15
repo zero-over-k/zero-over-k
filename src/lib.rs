@@ -7,7 +7,9 @@ use ark_poly::univariate::DensePolynomial;
 use ark_poly::{
     EvaluationDomain, GeneralEvaluationDomain, Polynomial, UVPolynomial,
 };
-use ark_poly_commit::{LabeledPolynomial, PCUniversalParams};
+use ark_poly_commit::{
+    LabeledPolynomial, PCUniversalParams, PolynomialCommitment,
+};
 
 use ark_std::rand::{Rng, RngCore};
 use commitment::HomomorphicCommitment;
@@ -51,6 +53,10 @@ pub mod permutation;
 
 mod tests;
 
+pub type PCKeys<F, PC> = (
+    <PC as PolynomialCommitment<F, DensePolynomial<F>>>::CommitterKey,
+    <PC as PolynomialCommitment<F, DensePolynomial<F>>>::VerifierKey,
+);
 pub struct PIL<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng> {
     _field: PhantomData<F>,
     _pc: PhantomData<PC>,
@@ -74,7 +80,7 @@ where
 
     pub fn prepare_keys(
         srs: &UniversalSRS<F, PC>,
-    ) -> Result<(PC::CommitterKey, PC::VerifierKey), Error<PC::Error>> {
+    ) -> Result<PCKeys<F, PC>, Error<PC::Error>> {
         let supported_hiding_bound = 1; // we need to blind oracles for multiproof and opening in x3
         let (committer_key, verifier_key) =
             PC::trim(srs, srs.max_degree(), supported_hiding_bound, None)
