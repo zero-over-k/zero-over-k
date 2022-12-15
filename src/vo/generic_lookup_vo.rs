@@ -64,16 +64,16 @@ impl<F: PrimeField> GenericLookupVO<F> {
         for query in &self.virtual_table_queries {
             match query.oracle_type {
                 OracleType::Witness => {
-                    return Err(PiopError::WitnessTableNotAllowed(
-                        format!("VirtualQuery index: {}", query.index)
-                            ,
-                    ))
+                    return Err(PiopError::WitnessTableNotAllowed(format!(
+                        "VirtualQuery index: {}",
+                        query.index
+                    )))
                 }
                 OracleType::Instance => {
-                    return Err(PiopError::InstanceTableNotAllowed(
-                        format!("VirtualQuery index: {}", query.index)
-                            ,
-                    ))
+                    return Err(PiopError::InstanceTableNotAllowed(format!(
+                        "VirtualQuery index: {}",
+                        query.index
+                    )))
                 }
                 OracleType::Fixed => {
                     table_oracles[query.index]
