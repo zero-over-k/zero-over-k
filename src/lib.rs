@@ -68,7 +68,6 @@ where
         max_degree: usize,
         rng: &mut R,
     ) -> Result<UniversalSRS<F, PC>, Error<PC::Error>> {
-        
         PC::setup(max_degree, None, rng).map_err(Error::from_pc_err)
     }
 
@@ -414,7 +413,8 @@ where
             .chain(lookup_z_rands.iter())
             .chain(quotient_rands.iter())
             .chain(z_rands.iter())
-            .chain(preprocessed.empty_rands_for_fixed.iter()).cloned()
+            .chain(preprocessed.empty_rands_for_fixed.iter())
+            .cloned()
             .collect();
 
         assert_eq!(oracles.len(), oracle_rands.len());
@@ -556,8 +556,8 @@ where
 
         Ok(proof)
     }
-
-    pub fn verify<R: Rng>(
+    #[allow(clippy::too_many_arguments)]
+    pub fn verify(
         vk: &VerifierKey<F, PC>,
         preprocessed: &mut VerifierPreprocessedInput<F, PC>,
         proof: Proof<F, PC>,
@@ -566,7 +566,6 @@ where
         vos: &[&dyn VirtualOracle<F>],
         domain_size: usize,
         vanishing_polynomial: &DensePolynomial<F>,
-        _zk_rng: &mut R,
     ) -> Result<(), Error<PC::Error>> {
         let verifier_init_state = PIOPforPolyIdentity::<F, PC>::init_verifier();
 
@@ -828,8 +827,7 @@ where
                 )?;
 
                     let a_prime = WitnessVerifierOracle::<F, PC> {
-                        label: format!("lookup_a_prime_{}_poly", lookup_index)
-                            ,
+                        label: format!("lookup_a_prime_{}_poly", lookup_index),
                         queried_rotations: BTreeSet::from([
                             Rotation::curr(),
                             Rotation::prev(),
@@ -846,8 +844,7 @@ where
                     };
 
                     let s_prime = WitnessVerifierOracle::<F, PC> {
-                        label: format!("lookup_s_prime_{}_poly", lookup_index)
-                            ,
+                        label: format!("lookup_s_prime_{}_poly", lookup_index),
                         queried_rotations: BTreeSet::from([Rotation::curr()]),
                         evals_at_challenges: BTreeMap::from([(
                             evaluation_challenge,
@@ -880,8 +877,7 @@ where
             .enumerate()
             .map(|(lookup_index, (z_commitment, evals))| {
                 WitnessVerifierOracle::<F, PC> {
-                    label: format!("lookup_{}_agg_poly", lookup_index)
-                        ,
+                    label: format!("lookup_{}_agg_poly", lookup_index),
                     queried_rotations: BTreeSet::from([
                         Rotation::curr(),
                         Rotation::next(),

@@ -233,7 +233,6 @@ mod test {
             &vos,
             domain_size,
             &domain.vanishing_polynomial().into(),
-            &mut rng,
         );
 
         assert!(res.is_ok());

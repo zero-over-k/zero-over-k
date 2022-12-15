@@ -209,7 +209,6 @@ mod test {
             instance,
             delta_vo,
             proof,
-            &mut rng,
         );
 
         assert!(res.is_ok())
@@ -345,7 +344,6 @@ mod test {
             instance,
             xor_and_vo,
             proof,
-            &mut rng,
         );
 
         assert!(res.is_ok());

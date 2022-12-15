@@ -139,7 +139,6 @@ mod test {
             instance,
             rescue_vo,
             proof,
-            &mut rng,
         );
 
         assert!(res.is_ok());

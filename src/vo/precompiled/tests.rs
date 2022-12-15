@@ -159,6 +159,7 @@ pub(crate) fn run_prover(
 }
 
 /// Run a verifier to test a VO without using copy constraints or lookups
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn run_verifier(
     domain: GeneralEvaluationDomain<F>,
     ck: CommKey,
@@ -168,7 +169,6 @@ pub(crate) fn run_verifier(
     instance: Vec<(impl Into<String>, &[F])>,
     mut vo: GenericVO<F>,
     proof: Proof<F, PC>,
-    rng: &mut StdRng,
 ) -> Result<(), Error<<PC as PolynomialCommitment<F, DensePolynomial<F>>>::Error>>
 {
     // 1. Generate Verifier Oracles
@@ -244,7 +244,6 @@ pub(crate) fn run_verifier(
         vos.as_slice(),
         domain.size(),
         &domain.vanishing_polynomial().into(),
-        rng,
     );
 
     res

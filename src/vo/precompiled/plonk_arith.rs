@@ -228,7 +228,6 @@ mod test {
             instance,
             plonk_vo,
             proof,
-            &mut rng,
         );
 
         assert!(res.is_ok());

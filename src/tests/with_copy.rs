@@ -1355,7 +1355,6 @@ mod copy_constraint_tests {
             &vos,
             domain_size,
             &domain.vanishing_polynomial().into(),
-            &mut rng,
         );
 
         assert!(res.is_ok())

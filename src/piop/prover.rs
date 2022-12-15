@@ -53,6 +53,7 @@ pub struct ProverState<'a, F: PrimeField> {
     pub(crate) lookup_z_polys: Option<Vec<WitnessProverOracle<F>>>,
     pub(crate) oracles_to_copy: Vec<&'a WitnessProverOracle<F>>,
     pub(crate) vos: &'a [&'a dyn VirtualOracle<F>],
+
     pub(crate) domain: GeneralEvaluationDomain<F>,
     pub(crate) quotient_chunks: Option<Vec<WitnessProverOracle<F>>>,
 }
