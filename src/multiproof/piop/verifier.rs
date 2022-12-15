@@ -63,7 +63,7 @@ impl<F: PrimeField> PIOP<F> {
     }
 
     /// Output the third message.
-    pub fn verifier_third_round<'a, R: RngCore>(
+    pub fn verifier_third_round<R: RngCore>(
         mut state: VerifierState<F>,
         rng: &mut R,
     ) -> (VerifierState<F>, VerifierThirdMsg<F>) {

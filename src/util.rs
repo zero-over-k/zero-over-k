@@ -34,16 +34,19 @@ where
 
 /// Evaluate the given polynomials at `query_set`.
 /// We can't use arkworks evaluate_query_set because iterating throw evaluations and collecting it into just evals is reordering array
-pub fn evaluate_query_set<'a, F: PrimeField>(
+pub fn evaluate_query_set<F: PrimeField>(
     polys: &[impl Instantiable<F>],
     query_set: &QuerySet<F>,
 ) -> Result<Vec<F>, PiopError> {
-    let oracles =
-        BTreeMap::from_iter(polys.iter().map(|p| (p.get_label(), p)));
+    let oracles = BTreeMap::from_iter(polys.iter().map(|p| (p.get_label(), p)));
     let mut evaluations = vec![];
     for (label, (_, point)) in query_set {
-        let oracle = oracles.get(label).unwrap_or_else(|| panic!("Evaluating Query Set: oracle with label {} not found",
-                label));
+        let oracle = oracles.get(label).unwrap_or_else(|| {
+            panic!(
+                "Evaluating Query Set: oracle with label {} not found",
+                label
+            )
+        });
         evaluations.push(oracle.query(point)?);
     }
     Ok(evaluations)
