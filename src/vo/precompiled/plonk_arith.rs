@@ -83,7 +83,7 @@ impl<F: PrimeField> PrecompiledVO<F> for PlonkArith4 {
             let a: VirtualExpression<F> = a.clone().into();
             let b: VirtualExpression<F> = b.clone().into();
             let c: VirtualExpression<F> = c.clone().into();
-            let d: VirtualExpression<F> = d.clone().into();
+            let d: VirtualExpression<F> = d.into();
 
             a.clone() * b.clone() * qm
                 + a * ql
@@ -228,9 +228,8 @@ mod test {
             instance,
             plonk_vo,
             proof,
-            &mut rng,
         );
 
-        assert_eq!(res, ());
+        assert!(res.is_ok());
     }
 }

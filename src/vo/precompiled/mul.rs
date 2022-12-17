@@ -148,9 +148,9 @@ mod test {
         };
 
         let preprocessed = ProverPreprocessedInput::new(
-            &vec![],
-            &vec![],
-            &vec![],
+            &[],
+            &[],
+            &[],
             &q_blind,
             &vk.index_info,
         );
@@ -162,7 +162,6 @@ mod test {
             &mut instance_oracles,
             &vos,
             domain_size,
-            &domain.vanishing_polynomial().into(),
             &mut rng,
         )
         .unwrap();
@@ -174,7 +173,7 @@ mod test {
         // Repeat just to make sure some change from prover does not affect this
         let a_ver = WitnessVerifierOracle::<F, PC>::new("a", false);
         let b_ver = WitnessVerifierOracle::<F, PC>::new("b", false);
-        let c = InstanceVerifierOracle::new("c", c_poly.clone(), &c_evals);
+        let c = InstanceVerifierOracle::new("c", c_poly);
 
         let mut ver_wtns_oracles = [a_ver, b_ver];
         let mut instance_oracles = [c];
@@ -192,11 +191,11 @@ mod test {
         let vos: Vec<&dyn VirtualOracle<F>> = vec![&mul_vo];
 
         // Repeat but this time provide verifier witness oracles
-        let mut vk = Indexer::index(
+        let vk = Indexer::index(
             &verifier_key,
             &vos,
             vec![],
-            &mut ver_wtns_oracles,
+            &ver_wtns_oracles,
             &instance_oracles,
             &fixed_oracles,
             domain,
@@ -223,10 +222,10 @@ mod test {
         // Since we mutate fixed oracles by adding evals at challenge for specific proof
         // preprocessed input is cloned in order to enable preserving original preprocessed
         // Second option is just to "reset" preprocessed after verification ends
-        let mut pp_clone = preprocessed.clone();
+        let mut pp_clone = preprocessed;
 
         let res = PilInstance::verify(
-            &mut vk,
+            &vk,
             &mut pp_clone,
             proof,
             &mut ver_wtns_oracles,
@@ -234,10 +233,8 @@ mod test {
             &vos,
             domain_size,
             &domain.vanishing_polynomial().into(),
-            &mut rng,
-        )
-        .unwrap();
+        );
 
-        assert_eq!(res, ());
+        assert!(res.is_ok());
     }
 }

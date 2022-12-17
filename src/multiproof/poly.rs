@@ -6,16 +6,15 @@ pub fn construct_lagrange_basis<F: FftField>(
     evaluation_domain: &[F],
 ) -> Vec<DensePolynomial<F>> {
     let mut bases = Vec::with_capacity(evaluation_domain.len());
-    for i in 0..evaluation_domain.len() {
+    for (i, x_i) in evaluation_domain.iter().enumerate() {
         let mut l_i = DensePolynomial::from_coefficients_slice(&[F::one()]);
-        let x_i = evaluation_domain[i];
-        for j in 0..evaluation_domain.len() {
+        for (j, elem) in evaluation_domain.iter().enumerate() {
             if j != i {
                 let nom = DensePolynomial::from_coefficients_slice(&[
-                    -evaluation_domain[j],
+                    -*elem,
                     F::one(),
                 ]);
-                let denom = x_i - evaluation_domain[j];
+                let denom = *x_i - *elem;
 
                 l_i = &l_i * &(&nom * denom.inverse().unwrap());
             }

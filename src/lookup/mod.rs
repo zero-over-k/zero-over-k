@@ -12,7 +12,10 @@ use crate::{
         traits::{ConcreteOracle, Instantiable},
         witness::{WitnessProverOracle, WitnessVerifierOracle},
     },
-    piop::error::Error as PiopError,
+    piop::{
+        error::Error as PiopError,
+        prover::{LookupProverOracles, LookupVerifierOracles},
+    },
     vo::expression::Expression,
 };
 use ark_ff::PrimeField;
@@ -36,27 +39,27 @@ pub struct LookupArgument<F: PrimeField> {
 
 impl<F: PrimeField> LookupArgument<F> {
     // Aux funcs for `evaluate`
-    const fn ident(x: F) -> Result<F, PiopError> {
+    fn ident(x: F) -> Result<F, PiopError> {
         Ok(x)
     }
     // }
     fn neg(x: Result<F, PiopError>) -> Result<F, PiopError> {
-        x.and_then(|x_val| Ok(-x_val))
+        x.map(|x_val| -x_val)
     }
     fn add(
         x: Result<F, PiopError>,
         y: Result<F, PiopError>,
     ) -> Result<F, PiopError> {
-        x.and_then(|x_val| y.and_then(|y_val| Ok(x_val + y_val)))
+        x.and_then(|x_val| y.map(|y_val| x_val + y_val))
     }
     fn mul(
         x: Result<F, PiopError>,
         y: Result<F, PiopError>,
     ) -> Result<F, PiopError> {
-        x.and_then(|x_val| y.and_then(|y_val| Ok(x_val * y_val)))
+        x.and_then(|x_val| y.map(|y_val| x_val * y_val))
     }
     fn scale(x: Result<F, PiopError>, y: F) -> Result<F, PiopError> {
-        x.and_then(|x_val| Ok(x_val * y))
+        x.map(|x_val| x_val * y)
     }
     /*
        In subset equality argument we have q_blind * z(wX) * A'(X) * S'(X) = 4n - 4
@@ -81,15 +84,7 @@ impl<F: PrimeField> LookupArgument<F> {
         domain: &GeneralEvaluationDomain<F>,
         extended_coset_domain: &GeneralEvaluationDomain<F>,
         zk_rng: &mut R,
-    ) -> Result<
-        (
-            WitnessProverOracle<F>,
-            WitnessProverOracle<F>,
-            WitnessProverOracle<F>,
-            WitnessProverOracle<F>,
-        ),
-        PiopError,
-    > {
+    ) -> Result<LookupProverOracles<F>, PiopError> {
         // When working on prover we want to construct A, A', S and S' as WitnessProverOracles
         // We need both polys and coset evals for them, one approach is to compute polynomials and then to do coset fft
         // But it's faster if we evaluate expression 2 times, one in coset and one in just domain
@@ -236,7 +231,7 @@ impl<F: PrimeField> LookupArgument<F> {
         }
 
         let a = WitnessProverOracle {
-            label: format!("lookup_a_{}_poly", lookup_index).to_string(),
+            label: format!("lookup_a_{}_poly", lookup_index),
             poly: DensePolynomial::from_coefficients_slice(
                 &domain.ifft(&a_original_domain_evals),
             ),
@@ -283,8 +278,7 @@ impl<F: PrimeField> LookupArgument<F> {
                                 }
                                 None => Err(PiopError::MissingFixedOracle(
                                     table_query.label.clone(),
-                                )
-                                .into()),
+                                )),
                             }
                         }
                     }
@@ -340,7 +334,7 @@ impl<F: PrimeField> LookupArgument<F> {
         }
 
         let s = WitnessProverOracle {
-            label: format!("lookup_s_{}_poly", lookup_index).to_string(),
+            label: format!("lookup_s_{}_poly", lookup_index),
             poly: DensePolynomial::from_coefficients_slice(
                 &domain.ifft(&s_original_domain_evals),
             ),
@@ -376,7 +370,7 @@ impl<F: PrimeField> LookupArgument<F> {
             &domain.ifft(&a_prime_evals),
         );
         let a_prime = WitnessProverOracle {
-            label: format!("lookup_a_prime_{}_poly", lookup_index).to_string(),
+            label: format!("lookup_a_prime_{}_poly", lookup_index),
             evals_at_coset_of_extended_domain: Some(
                 extended_coset_domain.coset_fft(&a_prime_poly),
             ),
@@ -393,7 +387,7 @@ impl<F: PrimeField> LookupArgument<F> {
             &domain.ifft(&s_prime_evals),
         );
         let s_prime = WitnessProverOracle {
-            label: format!("lookup_s_prime_{}_poly", lookup_index).to_string(),
+            label: format!("lookup_s_prime_{}_poly", lookup_index),
             evals_at_coset_of_extended_domain: Some(
                 extended_coset_domain.coset_fft(&s_prime_poly),
             ),
@@ -406,6 +400,7 @@ impl<F: PrimeField> LookupArgument<F> {
         Ok((a, s, a_prime, s_prime))
     }
 
+    #[allow(clippy::type_complexity)]
     pub fn construct_a_and_s_unpermuted_polys_verifier<
         'a,
         PC: HomomorphicCommitment<F>,
@@ -423,7 +418,7 @@ impl<F: PrimeField> LookupArgument<F> {
         table_queries: &[OracleQuery],
         theta: F,                // lookup aggregation expression,
         evaluation_challenge: F, // evaluation_challenge
-        omegas: &Vec<F>,
+        omegas: &[F],
     ) -> Result<
         (WitnessVerifierOracle<F, PC>, WitnessVerifierOracle<F, PC>),
         Error<PC::Error>,
@@ -486,7 +481,7 @@ impl<F: PrimeField> LookupArgument<F> {
         }
 
         let a = WitnessVerifierOracle::<F, PC> {
-            label: format!("lookup_a_{}_poly", lookup_index).to_string(),
+            label: format!("lookup_a_{}_poly", lookup_index),
             queried_rotations: BTreeSet::from([Rotation::curr()]),
             evals_at_challenges: BTreeMap::from([(evaluation_challenge, agg)]),
             commitment: None,
@@ -528,7 +523,7 @@ impl<F: PrimeField> LookupArgument<F> {
         }
 
         let s = WitnessVerifierOracle::<F, PC> {
-            label: format!("lookup_s_{}_poly", lookup_index).to_string(),
+            label: format!("lookup_s_{}_poly", lookup_index),
             queried_rotations: BTreeSet::from([Rotation::curr()]),
             evals_at_challenges: BTreeMap::from([(evaluation_challenge, agg)]),
             commitment: None,
@@ -539,13 +534,10 @@ impl<F: PrimeField> LookupArgument<F> {
     }
 
     pub fn instantiate_argument_at_omega_i(
-        l0_coset_evals: &Vec<F>,
-        q_last_coset_evals: &Vec<F>,
+        l0_coset_evals: &[F],
+        q_last_coset_evals: &[F],
         q_blind: &FixedProverOracle<F>,
-        a: &WitnessProverOracle<F>,
-        s: &WitnessProverOracle<F>,
-        a_prime: &WitnessProverOracle<F>,
-        s_prime: &WitnessProverOracle<F>,
+        lookup_oracles: &LookupProverOracles<F>,
         z: &WitnessProverOracle<F>,
         beta: F,
         gamma: F,
@@ -556,6 +548,7 @@ impl<F: PrimeField> LookupArgument<F> {
         // + 1 to check that A'(w^0) = S'(w^0)
         // + 1 to check well formation of A' and S'
         assert_eq!(alpha_powers.len(), 5);
+        let (_, _, a_prime, s_prime) = lookup_oracles;
 
         let mut num = F::zero();
 
@@ -563,15 +556,12 @@ impl<F: PrimeField> LookupArgument<F> {
             l0_coset_evals,
             q_last_coset_evals,
             q_blind,
-            a,
-            s,
-            a_prime,
-            s_prime,
+            lookup_oracles,
             z,
             beta,
             gamma,
             omega_index,
-            &alpha_powers[0..3].to_vec(),
+            &alpha_powers[0..3],
         )?;
 
         let a_prime_x =
@@ -605,10 +595,7 @@ impl<F: PrimeField> LookupArgument<F> {
         l0_eval: &F,
         q_last_eval: F,
         q_blind: &FixedVerifierOracle<F, PC>,
-        a: &WitnessVerifierOracle<F, PC>,
-        s: &WitnessVerifierOracle<F, PC>,
-        a_prime: &WitnessVerifierOracle<F, PC>,
-        s_prime: &WitnessVerifierOracle<F, PC>,
+        lookup_oracles: &LookupVerifierOracles<F, PC>,
         z: &WitnessVerifierOracle<F, PC>,
         beta: F,
         gamma: F,
@@ -618,34 +605,32 @@ impl<F: PrimeField> LookupArgument<F> {
     ) -> Result<F, Error<PC::Error>> {
         assert_eq!(alpha_powers.len(), 5);
 
+        let (_, _, a_prime, s_prime) = lookup_oracles;
         let mut opening = F::zero();
 
         opening += SubsetEqualityArgument::open_argument(
             l0_eval,
             q_last_eval,
             q_blind,
-            a,
-            s,
-            a_prime,
-            s_prime,
+            lookup_oracles,
             z,
             beta,
             gamma,
             evaluation_challenge,
             domain,
-            &alpha_powers[..3].to_vec(),
+            &alpha_powers[..3],
         )?;
 
         let negative_shifted_evaluation_challenge =
             domain.element(1).inverse().unwrap() * evaluation_challenge;
 
-        let a_prime_xi = a_prime.query(&evaluation_challenge)?;
+        let a_prime_xi = a_prime.query(evaluation_challenge)?;
         let a_prime_minus_wxi =
             a_prime.query(&negative_shifted_evaluation_challenge)?;
 
-        let s_prime_xi = s_prime.query(&evaluation_challenge)?;
+        let s_prime_xi = s_prime.query(evaluation_challenge)?;
 
-        let q_blind_xi = q_blind.query(&evaluation_challenge)?;
+        let q_blind_xi = q_blind.query(evaluation_challenge)?;
 
         opening += alpha_powers[3] * l0_eval * (a_prime_xi - s_prime_xi);
 
@@ -802,11 +787,9 @@ mod test {
         let beta = F::rand(&mut rng);
         let gamma = F::rand(&mut rng);
 
+        let lookup_oracles = (a, s, a_prime, s_prime);
         let z = SubsetEqualityArgument::construct_agg_poly(
-            &a,
-            &s,
-            &a_prime,
-            &s_prime,
+            &lookup_oracles,
             beta,
             gamma,
             0,
@@ -866,10 +849,7 @@ mod test {
                 &l0_coset_evals,
                 &lu_coset_evals,
                 &q_blind,
-                &a,
-                &s,
-                &a_prime,
-                &s_prime,
+                &lookup_oracles,
                 &z,
                 beta,
                 gamma,
@@ -992,14 +972,12 @@ mod test {
         let l0_eval = l0.evaluate(&evaluation_challenge);
         let lu_eval = lu.evaluate(&evaluation_challenge);
 
+        let lookup_oracles = (a, s, a_prime, s_prime);
         let opening = LookupArgument::open_argument::<PC>(
             &l0_eval,
             lu_eval,
             &q_blind,
-            &a,
-            &s,
-            &a_prime,
-            &s_prime,
+            &lookup_oracles,
             &z,
             beta,
             gamma,

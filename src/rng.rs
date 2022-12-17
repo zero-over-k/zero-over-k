@@ -46,7 +46,8 @@ impl<D: Digest, R: RngCore + SeedableRng> RngCore
         &mut self,
         dest: &mut [u8],
     ) -> Result<(), ark_std::rand::Error> {
-        Ok(self.r.fill_bytes(dest))
+        self.r.fill_bytes(dest);
+        Ok(())
     }
 }
 
@@ -68,7 +69,7 @@ where
         let r = R::from_seed(<R::Seed>::from(seed));
         Self {
             r,
-            seed: seed,
+            seed,
             digest: PhantomData,
         }
     }

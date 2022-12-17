@@ -17,6 +17,7 @@ use crate::data_structures::{
     PermutationInfo, Proof, ProverKey, ProverPreprocessedInput,
     VerifierPreprocessedInput,
 };
+use crate::error::Error;
 use crate::indexer::Indexer;
 use crate::oracles::fixed::{FixedProverOracle, FixedVerifierOracle};
 use crate::oracles::instance::{InstanceProverOracle, InstanceVerifierOracle};
@@ -56,6 +57,7 @@ pub fn test_init(
 }
 
 /// Run a prover to test a VO without using copy constraints or lookups
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn run_prover(
     domain: GeneralEvaluationDomain<F>,
     ck: CommKey,
@@ -71,8 +73,8 @@ pub(crate) fn run_prover(
         .into_iter()
         .map(|(label, evals)| {
             let poly =
-                DensePolynomial::from_coefficients_slice(&domain.ifft(&evals));
-            WitnessProverOracle::new(label, poly, &evals, false)
+                DensePolynomial::from_coefficients_slice(&domain.ifft(evals));
+            WitnessProverOracle::new(label, poly, evals, false)
         })
         .collect();
 
@@ -80,8 +82,8 @@ pub(crate) fn run_prover(
         .into_iter()
         .map(|(label, evals)| {
             let poly =
-                DensePolynomial::from_coefficients_slice(&domain.ifft(&evals));
-            FixedProverOracle::new(label, poly, &evals)
+                DensePolynomial::from_coefficients_slice(&domain.ifft(evals));
+            FixedProverOracle::new(label, poly, evals)
         })
         .collect();
 
@@ -89,8 +91,8 @@ pub(crate) fn run_prover(
         .into_iter()
         .map(|(label, evals)| {
             let poly =
-                DensePolynomial::from_coefficients_slice(&domain.ifft(&evals));
-            InstanceProverOracle::new(label, poly, &evals)
+                DensePolynomial::from_coefficients_slice(&domain.ifft(evals));
+            InstanceProverOracle::new(label, poly, evals)
         })
         .collect();
 
@@ -129,8 +131,8 @@ pub(crate) fn run_prover(
 
     let preprocessed = ProverPreprocessedInput::new(
         &fixed_oracles,
-        &vec![],
-        &vec![],
+        &[],
+        &[],
         &q_blind,
         &vk.index_info,
     );
@@ -144,7 +146,6 @@ pub(crate) fn run_prover(
         &mut instance_oracles,
         &vos,
         domain.size(),
-        &domain.vanishing_polynomial().into(),
         rng,
     )
     .unwrap();
@@ -159,6 +160,7 @@ pub(crate) fn run_prover(
 }
 
 /// Run a verifier to test a VO without using copy constraints or lookups
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn run_verifier(
     domain: GeneralEvaluationDomain<F>,
     ck: CommKey,
@@ -168,8 +170,8 @@ pub(crate) fn run_verifier(
     instance: Vec<(impl Into<String>, &[F])>,
     mut vo: GenericVO<F>,
     proof: Proof<F, PC>,
-    rng: &mut StdRng,
-) {
+) -> Result<(), Error<<PC as PolynomialCommitment<F, DensePolynomial<F>>>::Error>>
+{
     // 1. Generate Verifier Oracles
     let mut witness_ver_oracles: Vec<_> = witness_labels
         .into_iter()
@@ -180,8 +182,8 @@ pub(crate) fn run_verifier(
         .into_iter()
         .map(|(label, evals)| {
             let poly =
-                DensePolynomial::from_coefficients_slice(&domain.ifft(&evals));
-            InstanceVerifierOracle::new(label, poly, &evals)
+                DensePolynomial::from_coefficients_slice(&domain.ifft(evals));
+            InstanceVerifierOracle::new(label, poly)
         })
         .collect();
 
@@ -189,7 +191,7 @@ pub(crate) fn run_verifier(
         .into_iter()
         .map(|(label, evals)| {
             let poly =
-                DensePolynomial::from_coefficients_slice(&domain.ifft(&evals));
+                DensePolynomial::from_coefficients_slice(&domain.ifft(evals));
             LabeledPolynomial::new(label.into(), poly, None, None)
         })
         .collect();
@@ -198,7 +200,7 @@ pub(crate) fn run_verifier(
 
     let mut fixed_oracles: Vec<_> = fixed_comm
         .into_iter()
-        .map(|comm| FixedVerifierOracle::from_commitment(comm))
+        .map(FixedVerifierOracle::from_commitment)
         .collect();
 
     // 2. Configure VO
@@ -212,7 +214,7 @@ pub(crate) fn run_verifier(
 
     let vos: Vec<&dyn VirtualOracle<F>> = vec![&vo];
 
-    let mut vk = Indexer::index(
+    let vk = Indexer::index(
         &cs_vk,
         &vos,
         vec![],
@@ -235,7 +237,7 @@ pub(crate) fn run_verifier(
     // 4. Verify proof
 
     let res = PilInstance::verify(
-        &mut vk,
+        &vk,
         &mut verifier_pp,
         proof,
         &mut witness_ver_oracles,
@@ -243,9 +245,7 @@ pub(crate) fn run_verifier(
         vos.as_slice(),
         domain.size(),
         &domain.vanishing_polynomial().into(),
-        rng,
-    )
-    .unwrap();
+    );
 
     res
 }

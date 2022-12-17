@@ -67,7 +67,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng>
         fs_rng: &mut FS,
         zk_rng: &mut R,
     ) -> Result<Proof<F, PC>, Error<PC::Error>> {
-        let verifier_state = PIOP::init_verifier(evaluation_challenge);
+        let verifier_state = PIOP::init_verifier();
 
         let (verifier_state, verifier_first_msg) =
             PIOP::verifier_first_round(verifier_state, fs_rng);
@@ -111,7 +111,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng>
         let opening_proof = PC::open(
             ck,
             iter::once(&final_poly),
-            final_poly_commitment.clone().iter(),
+            final_poly_commitment.iter(),
             &verifier_second_msg.x3,
             F::one(), // Opening challenge is not needed since only one polynomial is being committed
             &[final_poly_rand],
@@ -128,6 +128,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng>
         Ok(proof)
     }
 
+    #[allow(clippy::type_complexity)]
     pub fn verify(
         vk: &PC::VerifierKey,
         proof: Proof<F, PC>,
@@ -137,7 +138,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng>
         fs_rng: &mut FS,
     ) -> Result<(), Error<PC::Error>> {
         let domain = GeneralEvaluationDomain::new(domain_size).unwrap();
-        let verifier_state = PIOP::init_verifier(evaluation_challenge);
+        let verifier_state = PIOP::init_verifier();
 
         let (verifier_state, verifier_first_msg) =
             PIOP::verifier_first_round(verifier_state, fs_rng);
@@ -160,7 +161,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng>
         for &oracle in oracles.iter() {
             let oracles = opening_sets
                 .entry(oracle.get_queried_rotations().clone())
-                .or_insert(vec![]);
+                .or_default();
             oracles.push(oracle)
         }
 
@@ -423,7 +424,7 @@ mod test {
             queried_rotations: BTreeSet::from([Rotation::curr()]),
             should_permute: false,
             evals_at_challenges: BTreeMap::from([(xi, a_at_xi)]),
-            commitment: Some(oracles_commitments[0].commitment().clone()),
+            commitment: Some(*oracles_commitments[0].commitment()),
         };
 
         let b_ver = WitnessVerifierOracle {
@@ -431,7 +432,7 @@ mod test {
             queried_rotations: BTreeSet::from([Rotation::curr()]),
             should_permute: false,
             evals_at_challenges: BTreeMap::from([(xi, b_at_xi)]),
-            commitment: Some(oracles_commitments[1].commitment().clone()),
+            commitment: Some(*oracles_commitments[1].commitment()),
         };
 
         let c_ver = WitnessVerifierOracle {
@@ -445,7 +446,7 @@ mod test {
                 (xi, c_at_xi),
                 (omega_xi, c_at_omega_xi),
             ]),
-            commitment: Some(oracles_commitments[2].commitment().clone()),
+            commitment: Some(*oracles_commitments[2].commitment()),
         };
 
         let d_ver = WitnessVerifierOracle {
@@ -459,7 +460,7 @@ mod test {
                 (xi, d_at_xi),
                 (omega_xi, d_at_omega_xi),
             ]),
-            commitment: Some(oracles_commitments[3].commitment().clone()),
+            commitment: Some(*oracles_commitments[3].commitment()),
         };
 
         let ver_oracles: Vec<&dyn CommittedOracle<F, PC>> = vec![
@@ -497,6 +498,6 @@ mod test {
             &mut fs_rng,
         );
 
-        assert_eq!(res.is_ok(), true);
+        assert!(res.is_ok());
     }
 }

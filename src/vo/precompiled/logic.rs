@@ -122,8 +122,8 @@ impl<F: PrimeField> PrecompiledVO<F> for DeltaXorAnd {
             let e = const_3.clone() * (a.clone() + b.clone() + d.clone())
                 - const_2 * f;
             let h = qc * (const_9 * d - const_3 * (a + b));
-            let a = h + e;
-            a
+
+            h + e
         };
 
         (expr, vec![a, b, c, d, qc])
@@ -161,7 +161,7 @@ mod test {
         let vals = &[F::zero(), F::one(), F::from(2u32), F::from(3u32)];
         let mut rand_4 = || {
             let u = rng.next_u32() % 4;
-            vals[u as usize].clone()
+            vals[u as usize]
         };
 
         let initial_val = rand_4();
@@ -209,10 +209,9 @@ mod test {
             instance,
             delta_vo,
             proof,
-            &mut rng,
         );
 
-        assert_eq!(res, ());
+        assert!(res.is_ok())
     }
 
     // TODO Fix test
@@ -297,17 +296,12 @@ mod test {
             let const_18 = F::from(18u32);
             let const_81 = F::from(81u32);
             let const_83 = F::from(83u32);
-            let f = c.clone()
-                * (c.clone()
-                    * (const_4 * c
-                        - const_18.clone() * (a.clone() + b.clone())
-                        + const_81.clone())
-                    + const_18
-                        * (a.clone() * a.clone() + b.clone() * b.clone())
-                    - const_81 * (a.clone() + b.clone())
+            let f = c
+                * (c * (const_4 * c - const_18 * (a + b) + const_81)
+                    + const_18 * (a * a + b * b)
+                    - const_81 * (a + b)
                     + const_83);
-            let e = const_3.clone() * (a.clone() + b.clone() + d.clone())
-                - const_2 * f;
+            let e = const_3 * (a + b + d) - const_2 * f;
             let h = *qc * (const_9 * d - const_3 * (a + b));
             let res = h + e;
 
@@ -350,9 +344,8 @@ mod test {
             instance,
             xor_and_vo,
             proof,
-            &mut rng,
         );
 
-        assert_eq!(res, ());
+        assert!(res.is_ok());
     }
 }

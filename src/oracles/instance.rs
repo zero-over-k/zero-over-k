@@ -96,21 +96,15 @@ impl<F: PrimeField> Instantiable<F> for InstanceProverOracle<F> {
 pub struct InstanceVerifierOracle<F: PrimeField> {
     pub(crate) label: String,
     pub(crate) poly: DensePolynomial<F>,
-    pub(crate) evals: Vec<F>, // TODO enable evals with lagrange
     pub(crate) queried_rotations: BTreeSet<Rotation>,
 }
 
 impl<F: PrimeField> InstanceVerifierOracle<F> {
     /// Creates a new InstanceVerifierOracle
-    pub fn new(
-        label: impl Into<String>,
-        poly: DensePolynomial<F>,
-        evals: &[F],
-    ) -> Self {
+    pub fn new(label: impl Into<String>, poly: DensePolynomial<F>) -> Self {
         Self {
             label: label.into(),
             poly,
-            evals: evals.to_vec(),
             queried_rotations: BTreeSet::new(),
         }
     }

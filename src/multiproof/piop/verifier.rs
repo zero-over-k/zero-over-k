@@ -4,7 +4,6 @@ use ark_std::rand::RngCore;
 use super::PIOP;
 
 pub struct VerifierState<F: PrimeField> {
-    evaluation_challenge: F,
     first_msg: Option<VerifierFirstMsg<F>>,
     second_msg: Option<VerifierSecondMsg<F>>,
     third_msg: Option<VerifierThirdMsg<F>>,
@@ -30,9 +29,8 @@ pub struct VerifierThirdMsg<F: PrimeField> {
 }
 
 impl<F: PrimeField> PIOP<F> {
-    pub fn init_verifier(evaluation_challenge: F) -> VerifierState<F> {
+    pub fn init_verifier() -> VerifierState<F> {
         VerifierState {
-            evaluation_challenge,
             first_msg: None,
             second_msg: None,
             third_msg: None,
@@ -65,7 +63,7 @@ impl<F: PrimeField> PIOP<F> {
     }
 
     /// Output the third message.
-    pub fn verifier_third_round<'a, R: RngCore>(
+    pub fn verifier_third_round<R: RngCore>(
         mut state: VerifierState<F>,
         rng: &mut R,
     ) -> (VerifierState<F>, VerifierThirdMsg<F>) {

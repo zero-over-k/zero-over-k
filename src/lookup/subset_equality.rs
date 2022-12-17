@@ -16,7 +16,10 @@ use crate::{
         traits::{ConcreteOracle, Instantiable},
         witness::{WitnessProverOracle, WitnessVerifierOracle},
     },
-    piop::error::Error as PiopError,
+    piop::{
+        error::Error as PiopError,
+        prover::{LookupProverOracles, LookupVerifierOracles},
+    },
 };
 
 pub struct SubsetEqualityArgument<F: PrimeField> {
@@ -25,10 +28,7 @@ pub struct SubsetEqualityArgument<F: PrimeField> {
 
 impl<F: PrimeField> SubsetEqualityArgument<F> {
     pub fn construct_agg_poly<R: Rng>(
-        a: &WitnessProverOracle<F>,
-        s: &WitnessProverOracle<F>,
-        a_prime: &WitnessProverOracle<F>,
-        s_prime: &WitnessProverOracle<F>,
+        lookup_polys: &LookupProverOracles<F>,
         beta: F,
         gamma: F,
         lookup_index: usize,
@@ -37,6 +37,7 @@ impl<F: PrimeField> SubsetEqualityArgument<F> {
         extended_coset_domain: &GeneralEvaluationDomain<F>,
         zk_rng: &mut R,
     ) -> WitnessProverOracle<F> {
+        let (a, s, a_prime, s_prime) = lookup_polys;
         let mut z_evals = Vec::with_capacity(domain.size());
         let mut z_prev = F::one();
         z_evals.push(z_prev);
@@ -62,7 +63,7 @@ impl<F: PrimeField> SubsetEqualityArgument<F> {
             DensePolynomial::from_coefficients_slice(&domain.ifft(&z_evals));
 
         WitnessProverOracle {
-            label: format!("lookup_{}_agg_poly", lookup_index).to_string(),
+            label: format!("lookup_{}_agg_poly", lookup_index),
             evals_at_coset_of_extended_domain: Some(
                 extended_coset_domain.coset_fft(&poly),
             ),
@@ -81,20 +82,18 @@ impl<F: PrimeField> SubsetEqualityArgument<F> {
     /// 2. Subset equality check
     /// 3. Z(w^u) = 0 or 1
     pub fn instantiate_argument_at_omega_i(
-        l0_coset_evals: &Vec<F>,
-        q_last_coset_evals: &Vec<F>,
+        l0_coset_evals: &[F],
+        q_last_coset_evals: &[F],
         q_blind: &FixedProverOracle<F>,
-        a: &WitnessProverOracle<F>,
-        s: &WitnessProverOracle<F>,
-        a_prime: &WitnessProverOracle<F>,
-        s_prime: &WitnessProverOracle<F>,
+        lookup_oracles: &LookupProverOracles<F>,
         z: &WitnessProverOracle<F>,
         beta: F,
         gamma: F,
         omega_index: usize,
-        alpha_powers: &Vec<F>,
+        alpha_powers: &[F],
     ) -> Result<F, PiopError> {
         assert_eq!(alpha_powers.len(), 3);
+        let (a, s, a_prime, s_prime) = lookup_oracles;
 
         let mut num = F::zero();
 
@@ -137,30 +136,28 @@ impl<F: PrimeField> SubsetEqualityArgument<F> {
         l0_eval: &F,
         q_last_eval: F,
         q_blind: &FixedVerifierOracle<F, PC>,
-        a: &WitnessVerifierOracle<F, PC>,
-        s: &WitnessVerifierOracle<F, PC>,
-        a_prime: &WitnessVerifierOracle<F, PC>,
-        s_prime: &WitnessVerifierOracle<F, PC>,
+        lookup_oracles: &LookupVerifierOracles<F, PC>,
         z: &WitnessVerifierOracle<F, PC>,
         beta: F,
         gamma: F,
         evaluation_challenge: &F,
         domain: &GeneralEvaluationDomain<F>,
-        alpha_powers: &Vec<F>,
+        alpha_powers: &[F],
     ) -> Result<F, Error<PC::Error>> {
         assert_eq!(alpha_powers.len(), 3);
+        let (a, s, a_prime, s_prime) = lookup_oracles;
         let shifted_evaluation_challenge =
             domain.element(1) * evaluation_challenge;
 
         let mut opening = F::zero();
 
-        let a_xi = a.query(&evaluation_challenge)?;
-        let a_prime_xi = a_prime.query(&evaluation_challenge)?;
+        let a_xi = a.query(evaluation_challenge)?;
+        let a_prime_xi = a_prime.query(evaluation_challenge)?;
 
-        let s_xi = s.query(&evaluation_challenge)?;
-        let s_prime_xi = s_prime.query(&evaluation_challenge)?;
+        let s_xi = s.query(evaluation_challenge)?;
+        let s_prime_xi = s_prime.query(evaluation_challenge)?;
 
-        let z_xi = z.query(&evaluation_challenge)?;
+        let z_xi = z.query(evaluation_challenge)?;
         let z_wxi = z.query(&shifted_evaluation_challenge)?;
 
         opening += alpha_powers[0] * l0_eval * (F::one() - z_xi);
@@ -296,11 +293,9 @@ mod test {
         let beta = F::rand(&mut rng);
         let gamma = F::rand(&mut rng);
 
+        let lookup_oracles = (a, s, a_prime, s_prime);
         let z = SubsetEqualityArgument::construct_agg_poly(
-            &a,
-            &s,
-            &a_prime,
-            &s_prime,
+            &lookup_oracles,
             beta,
             gamma,
             0,
@@ -354,10 +349,7 @@ mod test {
                 &l0_coset_evals,
                 &lu_coset_evals,
                 &q_blind,
-                &a,
-                &s,
-                &a_prime,
-                &s_prime,
+                &lookup_oracles,
                 &z,
                 beta,
                 gamma,
@@ -461,14 +453,12 @@ mod test {
         let l0_eval = l0.evaluate(&evaluation_challenge);
         let lu_eval = lu.evaluate(&evaluation_challenge);
 
+        let lookup_oracles = (a, s, a_prime, s_prime);
         let opening = SubsetEqualityArgument::open_argument::<PC>(
             &l0_eval,
             lu_eval,
             &q_blind,
-            &a,
-            &s,
-            &a_prime,
-            &s_prime,
+            &lookup_oracles,
             &z,
             beta,
             gamma,

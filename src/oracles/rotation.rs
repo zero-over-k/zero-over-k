@@ -44,7 +44,7 @@ impl Rotation {
     pub fn compute_evaluation_point<F: Field>(
         &self,
         evaluation_point: F,
-        omegas: &Vec<F>,
+        omegas: &[F],
     ) -> F {
         if self.degree == 0 {
             return evaluation_point;
@@ -62,10 +62,10 @@ impl Rotation {
         &self,
         opening_challenge_label: &str,
         opening_challenge: F,
-        omegas: &Vec<F>,
+        omegas: &[F],
     ) -> (String, F) {
         if self.degree == 0 {
-            return (opening_challenge_label.into(), opening_challenge);
+            (opening_challenge_label.into(), opening_challenge)
         } else {
             let (omega, point_label) = match self.sign {
                 Sign::Plus => {

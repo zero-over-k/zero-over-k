@@ -150,7 +150,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Clone
             queried_rotations: self.queried_rotations.clone(),
             evals_at_challenges: self.evals_at_challenges.clone(),
             commitment: self.commitment.clone(),
-            should_permute: self.should_permute.clone(),
+            should_permute: self.should_permute,
         }
     }
 }
@@ -163,7 +163,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> ConcreteOracle<F>
     }
 
     fn query(&self, challenge: &F) -> Result<F, Error> {
-        match self.evals_at_challenges.get(&challenge) {
+        match self.evals_at_challenges.get(challenge) {
             Some(eval) => Ok(*eval),
             None => Err(Error::MissingConcreteEval(self.label.clone())),
         }

@@ -128,3 +128,9 @@ impl<F: PrimeField> Mul<F> for VirtualExpression<F> {
         VirtualExpression::Scaled(Box::new(self), rhs)
     }
 }
+
+impl<F: PrimeField> From<VirtualQuery> for VirtualExpression<F> {
+    fn from(vq: VirtualQuery) -> Self {
+        VirtualExpression::Oracle(vq)
+    }
+}

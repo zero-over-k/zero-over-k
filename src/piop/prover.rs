@@ -19,7 +19,7 @@ use crate::{
         query::OracleType,
         rotation::Rotation,
         traits::{ConcreteOracle, Instantiable},
-        witness::WitnessProverOracle,
+        witness::{WitnessProverOracle, WitnessVerifierOracle},
     },
     permutation::PermutationArgument,
     piop::error::Error as PiopError,
@@ -28,6 +28,20 @@ use crate::{
 };
 
 use super::verifier::{VerifierLookupAggregationRound, VerifierPermutationMsg};
+
+pub type LookupProverOracles<F> = (
+    WitnessProverOracle<F>, //a
+    WitnessProverOracle<F>, //s
+    WitnessProverOracle<F>, //a_prime
+    WitnessProverOracle<F>, //s_prime
+);
+
+pub type LookupVerifierOracles<F, PC> = (
+    WitnessVerifierOracle<F, PC>, //a
+    WitnessVerifierOracle<F, PC>, //s
+    WitnessVerifierOracle<F, PC>, //a_prime
+    WitnessVerifierOracle<F, PC>, //s_prime
+);
 
 // Note: To keep flexible vanishing polynomial should not be strictly domain.vanishing_polynomial
 // For example consider https://hackmd.io/1DaroFVfQwySwZPHMoMdBg?view where we remove some roots from Zh
@@ -42,44 +56,37 @@ pub struct ProverState<'a, F: PrimeField> {
     pub(crate) witness_oracles: &'a [WitnessProverOracle<F>],
     pub(crate) instance_oracles: &'a [InstanceProverOracle<F>],
     pub(crate) z_polys: Option<Vec<WitnessProverOracle<F>>>,
-    pub(crate) lookup_polys: Option<
-        Vec<(
-            WitnessProverOracle<F>,
-            WitnessProverOracle<F>,
-            WitnessProverOracle<F>,
-            WitnessProverOracle<F>,
-        )>,
-    >,
+    pub(crate) lookup_polys: Option<Vec<LookupProverOracles<F>>>,
     pub(crate) lookup_z_polys: Option<Vec<WitnessProverOracle<F>>>,
     pub(crate) oracles_to_copy: Vec<&'a WitnessProverOracle<F>>,
     pub(crate) vos: &'a [&'a dyn VirtualOracle<F>],
+
     pub(crate) domain: GeneralEvaluationDomain<F>,
-    pub(crate) vanishing_polynomial: DensePolynomial<F>,
     pub(crate) quotient_chunks: Option<Vec<WitnessProverOracle<F>>>,
 }
 
 impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
     // Aux funcs for `evaluate`
-    const fn ident(x: F) -> Result<F, PiopError> {
+    fn ident(x: F) -> Result<F, PiopError> {
         Ok(x)
     }
     fn neg(x: Result<F, PiopError>) -> Result<F, PiopError> {
-        x.and_then(|x_val| Ok(-x_val))
+        x.map(|x_val| -x_val)
     }
     fn add(
         x: Result<F, PiopError>,
         y: Result<F, PiopError>,
     ) -> Result<F, PiopError> {
-        x.and_then(|x_val| y.and_then(|y_val| Ok(x_val + y_val)))
+        x.and_then(|x_val| y.map(|y_val| x_val + y_val))
     }
     fn mul(
         x: Result<F, PiopError>,
         y: Result<F, PiopError>,
     ) -> Result<F, PiopError> {
-        x.and_then(|x_val| y.and_then(|y_val| Ok(x_val * y_val)))
+        x.and_then(|x_val| y.map(|y_val| x_val * y_val))
     }
     fn scale(x: Result<F, PiopError>, y: F) -> Result<F, PiopError> {
-        x.and_then(|x_val| Ok(x_val * y))
+        x.map(|x_val| x_val * y)
     }
 
     pub fn init_prover<'a>(
@@ -87,7 +94,6 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
         instance_oracles: &'a [InstanceProverOracle<F>],
         vos: &'a [&'a dyn VirtualOracle<F>],
         domain_size: usize,
-        vanishing_polynomial: &DensePolynomial<F>,
         preprocessed: &ProverPreprocessedInput<F, PC>,
     ) -> ProverState<'a, F> {
         let domain = GeneralEvaluationDomain::new(domain_size).unwrap();
@@ -133,12 +139,11 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
             oracles_to_copy,
             vos,
             domain,
-            vanishing_polynomial: vanishing_polynomial.clone(),
             quotient_chunks: None,
         }
     }
 
-    pub fn prover_permutation_round<'a, R: Rng>(
+    pub fn prover_permutation_round<R: Rng>(
         permutation_msg: &VerifierPermutationMsg<F>,
         state: &mut ProverState<F>,
         permutation_argument: &PermutationArgument<F>,
@@ -147,7 +152,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
         zk_rng: &mut R,
     ) -> Vec<WitnessProverOracle<F>> {
         // if nothing to copy just return empty vector
-        if state.oracles_to_copy.len() == 0 {
+        if state.oracles_to_copy.is_empty() {
             state.z_polys = Some(vec![]);
             return vec![];
         }
@@ -171,15 +176,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
         preprocessed: &ProverPreprocessedInput<F, PC>,
         index: &Index<F>,
         zk_rng: &mut R,
-    ) -> Result<
-        Vec<(
-            WitnessProverOracle<F>,
-            WitnessProverOracle<F>,
-            WitnessProverOracle<F>,
-            WitnessProverOracle<F>,
-        )>,
-        PiopError,
-    > {
+    ) -> Result<Vec<LookupProverOracles<F>>, PiopError> {
         let lookup_polys: Vec<_> = index
             .lookups
             .iter()
@@ -190,8 +187,8 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
                     &state.instance_oracles_mapping,
                     &state.fixed_oracles_mapping,
                     &state.table_oracles_mapping,
-                    &state.witness_oracles,
-                    &state.instance_oracles,
+                    state.witness_oracles,
+                    state.instance_oracles,
                     &preprocessed.fixed_oracles,
                     &preprocessed.table_oracles,
                     index.usable_rows,
@@ -214,12 +211,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
     pub fn prover_lookup_subset_equality_round<R: Rng>(
         permutation_msg: &VerifierPermutationMsg<F>,
         // In order: (a, s, a_prime, s_prime)
-        lookup_polys: &Vec<(
-            WitnessProverOracle<F>,
-            WitnessProverOracle<F>,
-            WitnessProverOracle<F>,
-            WitnessProverOracle<F>,
-        )>,
+        lookup_polys: &[LookupProverOracles<F>],
         state: &mut ProverState<F>,
         index: &Index<F>,
         zk_rng: &mut R,
@@ -227,12 +219,9 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
         let lookup_z_polys: Vec<_> = lookup_polys
             .iter()
             .enumerate()
-            .map(|(lookup_index, (a, s, a_prime, s_prime))| {
+            .map(|(lookup_index, lookup_polys)| {
                 SubsetEqualityArgument::construct_agg_poly(
-                    a,
-                    s,
-                    a_prime,
-                    s_prime,
+                    lookup_polys,
                     permutation_msg.beta,
                     permutation_msg.gamma,
                     lookup_index,
@@ -284,7 +273,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
 
         // start from next of last power of alpha
         let permutation_begin_with =
-            powers_of_alpha.last().unwrap().clone() * verifier_msg.alpha;
+            *powers_of_alpha.last().unwrap() * verifier_msg.alpha;
         let permutation_alphas: Vec<F> =
             successors(Some(permutation_begin_with), |alpha_i| {
                 Some(*alpha_i * verifier_msg.alpha)
@@ -296,9 +285,9 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
         // Again begin with last alpha after permutation argument
         let lookups_begin_with = if let Some(alpha) = permutation_alphas.last()
         {
-            alpha.clone()
+            *alpha
         } else {
-            powers_of_alpha.last().unwrap().clone()
+            *powers_of_alpha.last().unwrap()
         };
 
         let lookup_alphas: Vec<F> =
@@ -325,7 +314,8 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
         );
         let lu_coset_evals = vk.index_info.extended_coset_domain.coset_fft(&lu);
 
-        for i in 0..vk.index_info.extended_coset_domain.size() {
+        // for i in 0..vk.index_info.extended_coset_domain.size() {
+        for (i, numerator_eval) in numerator_evals.iter_mut().enumerate() {
             for (vo_index, vo) in state.vos.iter().enumerate() {
                 let vo_evaluation = vo.get_expression()?.evaluate(
                     &Self::ident,
@@ -372,13 +362,12 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
                     &Self::scale,
                 );
 
-                numerator_evals[i] +=
-                    powers_of_alpha[vo_index] * vo_evaluation?;
+                *numerator_eval += powers_of_alpha[vo_index] * vo_evaluation?;
             }
 
             // Permutation argument
             // If there are no oracles to enforce copy constraints on, we just return zero
-            numerator_evals[i] += if state.oracles_to_copy.len() > 0 {
+            *numerator_eval += if !state.oracles_to_copy.is_empty() {
                 vk.index_info
                     .permutation_argument
                     .instantiate_argument_at_omega_i(
@@ -387,7 +376,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
                         &preprocessed.q_blind,
                         &state.oracles_to_copy,
                         &preprocessed.permutation_oracles,
-                        &z_polys,
+                        z_polys,
                         i,
                         vk.index_info.extended_coset_domain.element(i),
                         verifier_permutation_msg.beta,
@@ -404,17 +393,12 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
                 .zip(lookup_z_polys.iter())
                 .zip(lookup_alpha_chunks.iter())
             {
-                let (a, s, a_prime, s_prime) = lookup_oracles;
-
-                numerator_evals[i] +=
+                *numerator_eval +=
                     LookupArgument::instantiate_argument_at_omega_i(
                         &l0_coset_evals,
                         &lu_coset_evals,
                         &preprocessed.q_blind,
-                        a,
-                        s,
-                        a_prime,
-                        s_prime,
+                        lookup_oracles,
                         z,
                         verifier_permutation_msg.beta,
                         verifier_permutation_msg.gamma,
@@ -449,7 +433,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> PIOPforPolyIdentity<F, PC> {
             .map(|(i, chunk)| {
                 let poly = DensePolynomial::from_coefficients_slice(chunk);
                 WitnessProverOracle {
-                    label: format!("quotient_chunk_{}", i).to_string(),
+                    label: format!("quotient_chunk_{}", i),
                     evals: state.domain.fft(&poly),
                     poly,
                     evals_at_coset_of_extended_domain: None,
@@ -490,11 +474,9 @@ mod test {
             PC::trim(&srs, srs.max_degree(), 1, None).unwrap();
 
         let p = DensePolynomial::<F>::rand(poly_degree, &mut rng);
-        let p =
-            LabeledPolynomial::new("p".to_string(), p.clone(), None, Some(1));
+        let p = LabeledPolynomial::new("p".to_string(), p, None, Some(1));
         let q = DensePolynomial::<F>::rand(poly_degree, &mut rng);
-        let q =
-            LabeledPolynomial::new("q".to_string(), q.clone(), None, Some(1));
+        let q = LabeledPolynomial::new("q".to_string(), q, None, Some(1));
 
         let polys = [p.clone(), q.clone()];
 
@@ -507,20 +489,18 @@ mod test {
         let r = p.polynomial().clone() + q.polynomial() * x1;
         let value = r.evaluate(&challenge);
 
-        let r =
-            LabeledPolynomial::new("r".to_string(), r.clone(), None, Some(1));
+        let r = LabeledPolynomial::new("r".to_string(), r, None, Some(1));
 
         let r_comm = PC::add(
             comms[0].commitment(),
             &PC::scale_com(comms[1].commitment(), x1),
         );
-        let r_comm =
-            LabeledCommitment::new("r_comm".to_string(), r_comm.clone(), None);
+        let r_comm = LabeledCommitment::new("r_comm".to_string(), r_comm, None);
         let r_rand = PC::add_rands(&rands[0], &PC::scale_rand(&rands[1], x1));
 
         let proof = PC::open(
             &committer_key,
-            &[r.clone()],
+            &[r],
             &[r_comm],
             &challenge,
             F::one(),
@@ -533,12 +513,11 @@ mod test {
             comms[0].commitment(),
             &PC::scale_com(comms[1].commitment(), x1),
         );
-        let r_comm =
-            LabeledCommitment::new("r_comm".to_string(), r_comm.clone(), None);
+        let r_comm = LabeledCommitment::new("r_comm".to_string(), r_comm, None);
 
         let res = PC::check(
             &verifier_key,
-            &[r_comm.clone()],
+            &[r_comm],
             &challenge,
             vec![value],
             &proof,
@@ -546,6 +525,6 @@ mod test {
             Some(&mut rng),
         )
         .unwrap();
-        assert_eq!(res, true);
+        assert!(res);
     }
 }

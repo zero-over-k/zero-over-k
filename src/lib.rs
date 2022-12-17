@@ -7,7 +7,9 @@ use ark_poly::univariate::DensePolynomial;
 use ark_poly::{
     EvaluationDomain, GeneralEvaluationDomain, Polynomial, UVPolynomial,
 };
-use ark_poly_commit::{LabeledPolynomial, PCUniversalParams};
+use ark_poly_commit::{
+    LabeledPolynomial, PCUniversalParams, PolynomialCommitment,
+};
 
 use ark_std::rand::{Rng, RngCore};
 use commitment::HomomorphicCommitment;
@@ -44,12 +46,17 @@ mod util;
 pub mod vo;
 
 pub mod indexer;
+#[allow(clippy::too_many_arguments)]
 pub mod lookup;
 pub mod multiproof;
 pub mod permutation;
 
 mod tests;
 
+pub type PCKeys<F, PC> = (
+    <PC as PolynomialCommitment<F, DensePolynomial<F>>>::CommitterKey,
+    <PC as PolynomialCommitment<F, DensePolynomial<F>>>::VerifierKey,
+);
 pub struct PIL<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng> {
     _field: PhantomData<F>,
     _pc: PhantomData<PC>,
@@ -68,16 +75,15 @@ where
         max_degree: usize,
         rng: &mut R,
     ) -> Result<UniversalSRS<F, PC>, Error<PC::Error>> {
-        let srs = PC::setup(max_degree, None, rng).map_err(Error::from_pc_err);
-        srs
+        PC::setup(max_degree, None, rng).map_err(Error::from_pc_err)
     }
 
     pub fn prepare_keys(
         srs: &UniversalSRS<F, PC>,
-    ) -> Result<(PC::CommitterKey, PC::VerifierKey), Error<PC::Error>> {
+    ) -> Result<PCKeys<F, PC>, Error<PC::Error>> {
         let supported_hiding_bound = 1; // we need to blind oracles for multiproof and opening in x3
         let (committer_key, verifier_key) =
-            PC::trim(&srs, srs.max_degree(), supported_hiding_bound, None)
+            PC::trim(srs, srs.max_degree(), supported_hiding_bound, None)
                 .map_err(Error::from_pc_err)?;
 
         Ok((committer_key, verifier_key))
@@ -90,7 +96,6 @@ where
         instance_oracles: &'a mut [InstanceProverOracle<F>],
         vos: &[&'a dyn VirtualOracle<F>], // TODO: this should be in index
         domain_size: usize,
-        vanishing_polynomial: &DensePolynomial<F>,
         zk_rng: &mut R,
     ) -> Result<Proof<F, PC>, Error<PC::Error>> {
         let mut fs_rng =
@@ -132,14 +137,10 @@ where
             instance_oracles,
             vos,
             domain_size,
-            vanishing_polynomial,
             preprocessed,
         );
 
-        let verifier_init_state = PIOPforPolyIdentity::<F, PC>::init_verifier(
-            domain_size,
-            vanishing_polynomial,
-        );
+        let verifier_init_state = PIOPforPolyIdentity::<F, PC>::init_verifier();
 
         let (verifier_lookup_aggregation_msg, verifier_state) =
             PIOPforPolyIdentity::<F, PC>::verifier_lookup_aggregation_round(
@@ -172,17 +173,15 @@ where
 
         let lookup_polys_to_open = lookup_polys
             .iter()
-            .map(|(_, _, a_prime, s_prime)| vec![a_prime, s_prime])
-            .flatten();
+            .flat_map(|(_, _, a_prime, s_prime)| vec![a_prime, s_prime]);
 
         let lookup_prime_labeled: Vec<
             LabeledPolynomial<F, DensePolynomial<F>>,
         > = lookup_polys
             .iter()
-            .map(|(_, _, a_prime, s_prime)| {
+            .flat_map(|(_, _, a_prime, s_prime)| {
                 vec![a_prime.to_labeled(), s_prime.to_labeled()]
             })
-            .flatten()
             .collect();
 
         // commit to a_prime and s_prime for each lookup
@@ -272,7 +271,7 @@ where
                 &verifier_first_msg,
                 &mut prover_state,
                 &pk.vk,
-                &preprocessed,
+                preprocessed,
             )?;
 
         let quotient_chunks_labeled: Vec<
@@ -305,7 +304,7 @@ where
 
         // Compute witness evals
         let witness_query_set = PIOPforPolyIdentity::<F, PC>::get_query_set(
-            &witness_oracles,
+            witness_oracles,
             verifier_second_msg.label,
             verifier_second_msg.xi,
             &omegas,
@@ -413,7 +412,7 @@ where
             .map(|o| o as &dyn Instantiable<F>)
             .collect();
 
-        oracles.extend_from_slice(&preprocessed_oracles.as_slice());
+        oracles.extend_from_slice(preprocessed_oracles.as_slice());
 
         let oracle_rands: Vec<PC::Randomness> = wtns_rands
             .iter()
@@ -422,7 +421,7 @@ where
             .chain(quotient_rands.iter())
             .chain(z_rands.iter())
             .chain(preprocessed.empty_rands_for_fixed.iter())
-            .map(|rand| rand.clone())
+            .cloned()
             .collect();
 
         assert_eq!(oracles.len(), oracle_rands.len());
@@ -564,8 +563,8 @@ where
 
         Ok(proof)
     }
-
-    pub fn verify<R: Rng>(
+    #[allow(clippy::too_many_arguments)]
+    pub fn verify(
         vk: &VerifierKey<F, PC>,
         preprocessed: &mut VerifierPreprocessedInput<F, PC>,
         proof: Proof<F, PC>,
@@ -574,12 +573,8 @@ where
         vos: &[&dyn VirtualOracle<F>],
         domain_size: usize,
         vanishing_polynomial: &DensePolynomial<F>,
-        _zk_rng: &mut R,
     ) -> Result<(), Error<PC::Error>> {
-        let verifier_init_state = PIOPforPolyIdentity::<F, PC>::init_verifier(
-            domain_size,
-            vanishing_polynomial,
-        );
+        let verifier_init_state = PIOPforPolyIdentity::<F, PC>::init_verifier();
 
         let mut fs_rng =
             FS::initialize(&to_bytes![&Self::PROTOCOL_NAME].unwrap()); // TODO: add &pk.vk, &public oracles to transcript, fixed evals
@@ -672,7 +667,7 @@ where
         // Quotient chunks are evaluated only in evaluation challenge
         let quotient_chunk_oracles = (0..num_of_quotient_chunks)
             .map(|i| WitnessVerifierOracle {
-                label: format!("quotient_chunk_{}", i).to_string(),
+                label: format!("quotient_chunk_{}", i),
                 queried_rotations: BTreeSet::from([Rotation::curr()]),
                 should_permute: false,
                 evals_at_challenges: BTreeMap::from([(
@@ -839,8 +834,7 @@ where
                 )?;
 
                     let a_prime = WitnessVerifierOracle::<F, PC> {
-                        label: format!("lookup_a_prime_{}_poly", lookup_index)
-                            .to_string(),
+                        label: format!("lookup_a_prime_{}_poly", lookup_index),
                         queried_rotations: BTreeSet::from([
                             Rotation::curr(),
                             Rotation::prev(),
@@ -857,8 +851,7 @@ where
                     };
 
                     let s_prime = WitnessVerifierOracle::<F, PC> {
-                        label: format!("lookup_s_prime_{}_poly", lookup_index)
-                            .to_string(),
+                        label: format!("lookup_s_prime_{}_poly", lookup_index),
                         queried_rotations: BTreeSet::from([Rotation::curr()]),
                         evals_at_challenges: BTreeMap::from([(
                             evaluation_challenge,
@@ -875,8 +868,7 @@ where
 
         let lookup_polys_to_check_in_opening = lookup_polys
             .iter()
-            .map(|(_, _, a_prime, s_prime)| vec![a_prime, s_prime])
-            .flatten();
+            .flat_map(|(_, _, a_prime, s_prime)| vec![a_prime, s_prime]);
 
         let lookup_z_evals_chunks = proof.lookup_z_evals.chunks(2);
         assert_eq!(
@@ -892,8 +884,7 @@ where
             .enumerate()
             .map(|(lookup_index, (z_commitment, evals))| {
                 WitnessVerifierOracle::<F, PC> {
-                    label: format!("lookup_{}_agg_poly", lookup_index)
-                        .to_string(),
+                    label: format!("lookup_{}_agg_poly", lookup_index),
                     queried_rotations: BTreeSet::from([
                         Rotation::curr(),
                         Rotation::next(),
@@ -934,7 +925,7 @@ where
                 }
 
                 WitnessVerifierOracle::<F, PC> {
-                    label: format!("agg_permutation_{}", i).to_string(),
+                    label: format!("agg_permutation_{}", i),
                     queried_rotations,
                     evals_at_challenges: BTreeMap::default(),
                     commitment: Some(zi.clone()),
@@ -975,7 +966,7 @@ where
 
         preprocessed.q_blind.register_eval_at_challenge(
             verifier_second_msg.xi,
-            proof.q_blind_eval.clone(),
+            proof.q_blind_eval,
         );
 
         // END CHALLENGE => EVALS MAPPING
@@ -993,7 +984,7 @@ where
 
         // start from next of last power of alpha
         let permutation_begin_with =
-            powers_of_alpha.last().unwrap().clone() * verifier_first_msg.alpha;
+            *powers_of_alpha.last().unwrap() * verifier_first_msg.alpha;
         let permutation_alphas: Vec<F> =
             successors(Some(permutation_begin_with), |alpha_i| {
                 Some(*alpha_i * verifier_first_msg.alpha)
@@ -1005,9 +996,9 @@ where
         // Again begin with last alpha after permutation argument
         let lookups_begin_with = if let Some(alpha) = permutation_alphas.last()
         {
-            alpha.clone()
+            *alpha
         } else {
-            powers_of_alpha.last().unwrap().clone()
+            *powers_of_alpha.last().unwrap()
         };
 
         let lookup_alphas: Vec<F> =
@@ -1075,14 +1066,10 @@ where
                         }
                     }
                 },
-                &|x| x.and_then(|x_val| Ok(-x_val)),
-                &|x, y| {
-                    x.and_then(|x_val| y.and_then(|y_val| Ok(x_val + y_val)))
-                },
-                &|x, y| {
-                    x.and_then(|x_val| y.and_then(|y_val| Ok(x_val * y_val)))
-                },
-                &|x, y| x.and_then(|x_val| Ok(x_val * y)),
+                &|x| x.map(|x_val| -x_val),
+                &|x, y| x.and_then(|x_val| y.map(|y_val| x_val + y_val)),
+                &|x, y| x.and_then(|x_val| y.map(|y_val| x_val * y_val)),
+                &|x, y| x.map(|x_val| x_val * y),
             )?;
 
             quotient_eval += powers_of_alpha[vo_index] * vo_evaluation;
@@ -1090,7 +1077,7 @@ where
 
         // Permutation argument
         // If there are no oracles to enforce copy constraints on, we just return zero
-        quotient_eval += if oracles_to_copy.len() > 0 {
+        quotient_eval += if !oracles_to_copy.is_empty() {
             vk.index_info.permutation_argument.open_argument(
                 l0_eval,
                 lu_eval,
@@ -1114,15 +1101,11 @@ where
             .zip(lookup_z_polys.iter())
             .zip(lookup_alpha_chunks.iter())
         {
-            let (a, s, a_prime, s_prime) = lookup_oracles;
             quotient_eval += LookupArgument::open_argument(
                 &l0_eval,
                 lu_eval,
                 &preprocessed.q_blind,
-                a,
-                s,
-                a_prime,
-                s_prime,
+                lookup_oracles,
                 z,
                 verifier_permutation_msg.beta,
                 verifier_permutation_msg.gamma,
@@ -1171,9 +1154,9 @@ where
                 .map(|o| o as &dyn CommittedOracle<F, PC>)
                 .collect();
 
-        oracles.extend_from_slice(&preprocessed_oracles.as_slice());
+        oracles.extend_from_slice(preprocessed_oracles.as_slice());
 
-        let res = Multiopen::<F, PC, FS>::verify(
+        Multiopen::<F, PC, FS>::verify(
             &vk.verifier_key,
             proof.multiopen_proof,
             &oracles,
@@ -1181,8 +1164,6 @@ where
             domain_size,
             &mut fs_rng,
         )
-        .map_err(Error::from_multiproof_err)?;
-
-        Ok(res)
+        .map_err(Error::from_multiproof_err)
     }
 }
