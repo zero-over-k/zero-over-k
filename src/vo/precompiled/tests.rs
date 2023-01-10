@@ -25,7 +25,7 @@ use crate::oracles::instance::{InstanceProverOracle, InstanceVerifierOracle};
 use crate::oracles::witness::{WitnessProverOracle, WitnessVerifierOracle};
 use crate::rng::SimpleHashFiatShamirRng;
 use crate::vo::generic_vo::GenericVO;
-use crate::PIL;
+use crate::{TurboPlonk, PIL};
 use blake2::Blake2s;
 
 use crate::commitment::KZG10;
@@ -38,7 +38,7 @@ type PC = KZG10<Bls12_381>;
 type CommKey = CommitterKey<Bls12_381>;
 type CSVerKey = VerifierKey<Bls12_381>;
 
-type PilInstance = PIL<F, PC, FS>;
+type PilInstance = TurboPlonk<F, PC, FS>;
 
 /// Initialize domain, srs and CS keys
 pub fn test_init(

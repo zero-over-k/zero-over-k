@@ -32,13 +32,13 @@ mod test {
     use crate::vo::query::VirtualQuery;
     use crate::vo::virtual_expression::VirtualExpression;
     use crate::vo::{LookupVirtualOracle, VirtualOracle};
-    use crate::PIL;
+    use crate::{TurboPlonk, PIL};
     use blake2::Blake2s;
 
     type FS = SimpleHashFiatShamirRng<Blake2s, ChaChaRng>;
     type PC = KZG10<Bls12_381>;
 
-    type PilInstance = PIL<F, PC, FS>;
+    type PilInstance = TurboPlonk<F, PC, FS>;
 
     fn get_lookup_expressions_and_queries() -> (
         Vec<VirtualExpression<F>>,

@@ -57,28 +57,65 @@ pub type PCKeys<F, PC> = (
     <PC as PolynomialCommitment<F, DensePolynomial<F>>>::CommitterKey,
     <PC as PolynomialCommitment<F, DensePolynomial<F>>>::VerifierKey,
 );
-pub struct PIL<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng> {
+
+pub struct TurboPlonk<
+    F: PrimeField,
+    PC: HomomorphicCommitment<F>,
+    FS: FiatShamirRng,
+> {
     _field: PhantomData<F>,
     _pc: PhantomData<PC>,
     _fs: PhantomData<FS>,
 }
 
-impl<F, PC, FS> PIL<F, PC, FS>
+pub trait PIL<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng> {
+    const PROTOCOL_NAME: &'static [u8];
+    fn universal_setup<R: RngCore>(
+        max_degree: usize,
+        rng: &mut R,
+    ) -> Result<UniversalSRS<F, PC>, Error<PC::Error>>;
+
+    fn prepare_keys(
+        srs: &UniversalSRS<F, PC>,
+    ) -> Result<PCKeys<F, PC>, Error<PC::Error>>;
+
+    fn prove<'a, R: Rng>(
+        pk: &ProverKey<F, PC>,
+        preprocessed: &ProverPreprocessedInput<F, PC>,
+        witness_oracles: &'a mut [WitnessProverOracle<F>],
+        instance_oracles: &'a mut [InstanceProverOracle<F>],
+        vos: &[&'a dyn VirtualOracle<F>], // TODO: this should be in index
+        domain_size: usize,
+        zk_rng: &mut R,
+    ) -> Result<Proof<F, PC>, Error<PC::Error>>;
+
+    fn verify(
+        vk: &VerifierKey<F, PC>,
+        preprocessed: &mut VerifierPreprocessedInput<F, PC>,
+        proof: Proof<F, PC>,
+        witness_oracles: &mut [WitnessVerifierOracle<F, PC>],
+        instance_oracles: &mut [InstanceVerifierOracle<F>],
+        vos: &[&dyn VirtualOracle<F>],
+        domain_size: usize,
+        vanishing_polynomial: &DensePolynomial<F>,
+    ) -> Result<(), Error<PC::Error>>;
+}
+impl<F, PC, FS> PIL<F, PC, FS> for TurboPlonk<F, PC, FS>
 where
     F: PrimeField,
     PC: HomomorphicCommitment<F>,
     FS: FiatShamirRng,
 {
-    pub const PROTOCOL_NAME: &'static [u8] = b"PIL-0.0.1";
+    const PROTOCOL_NAME: &'static [u8] = b"TurboPlonk-0.0.1";
 
-    pub fn universal_setup<R: RngCore>(
+    fn universal_setup<R: RngCore>(
         max_degree: usize,
         rng: &mut R,
     ) -> Result<UniversalSRS<F, PC>, Error<PC::Error>> {
         PC::setup(max_degree, None, rng).map_err(Error::from_pc_err)
     }
 
-    pub fn prepare_keys(
+    fn prepare_keys(
         srs: &UniversalSRS<F, PC>,
     ) -> Result<PCKeys<F, PC>, Error<PC::Error>> {
         let supported_hiding_bound = 1; // we need to blind oracles for multiproof and opening in x3
@@ -89,7 +126,7 @@ where
         Ok((committer_key, verifier_key))
     }
 
-    pub fn prove<'a, R: Rng>(
+    fn prove<'a, R: Rng>(
         pk: &ProverKey<F, PC>,
         preprocessed: &ProverPreprocessedInput<F, PC>,
         witness_oracles: &'a mut [WitnessProverOracle<F>],
@@ -564,7 +601,7 @@ where
         Ok(proof)
     }
     #[allow(clippy::too_many_arguments)]
-    pub fn verify(
+    fn verify(
         vk: &VerifierKey<F, PC>,
         preprocessed: &mut VerifierPreprocessedInput<F, PC>,
         proof: Proof<F, PC>,

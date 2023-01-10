@@ -40,12 +40,12 @@ mod copy_constraint_tests {
 
     type PC = KZG10<Bls12_381>;
 
-    use crate::PIL;
+    use crate::{TurboPlonk, PIL};
     use blake2::Blake2s;
 
     type FS = SimpleHashFiatShamirRng<Blake2s, ChaChaRng>;
 
-    type PilInstance = PIL<F, PC, FS>;
+    type PilInstance = TurboPlonk<F, PC, FS>;
 
     use crate::{
         oracles::{

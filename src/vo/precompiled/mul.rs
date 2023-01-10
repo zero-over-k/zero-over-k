@@ -56,7 +56,7 @@ mod test {
     use crate::rng::SimpleHashFiatShamirRng;
     use crate::vo::generic_vo::GenericVO;
     use crate::vo::precompiled::PrecompiledVO;
-    use crate::PIL;
+    use crate::{TurboPlonk, PIL};
     use blake2::Blake2s;
 
     use crate::commitment::{HomomorphicCommitment, KZG10};
@@ -66,7 +66,7 @@ mod test {
     type FS = SimpleHashFiatShamirRng<Blake2s, ChaChaRng>;
     type PC = KZG10<Bls12_381>;
 
-    type PilInstance = PIL<F, PC, FS>;
+    type PilInstance = TurboPlonk<F, PC, FS>;
 
     #[test]
     fn test_simple_mul() {
