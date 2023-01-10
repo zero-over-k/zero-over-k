@@ -24,8 +24,9 @@ use crate::oracles::instance::{InstanceProverOracle, InstanceVerifierOracle};
 
 use crate::oracles::witness::{WitnessProverOracle, WitnessVerifierOracle};
 use crate::rng::SimpleHashFiatShamirRng;
+use crate::turbo_plonk::TurboPlonk;
 use crate::vo::generic_vo::GenericVO;
-use crate::{TurboPlonk, PIL};
+use crate::PIL;
 use blake2::Blake2s;
 
 use crate::commitment::KZG10;

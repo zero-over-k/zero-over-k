@@ -54,9 +54,10 @@ mod test {
 
     use crate::oracles::witness::{WitnessProverOracle, WitnessVerifierOracle};
     use crate::rng::SimpleHashFiatShamirRng;
+    use crate::turbo_plonk::TurboPlonk;
     use crate::vo::generic_vo::GenericVO;
     use crate::vo::precompiled::PrecompiledVO;
-    use crate::{TurboPlonk, PIL};
+    use crate::PIL;
     use blake2::Blake2s;
 
     use crate::commitment::{HomomorphicCommitment, KZG10};

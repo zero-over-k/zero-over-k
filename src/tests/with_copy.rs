@@ -40,7 +40,8 @@ mod copy_constraint_tests {
 
     type PC = KZG10<Bls12_381>;
 
-    use crate::{TurboPlonk, PIL};
+    use crate::turbo_plonk::TurboPlonk;
+    use crate::PIL;
     use blake2::Blake2s;
 
     type FS = SimpleHashFiatShamirRng<Blake2s, ChaChaRng>;

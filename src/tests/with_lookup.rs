@@ -29,10 +29,11 @@ mod test {
     use crate::vo::generic_lookup_vo::GenericLookupVO;
     use crate::vo::generic_vo::GenericVO;
 
+    use crate::turbo_plonk::TurboPlonk;
     use crate::vo::query::VirtualQuery;
     use crate::vo::virtual_expression::VirtualExpression;
     use crate::vo::{LookupVirtualOracle, VirtualOracle};
-    use crate::{TurboPlonk, PIL};
+    use crate::PIL;
     use blake2::Blake2s;
 
     type FS = SimpleHashFiatShamirRng<Blake2s, ChaChaRng>;
