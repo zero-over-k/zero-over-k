@@ -1,8 +1,9 @@
 use crate::piop::error::Error as PiopError;
+
 #[derive(Debug)]
-pub enum Error<E> {
+pub enum Error {
     /// There was an error in the underlying polynomial commitment.
-    PolynomialCommitmentError(E),
+    PolynomialCommitmentError,
 
     /// There was an error in PIOP.
     PIOPError(PiopError),
@@ -11,7 +12,7 @@ pub enum Error<E> {
     OpeningCheckFailed,
 }
 
-impl<E> From<PiopError> for Error<E> {
+impl From<PiopError> for Error {
     fn from(err: PiopError) -> Self {
         Error::PIOPError(err)
     }
