@@ -42,6 +42,10 @@ pub type PCKeys<F, PC> = (
 pub trait Proof: CanonicalSerialize + CanonicalDeserialize {
     // /// Size in bytes
     // fn size_in_bytes(&self) -> usize;
+    /// Basic information about the proof.
+    fn info(&self) -> String;
+
+    fn cumulative_info(&self) -> String;
 }
 
 pub trait PIL<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng> {

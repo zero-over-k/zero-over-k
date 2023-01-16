@@ -11,13 +11,17 @@ use ark_poly_commit::{LabeledPolynomial, PCUniversalParams};
 
 use crate::commitment::HomomorphicCommitment;
 use crate::data_structures::{
-    ProverKey, ProverPreprocessedInput, TPProof, UniversalSRS, VerifierKey,
+    ProverKey, ProverPreprocessedInput, UniversalSRS, VerifierKey,
     VerifierPreprocessedInput,
 };
+
 use crate::error::Error;
 use crate::multiproof::piop::Multiopen;
 use crate::oracles::instance::{InstanceProverOracle, InstanceVerifierOracle};
 use crate::piop::error::Error as PiopError;
+use ark_serialize::{
+    CanonicalDeserialize, CanonicalSerialize, SerializationError,
+};
 use ark_std::rand::{Rng, RngCore};
 
 use crate::oracles::traits::{ConcreteOracle, Instantiable};
@@ -33,7 +37,131 @@ use crate::oracles::rotation::{Rotation, Sign};
 use crate::oracles::traits::CommittedOracle;
 
 use crate::util::evaluate_query_set;
-use crate::{PCKeys, PIL};
+use crate::{PCKeys, Proof, PIL};
+
+use crate::multiproof::Proof as MultiOpenProof;
+
+use ark_std::io::{Read, Write};
+
+#[derive(Clone, CanonicalSerialize, CanonicalDeserialize)]
+pub struct TPProof<F: PrimeField, PC: HomomorphicCommitment<F>> {
+    // witness oracles
+    pub witness_commitments: Vec<PC::Commitment>,
+    pub witness_evals: Vec<F>,
+    // fixed oracles
+    pub fixed_oracle_evals: Vec<F>,
+    pub table_oracle_evals: Vec<F>,
+    pub permutation_oracle_evals: Vec<F>,
+    pub q_blind_eval: F,
+    // lookup oracles
+    pub lookup_commitments: Vec<PC::Commitment>,
+    pub lookup_z_commitments: Vec<PC::Commitment>,
+    pub lookup_evals: Vec<F>,
+    pub lookup_z_evals: Vec<F>,
+    // permutation aggregation
+    pub z_commitments: Vec<PC::Commitment>,
+    pub z_evals: Vec<F>,
+
+    // quotient
+    pub quotient_chunk_commitments: Vec<PC::Commitment>,
+    pub quotient_chunks_evals: Vec<F>,
+
+    // multiproof
+    pub multiopen_proof: MultiOpenProof<F, PC>,
+}
+
+impl<F, PC> Proof for TPProof<F, PC>
+where
+    F: PrimeField,
+    PC: HomomorphicCommitment<F>,
+{
+    fn info(&self) -> String {
+        format!(
+            "Proof stats: \n
+            witness commitments: {}
+            witness evals: {}
+
+            fixed oracle evals: {}
+            table oracle evals: {}
+            permutation oracle evals {}
+            q blind eval 1
+
+            lookup commitments {}
+            lookup evals {}
+
+            lookup z commitments {}
+            lookup z evals {}
+
+            quotient chunk commitments: {}
+            quotient chunks evals: {}
+
+            z commitments: {}
+            z evals {}
+
+            MultiOpenProof:
+                q_evals: {}
+                f_commit: 1
+                opening_proof: 1,
+            ",
+            // witness
+            self.witness_commitments.len(),
+            self.witness_evals.len(),
+            // fixed
+            self.fixed_oracle_evals.len(),
+            self.table_oracle_evals.len(),
+            self.permutation_oracle_evals.len(),
+            // lookups
+            self.lookup_commitments.len(),
+            self.lookup_evals.len(),
+            self.lookup_z_commitments.len(),
+            self.lookup_z_evals.len(),
+            // quotient
+            self.quotient_chunk_commitments.len(),
+            self.quotient_chunks_evals.len(),
+            // permutation agg polys
+            self.z_commitments.len(),
+            self.z_evals.len(),
+            // multiopen
+            self.multiopen_proof.q_evals.len()
+        )
+    }
+
+    fn cumulative_info(&self) -> String {
+        let num_of_commitments = self.witness_commitments.len()
+            + self.lookup_commitments.len()
+            + self.lookup_z_commitments.len()
+            + self.quotient_chunk_commitments.len()
+            + self.z_commitments.len()
+            + 1; // + 1 for f commitment in multiopen
+        let num_of_field_elements =
+            // witness
+            self.witness_evals.len()
+            //fixed
+            + self.fixed_oracle_evals.len()
+            + self.table_oracle_evals.len()
+            + self.permutation_oracle_evals.len()
+            + 1 // q_blind
+            //lookups
+            + self.lookup_evals.len()
+            + self.lookup_z_evals.len()
+            // quotient
+            + self.quotient_chunks_evals.len()
+            // permutation agg polys
+            + self.z_evals.len()
+            // multiopen
+            + self.multiopen_proof.q_evals.len();
+
+        format!(
+            "
+            Proof consists of: \n
+            {} commitments
+            {} field elements
+            1 PC::Proof
+            ",
+            num_of_commitments, num_of_field_elements
+        )
+    }
+}
 
 pub struct TurboPlonk<
     F: PrimeField,

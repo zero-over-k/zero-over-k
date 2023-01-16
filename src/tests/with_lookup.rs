@@ -28,6 +28,7 @@ mod test {
     use crate::rng::SimpleHashFiatShamirRng;
     use crate::vo::generic_lookup_vo::GenericLookupVO;
     use crate::vo::generic_vo::GenericVO;
+    use crate::Proof;
 
     use crate::turbo_plonk::TurboPlonk;
     use crate::vo::query::VirtualQuery;

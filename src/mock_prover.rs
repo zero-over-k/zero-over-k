@@ -55,6 +55,13 @@ where
     F: PrimeField,
     PC: HomomorphicCommitment<F>,
 {
+    fn info(&self) -> String {
+        "This is an empty proof used for the Mock Prover".to_owned()
+    }
+
+    fn cumulative_info(&self) -> String {
+        self.info()
+    }
 }
 
 pub struct MockProver<
