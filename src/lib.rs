@@ -2,10 +2,11 @@ use ark_ff::PrimeField;
 use ark_poly::univariate::DensePolynomial;
 use ark_poly_commit::PolynomialCommitment;
 
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::rand::{Rng, RngCore};
 use commitment::HomomorphicCommitment;
 use data_structures::{
-    Proof, ProverKey, ProverPreprocessedInput, UniversalSRS, VerifierKey,
+    ProverKey, ProverPreprocessedInput, UniversalSRS, VerifierKey,
     VerifierPreprocessedInput,
 };
 use error::Error;
@@ -27,6 +28,7 @@ pub mod vo;
 pub mod indexer;
 #[allow(clippy::too_many_arguments)]
 pub mod lookup;
+mod mock_prover;
 pub mod multiproof;
 pub mod permutation;
 mod turbo_plonk;
@@ -37,8 +39,13 @@ pub type PCKeys<F, PC> = (
     <PC as PolynomialCommitment<F, DensePolynomial<F>>>::CommitterKey,
     <PC as PolynomialCommitment<F, DensePolynomial<F>>>::VerifierKey,
 );
+pub trait Proof: CanonicalSerialize + CanonicalDeserialize {
+    // /// Size in bytes
+    // fn size_in_bytes(&self) -> usize;
+}
 
 pub trait PIL<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng> {
+    type Proof: Proof;
     const PROTOCOL_NAME: &'static [u8];
     fn universal_setup<R: RngCore>(
         max_degree: usize,
@@ -57,12 +64,12 @@ pub trait PIL<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng> {
         vos: &[&'a dyn VirtualOracle<F>], // TODO: this should be in index
         domain_size: usize,
         zk_rng: &mut R,
-    ) -> Result<Proof<F, PC>, Error<PC::Error>>;
+    ) -> Result<Self::Proof, Error<PC::Error>>;
 
     fn verify(
         vk: &VerifierKey<F, PC>,
         preprocessed: &mut VerifierPreprocessedInput<F, PC>,
-        proof: Proof<F, PC>,
+        proof: Self::Proof,
         witness_oracles: &mut [WitnessVerifierOracle<F, PC>],
         instance_oracles: &mut [InstanceVerifierOracle<F>],
         vos: &[&dyn VirtualOracle<F>],

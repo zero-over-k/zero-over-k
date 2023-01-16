@@ -11,7 +11,7 @@ use ark_poly_commit::{LabeledPolynomial, PCUniversalParams};
 
 use crate::commitment::HomomorphicCommitment;
 use crate::data_structures::{
-    Proof, ProverKey, ProverPreprocessedInput, UniversalSRS, VerifierKey,
+    ProverKey, ProverPreprocessedInput, TPProof, UniversalSRS, VerifierKey,
     VerifierPreprocessedInput,
 };
 use crate::error::Error;
@@ -52,6 +52,7 @@ where
     FS: FiatShamirRng,
 {
     const PROTOCOL_NAME: &'static [u8] = b"TurboPlonk-0.0.1";
+    type Proof = TPProof<F, PC>;
 
     fn universal_setup<R: RngCore>(
         max_degree: usize,
@@ -79,7 +80,7 @@ where
         vos: &[&'a dyn VirtualOracle<F>], // TODO: this should be in index
         domain_size: usize,
         zk_rng: &mut R,
-    ) -> Result<Proof<F, PC>, Error<PC::Error>> {
+    ) -> Result<TPProof<F, PC>, Error<PC::Error>> {
         let mut fs_rng =
             FS::initialize(&to_bytes![&Self::PROTOCOL_NAME].unwrap()); // TODO: add &pk.vk, &public oracles to transcript
 
@@ -419,7 +420,7 @@ where
         )
         .map_err(Error::from_multiproof_err)?;
 
-        let proof = Proof {
+        let proof = TPProof {
             // witness oracles
             witness_commitments: witness_commitments
                 .iter()
@@ -549,7 +550,7 @@ where
     fn verify(
         vk: &VerifierKey<F, PC>,
         preprocessed: &mut VerifierPreprocessedInput<F, PC>,
-        proof: Proof<F, PC>,
+        proof: TPProof<F, PC>,
         witness_oracles: &mut [WitnessVerifierOracle<F, PC>],
         instance_oracles: &mut [InstanceVerifierOracle<F>],
         vos: &[&dyn VirtualOracle<F>],

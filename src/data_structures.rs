@@ -4,7 +4,6 @@ use ark_poly_commit::{PCRandomness, PolynomialCommitment};
 
 use crate::{
     commitment::HomomorphicCommitment,
-    // error::Error,
     multiproof::Proof as MultiOpenProof,
     oracles::{
         fixed::{FixedProverOracle, FixedVerifierOracle},
@@ -12,6 +11,7 @@ use crate::{
     },
     permutation::PermutationArgument,
     vo::LookupVirtualOracle,
+    Proof,
 };
 
 use ark_serialize::{
@@ -207,8 +207,8 @@ impl<'a, F: PrimeField, PC: HomomorphicCommitment<F>> ProverKey<'a, F, PC> {
     }
 }
 
-#[derive(CanonicalSerialize, CanonicalDeserialize)]
-pub struct Proof<F: PrimeField, PC: HomomorphicCommitment<F>> {
+#[derive(Clone, CanonicalSerialize, CanonicalDeserialize)]
+pub struct TPProof<F: PrimeField, PC: HomomorphicCommitment<F>> {
     // witness oracles
     pub witness_commitments: Vec<PC::Commitment>,
     pub witness_evals: Vec<F>,
@@ -233,8 +233,14 @@ pub struct Proof<F: PrimeField, PC: HomomorphicCommitment<F>> {
     // multiproof
     pub multiopen_proof: MultiOpenProof<F, PC>,
 }
+impl<F, PC> Proof for TPProof<F, PC>
+where
+    F: PrimeField,
+    PC: HomomorphicCommitment<F>,
+{
+}
 
-impl<F: PrimeField, PC: HomomorphicCommitment<F>> Proof<F, PC> {
+impl<F: PrimeField, PC: HomomorphicCommitment<F>> TPProof<F, PC> {
     pub fn info(&self) -> String {
         format!(
             "Proof stats: \n
