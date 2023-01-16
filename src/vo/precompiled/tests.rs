@@ -12,6 +12,8 @@ use ark_std::rand::rngs::StdRng;
 use ark_std::test_rng;
 use rand_chacha::ChaChaRng;
 
+use ark_serialize::CanonicalSerialize;
+
 use crate::data_structures::{
     PermutationInfo, ProverKey, ProverPreprocessedInput,
     VerifierPreprocessedInput,
@@ -26,6 +28,7 @@ use crate::rng::SimpleHashFiatShamirRng;
 // use crate::turbo_plonk::TurboPlonk;
 use crate::mock_prover::MockProver;
 use crate::vo::generic_vo::GenericVO;
+use crate::Proof;
 use crate::PIL;
 use blake2::Blake2s;
 
@@ -153,9 +156,9 @@ pub(crate) fn run_prover(
 
     // 6. Print Proof info
 
-    // println!("{}", proof.info());
-    // println!("{}", proof.cumulative_info());
-    // println!("in bytes: {}", proof.serialized_size());
+    println!("{}", proof.info());
+    println!("{}", proof.cumulative_info());
+    println!("in bytes: {}", proof.serialized_size());
 
     proof
 }
