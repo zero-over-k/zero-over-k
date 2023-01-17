@@ -23,20 +23,26 @@ pub enum Error {
     QuotientTooSmall,
 }
 
-impl<E> From<IOPError> for Error {
+impl From<IOPError> for Error {
     fn from(err: IOPError) -> Self {
         Error::IOPError(err)
     }
 }
 
-impl<E> From<VOError> for Error {
+impl From<VOError> for Error {
     fn from(err: VOError) -> Self {
         Error::VOError(err)
     }
 }
 
 impl From<ArkPolyCommitError> for Error {
-    fn from(ark_err: ArkPolyCommitError) -> Self {
-        Error::ArkPolyCommitError(ark_err)
+    fn from(err: ArkPolyCommitError) -> Self {
+        Error::ArkPolyCommitError(err)
+    }
+}
+
+impl From<MultiproofError> for Error {
+    fn from(err: MultiproofError) -> Self {
+        Error::MultiproofError(err)
     }
 }

@@ -255,7 +255,7 @@ impl<F: PrimeField> PermutationArgument<F> {
         domain: &GeneralEvaluationDomain<F>,
         evaluation_challenge: F,
         alpha_powers: &[F], // quotient separation challenges
-    ) -> Result<F, Error<PC::Error>> {
+    ) -> Result<F, Error> {
         assert_eq!(witness_oracles.len(), permutation_oracles.len());
         assert_eq!(witness_oracles.len(), self.deltas.len());
 

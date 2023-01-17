@@ -421,7 +421,7 @@ impl<F: PrimeField> LookupArgument<F> {
         omegas: &[F],
     ) -> Result<
         (WitnessVerifierOracle<F, PC>, WitnessVerifierOracle<F, PC>),
-        Error<PC::Error>,
+        Error,
     > {
         assert_eq!(lookup_expressions.len(), table_queries.len());
         let lookup_arith = lookup_expressions.len();
@@ -602,7 +602,7 @@ impl<F: PrimeField> LookupArgument<F> {
         evaluation_challenge: &F,
         domain: &GeneralEvaluationDomain<F>,
         alpha_powers: &[F],
-    ) -> Result<F, Error<PC::Error>> {
+    ) -> Result<F, Error> {
         assert_eq!(alpha_powers.len(), 5);
 
         let (_, _, a_prime, s_prime) = lookup_oracles;
