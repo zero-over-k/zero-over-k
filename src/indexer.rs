@@ -54,7 +54,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
         vos: &[&dyn VirtualOracle<F>],
         domain_size: usize,
         z_h_degree: usize,
-    ) -> Result<usize, Error<PC::Error>> {
+    ) -> Result<usize, Error> {
         let mut max_degree = 0;
         for &vo in vos {
             let vo_degree =
@@ -142,7 +142,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>> Indexer<F, PC> {
         z_h: &DensePolynomial<F>,
         permutation_info: PermutationInfo<F>,
         usable_rows: usize,
-    ) -> Result<VerifierKey<'a, F, PC>, Error<PC::Error>> {
+    ) -> Result<VerifierKey<'a, F, PC>, Error> {
         let witness_oracles_mapping: BTreeMap<String, usize> = witness_oracles
             .iter()
             .enumerate()

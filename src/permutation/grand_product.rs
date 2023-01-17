@@ -154,7 +154,7 @@ impl<F: PrimeField> GrandProductArgument<F> {
         gamma: F,
         domain: &GeneralEvaluationDomain<F>,
         evaluation_challenge: F,
-    ) -> Result<F, Error<PC::Error>> {
+    ) -> Result<F, Error> {
         let shifted_evaluation_challenge =
             domain.element(1) * evaluation_challenge;
         let zk_part =

@@ -170,8 +170,7 @@ pub(crate) fn run_verifier(
     instance: Vec<(impl Into<String>, &[F])>,
     mut vo: GenericVO<F>,
     proof: Proof<F, PC>,
-) -> Result<(), Error<<PC as PolynomialCommitment<F, DensePolynomial<F>>>::Error>>
-{
+) -> Result<(), Error> {
     // 1. Generate Verifier Oracles
     let mut witness_ver_oracles: Vec<_> = witness_labels
         .into_iter()

@@ -8,9 +8,11 @@ use ark_poly::{
     EvaluationDomain, GeneralEvaluationDomain, Polynomial, UVPolynomial,
 };
 use ark_poly_commit::{
-    LabeledPolynomial, PCUniversalParams, PolynomialCommitment,
+    Error as ArkError, LabeledPolynomial, PCUniversalParams,
+    PolynomialCommitment,
 };
 
+use crate::piop::error::Error as PiopError;
 use ark_std::rand::{Rng, RngCore};
 use commitment::HomomorphicCommitment;
 use data_structures::{
@@ -20,8 +22,6 @@ use data_structures::{
 use error::Error;
 use multiproof::piop::Multiopen;
 use oracles::instance::{InstanceProverOracle, InstanceVerifierOracle};
-use piop::error::Error as PiopError;
-
 use oracles::traits::{ConcreteOracle, Instantiable};
 use oracles::witness::{WitnessProverOracle, WitnessVerifierOracle};
 use piop::PIOPforPolyIdentity;
@@ -74,17 +74,16 @@ where
     pub fn universal_setup<R: RngCore>(
         max_degree: usize,
         rng: &mut R,
-    ) -> Result<UniversalSRS<F, PC>, Error<PC::Error>> {
-        PC::setup(max_degree, None, rng).map_err(Error::from_pc_err)
+    ) -> Result<UniversalSRS<F, PC>, Error> {
+        PC::setup(max_degree, None, rng)?
     }
 
     pub fn prepare_keys(
         srs: &UniversalSRS<F, PC>,
-    ) -> Result<PCKeys<F, PC>, Error<PC::Error>> {
+    ) -> Result<PCKeys<F, PC>, Error> {
         let supported_hiding_bound = 1; // we need to blind oracles for multiproof and opening in x3
         let (committer_key, verifier_key) =
-            PC::trim(srs, srs.max_degree(), supported_hiding_bound, None)
-                .map_err(Error::from_pc_err)?;
+            PC::trim(srs, srs.max_degree(), supported_hiding_bound, None)?;
 
         Ok((committer_key, verifier_key))
     }
@@ -97,7 +96,7 @@ where
         vos: &[&'a dyn VirtualOracle<F>], // TODO: this should be in index
         domain_size: usize,
         zk_rng: &mut R,
-    ) -> Result<Proof<F, PC>, Error<PC::Error>> {
+    ) -> Result<Proof<F, PC>, Error> {
         let mut fs_rng =
             FS::initialize(&to_bytes![&Self::PROTOCOL_NAME].unwrap()); // TODO: add &pk.vk, &public oracles to transcript
 
@@ -127,8 +126,7 @@ where
             &pk.committer_key,
             &witness_oracles_labeled,
             Some(zk_rng),
-        )
-        .map_err(Error::from_pc_err)?;
+        )?;
 
         fs_rng.absorb(&to_bytes![witness_commitments].unwrap());
 
@@ -186,8 +184,7 @@ where
 
         // commit to a_prime and s_prime for each lookup
         let (lookup_commitments, lookup_rands) =
-            PC::commit(&pk.committer_key, &lookup_prime_labeled, Some(zk_rng))
-                .map_err(Error::from_pc_err)?;
+            PC::commit(&pk.committer_key, &lookup_prime_labeled, Some(zk_rng))?;
 
         fs_rng.absorb(&to_bytes![lookup_commitments].unwrap());
 
@@ -217,8 +214,7 @@ where
             z_polys.iter().map(|z| z.to_labeled()).collect();
         // commit to z oracles
         let (z_commitments, z_rands) =
-            PC::commit(&pk.committer_key, &z_polys_labeled, Some(zk_rng))
-                .map_err(Error::from_pc_err)?;
+            PC::commit(&pk.committer_key, &z_polys_labeled, Some(zk_rng))?;
 
         fs_rng.absorb(&to_bytes![z_commitments].unwrap());
 
@@ -249,8 +245,7 @@ where
             &pk.committer_key,
             &lookup_z_polys_labeled,
             Some(zk_rng),
-        )
-        .map_err(Error::from_pc_err)?;
+        )?;
 
         fs_rng.absorb(&to_bytes![lookup_z_commitments].unwrap());
 
@@ -285,8 +280,7 @@ where
             &pk.committer_key,
             &quotient_chunks_labeled,
             Some(zk_rng),
-        )
-        .map_err(Error::from_pc_err)?;
+        )?;
 
         fs_rng.absorb(&to_bytes![quotient_chunk_commitments].unwrap());
 
@@ -434,8 +428,7 @@ where
             domain_size,
             &mut fs_rng,
             zk_rng,
-        )
-        .map_err(Error::from_multiproof_err)?;
+        )?;
 
         let proof = Proof {
             // witness oracles
@@ -573,7 +566,7 @@ where
         vos: &[&dyn VirtualOracle<F>],
         domain_size: usize,
         vanishing_polynomial: &DensePolynomial<F>,
-    ) -> Result<(), Error<PC::Error>> {
+    ) -> Result<(), Error> {
         let verifier_init_state = PIOPforPolyIdentity::<F, PC>::init_verifier();
 
         let mut fs_rng =
@@ -814,7 +807,7 @@ where
                     lookup_index,
                     ((lookup_vo, permuted_commitments), permuted_evals),
                 )|
-                 -> Result<_, Error<PC::Error>> {
+                 -> Result<_, Error> {
                     let (a, s) =
                 LookupArgument::construct_a_and_s_unpermuted_polys_verifier(
                     &witness_oracles_mapping,
@@ -1164,6 +1157,6 @@ where
             domain_size,
             &mut fs_rng,
         )
-        .map_err(Error::from_multiproof_err)
+        .map_err(|err| Error::from(err))?
     }
 }

@@ -1,26 +1,24 @@
 use crate::piop::error::Error as PiopError;
-#[derive(Debug)]
-pub enum Error<E> {
-    /// There was an error in the underlying polynomial commitment.
-    PolynomialCommitmentError(E),
+use ark_poly_commit::Error as ArkError;
 
+#[derive(Debug)]
+pub enum Error {
     /// There was an error in PIOP.
     PIOPError(PiopError),
-
     /// Pairing check does not hold.
     OpeningCheckFailed,
+    /// Ark-poly-commit lib error
+    ArkError(ArkError),
 }
 
-impl<E> Error<E> {
-    /// Convert an error in the underlying polynomial commitment scheme
-    /// to a `Error`.
-    pub fn from_pc_err(err: E) -> Self {
-        Self::PolynomialCommitmentError(err)
+impl From<PiopError> for Error {
+    fn from(err: PiopError) -> Self {
+        Error::PIOPError(err)
     }
 }
 
-impl<E> From<PiopError> for Error<E> {
-    fn from(err: PiopError) -> Self {
-        Error::PIOPError(err)
+impl From<ArkError> for Error {
+    fn from(err: ArkError) -> Self {
+        Error::ArkError(err)
     }
 }

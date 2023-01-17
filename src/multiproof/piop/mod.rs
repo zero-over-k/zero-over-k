@@ -1,16 +1,15 @@
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    iter::{self, successors},
-    marker::PhantomData,
-};
-
+use crate::Rng;
 use ark_ff::{to_bytes, PrimeField, Zero};
 use ark_poly::{
     univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain,
     Polynomial,
 };
 use ark_poly_commit::LabeledCommitment;
-use ark_std::rand::Rng;
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    iter::{self, successors},
+    marker::PhantomData,
+};
 
 use crate::{
     commitment::HomomorphicCommitment,
@@ -22,9 +21,8 @@ use crate::{
 };
 
 use self::prover::ProverState;
-
+use super::error::Error;
 use super::{
-    error::Error,
     poly::{construct_lagrange_basis, construct_vanishing},
     Proof,
 };
@@ -66,7 +64,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng>
         domain_size: usize,
         fs_rng: &mut FS,
         zk_rng: &mut R,
-    ) -> Result<Proof<F, PC>, Error<PC::Error>> {
+    ) -> Result<Proof<F, PC>, Error> {
         let verifier_state = PIOP::init_verifier();
 
         let (verifier_state, verifier_first_msg) =
@@ -83,7 +81,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng>
 
         let (f_agg_poly_commitment, f_agg_rand) =
             PC::commit(ck, iter::once(&f_agg_poly), Some(zk_rng))
-                .map_err(Error::from_pc_err)?;
+                .map_err(|err| Error::from);
 
         fs_rng.absorb(&to_bytes![&f_agg_poly_commitment].unwrap());
 
@@ -105,8 +103,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng>
         )?;
 
         let (final_poly_commitment, _) =
-            PC::commit(ck, iter::once(&final_poly), None)
-                .map_err(Error::from_pc_err)?;
+            PC::commit(ck, iter::once(&final_poly), None)?;
 
         let opening_proof = PC::open(
             ck,
@@ -116,8 +113,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng>
             F::one(), // Opening challenge is not needed since only one polynomial is being committed
             &[final_poly_rand],
             None, // Randomness is not needed since only one polynomial is committed
-        )
-        .map_err(Error::from_pc_err)?;
+        )?;
 
         let proof = Proof {
             q_evals,
@@ -136,7 +132,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng>
         evaluation_challenge: F,
         domain_size: usize,
         fs_rng: &mut FS,
-    ) -> Result<(), Error<PC::Error>> {
+    ) -> Result<(), Error> {
         let domain = GeneralEvaluationDomain::new(domain_size).unwrap();
         let verifier_state = PIOP::init_verifier();
 
@@ -176,7 +172,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng>
             opening_sets.iter().map(
                 |(rotations, oracles)| -> Result<
                     (PC::Commitment, BTreeMap<F, F>),
-                    Error<PC::Error>,
+                    Error
                 > {
                     let mut q_i = PC::zero_comm();
                     let mut q_i_evals_set = BTreeMap::<F, F>::new();
@@ -215,7 +211,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng>
         let f_evals = qs
             .clone()
             .zip(proof.q_evals.iter())
-            .map(|(qs_i, &q_eval)| -> Result<F, Error<PC::Error>> {
+            .map(|(qs_i, &q_eval)| -> Result<F, Error> {
                 let (_, q_eval_set) = qs_i?;
                 let evaluation_domain: Vec<F> =
                     q_eval_set.keys().cloned().collect();
@@ -234,7 +230,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng>
                 Ok((q_eval - r_poly.evaluate(&verifier_second_msg.x3))
                     * z_h.evaluate(&verifier_second_msg.x3).inverse().unwrap())
             })
-            .collect::<Result<Vec<F>, Error<PC::Error>>>()?;
+            .collect::<Result<Vec<F>, Error>>()?;
 
         let x2_powers: Vec<F> = successors(Some(F::one()), |x2_i| {
             Some(*x2_i * verifier_first_msg.x2)
@@ -278,8 +274,7 @@ impl<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng>
             &proof.opening_proof,
             F::one(),
             None,
-        )
-        .map_err(Error::from_pc_err)?;
+        )?;
 
         if !res {
             return Err(Error::OpeningCheckFailed);

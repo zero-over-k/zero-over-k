@@ -17,7 +17,6 @@ pub enum Error {
     MissingCosetFixedEval(String),
     /// Missing extended coset evaluations for instance oracle.
     MissingCosetInstanceEval(String),
-    MissingExtendedEvals,
     /// Missing witness oracle with givien label.
     MissingWitnessOracle(String),
     /// Missing fixed oracle with givien label.
@@ -28,10 +27,6 @@ pub enum Error {
     MissingPermutationOracle(String),
     /// Missing LookUp table oracle.
     MissingLookupTableOracle(String),
-    /// Query index exceeds witness oracle size.
-    WitnessQueryIndexOutOfBounds(usize),
-    /// Query index exceeds instance oracle size.
-    InstanceQueryIndexOutOfBounds(usize),
     /// Non-constant tables not supported.
     //This feaure may get introduced in the future
     //see: https:github.com/zcash/halo2/issues/534

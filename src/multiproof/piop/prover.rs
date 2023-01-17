@@ -7,9 +7,9 @@ use ark_poly::{EvaluationDomain, GeneralEvaluationDomain, Polynomial};
 use ark_poly_commit::{LabeledPolynomial, PCRandomness};
 
 use super::verifier::{VerifierFirstMsg, VerifierSecondMsg, VerifierThirdMsg};
+use super::Error;
 use super::PIOP;
 use crate::commitment::HomomorphicCommitment;
-use crate::multiproof::error::Error as MpError;
 use crate::multiproof::poly::construct_vanishing;
 
 use crate::oracles::rotation::Rotation;
@@ -42,7 +42,7 @@ impl<F: PrimeField> PIOP<F> {
         oracles: &'a [&dyn Instantiable<F>],
         oracle_rands: &'a [PC::Randomness],
         domain_size: usize,
-    ) -> Result<ProverState<'a, F, PC>, MpError<PC::Error>> {
+    ) -> Result<ProverState<'a, F, PC>, Error> {
         let mut opening_sets = BTreeMap::<
             BTreeSet<Rotation>,
             Vec<(&'a dyn Instantiable<F>, &'a PC::Randomness)>,
@@ -73,7 +73,7 @@ impl<F: PrimeField> PIOP<F> {
         mut state: ProverState<'a, F, PC>,
         evaluation_challenge: F,
         verifier_first_msg: &VerifierFirstMsg<F>,
-    ) -> Result<FirstRound<'a, F, PC>, MpError<PC::Error>> {
+    ) -> Result<FirstRound<'a, F, PC>, Error> {
         // Max number of oracles in one opening set are all oracles
         let x1_powers: Vec<F> = successors(Some(F::one()), |x1_i| {
             Some(*x1_i * verifier_first_msg.x1)
@@ -190,7 +190,7 @@ impl<F: PrimeField> PIOP<F> {
     pub fn prover_second_round<'a, PC: HomomorphicCommitment<F>>(
         state: &'a ProverState<'a, F, PC>,
         verifier_second_msg: &VerifierSecondMsg<F>,
-    ) -> Result<Vec<F>, MpError<PC::Error>> {
+    ) -> Result<Vec<F>, Error> {
         let q_polys =
             state.q_polys.as_ref().expect("Q polys should be in state");
         let q_evals = q_polys
@@ -204,7 +204,7 @@ impl<F: PrimeField> PIOP<F> {
         state: &'a ProverState<'a, F, PC>,
         verifier_third_msg: &VerifierThirdMsg<F>,
         f_agg_poly_rand: &PC::Randomness,
-    ) -> Result<ThirdRound<F, PC::Randomness>, MpError<PC::Error>> {
+    ) -> Result<ThirdRound<F, PC::Randomness>, Error> {
         let q_polys =
             state.q_polys.as_ref().expect("Q polys should be in state");
 

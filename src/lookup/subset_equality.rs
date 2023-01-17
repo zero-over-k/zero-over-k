@@ -143,7 +143,7 @@ impl<F: PrimeField> SubsetEqualityArgument<F> {
         evaluation_challenge: &F,
         domain: &GeneralEvaluationDomain<F>,
         alpha_powers: &[F],
-    ) -> Result<F, Error<PC::Error>> {
+    ) -> Result<F, Error> {
         assert_eq!(alpha_powers.len(), 3);
         let (a, s, a_prime, s_prime) = lookup_oracles;
         let shifted_evaluation_challenge =
