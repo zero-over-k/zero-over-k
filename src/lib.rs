@@ -70,6 +70,7 @@ pub trait PIL<F: PrimeField, PC: HomomorphicCommitment<F>, FS: FiatShamirRng> {
         zk_rng: &mut R,
     ) -> Result<Self::Proof, Error<PC::Error>>;
 
+    #[allow(clippy::too_many_arguments)]
     fn verify(
         vk: &VerifierKey<F, PC>,
         preprocessed: &mut VerifierPreprocessedInput<F, PC>,
