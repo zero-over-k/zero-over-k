@@ -58,7 +58,6 @@ where
     fn info(&self) -> String {
         "This is an empty proof used for the Mock Prover".to_owned()
     }
-
     fn cumulative_info(&self) -> String {
         self.info()
     }
@@ -167,6 +166,42 @@ where
                 }
             }
         }
+
+        // TODO: Check permuation argument
+        /*
+        let coset_deltas = pk.vk.index_info.permutation_argument.deltas;
+        for (i, (perm_oracle, w_oracle)) in preprocessed
+            .permutation_oracles
+            .iter()
+            .zip_eq(prover_state.oracles_to_copy.iter())
+            .enumerate()
+        {
+            for (j, (perm_eval, w_eval)) in perm_oracle
+                .evals
+                .iter()
+                .zip_eq(w_oracle.evals.iter())
+                .enumerate()
+            {
+                //TODO: Extract wire_index and row_number from aux structure
+                println!(
+                    "Checking positions [{}, {}] <=> [{}, {}] \nValues: {:?} {:?} ",
+                    i,
+                    j,
+                    wire_index,
+                    row_number,
+                    w_eval,
+                    &prover_state.oracles_to_copy[wire_index].evals[row_number]
+                );
+                if *w_eval
+                    != prover_state.oracles_to_copy[wire_index].evals
+                        [row_number]
+                {
+                    panic!("Permutation check failed.");
+                }
+            }
+        }
+        */
+
         Ok(MockProof::new())
     }
 
