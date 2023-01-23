@@ -13,7 +13,7 @@ pub mod poly;
 
 pub mod error;
 
-#[derive(CanonicalSerialize, CanonicalDeserialize)]
+#[derive(Clone, CanonicalSerialize, CanonicalDeserialize)]
 pub struct Proof<F: PrimeField, PC: HomomorphicCommitment<F>> {
     // pub oracle_evaluations: Vec<F>,
     pub q_evals: Vec<F>,

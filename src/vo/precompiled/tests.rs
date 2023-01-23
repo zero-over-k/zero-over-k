@@ -8,13 +8,14 @@ use ark_poly::{
 use ark_poly_commit::sonic_pc::CommitterKey;
 use ark_poly_commit::sonic_pc::VerifierKey;
 use ark_poly_commit::{LabeledPolynomial, PolynomialCommitment};
-use ark_serialize::CanonicalSerialize;
 use ark_std::rand::rngs::StdRng;
 use ark_std::test_rng;
 use rand_chacha::ChaChaRng;
 
+use ark_serialize::CanonicalSerialize;
+
 use crate::data_structures::{
-    PermutationInfo, Proof, ProverKey, ProverPreprocessedInput,
+    PermutationInfo, ProverKey, ProverPreprocessedInput,
     VerifierPreprocessedInput,
 };
 use crate::error::Error;
@@ -24,7 +25,10 @@ use crate::oracles::instance::{InstanceProverOracle, InstanceVerifierOracle};
 
 use crate::oracles::witness::{WitnessProverOracle, WitnessVerifierOracle};
 use crate::rng::SimpleHashFiatShamirRng;
+// use crate::turbo_plonk::TurboPlonk;
+use crate::mock_prover::MockProver;
 use crate::vo::generic_vo::GenericVO;
+use crate::Proof;
 use crate::PIL;
 use blake2::Blake2s;
 
@@ -38,7 +42,7 @@ type PC = KZG10<Bls12_381>;
 type CommKey = CommitterKey<Bls12_381>;
 type CSVerKey = VerifierKey<Bls12_381>;
 
-type PilInstance = PIL<F, PC, FS>;
+type PilInstance = MockProver<F, PC, FS>;
 
 /// Initialize domain, srs and CS keys
 pub fn test_init(
@@ -67,7 +71,7 @@ pub(crate) fn run_prover(
     instance: Vec<(impl Into<String>, &[F])>,
     mut vo: GenericVO<F>,
     rng: &mut StdRng,
-) -> Proof<F, PC> {
+) -> <PilInstance as PIL<F, PC, FS>>::Proof {
     // 1. Generate Prover Oracles
     let mut witness_oracles: Vec<_> = witness
         .into_iter()
@@ -169,7 +173,7 @@ pub(crate) fn run_verifier(
     fixed: Vec<(impl Into<String>, &[F])>,
     instance: Vec<(impl Into<String>, &[F])>,
     mut vo: GenericVO<F>,
-    proof: Proof<F, PC>,
+    proof: <PilInstance as PIL<F, PC, FS>>::Proof,
 ) -> Result<(), Error<<PC as PolynomialCommitment<F, DensePolynomial<F>>>::Error>>
 {
     // 1. Generate Verifier Oracles

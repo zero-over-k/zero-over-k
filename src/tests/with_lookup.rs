@@ -28,7 +28,9 @@ mod test {
     use crate::rng::SimpleHashFiatShamirRng;
     use crate::vo::generic_lookup_vo::GenericLookupVO;
     use crate::vo::generic_vo::GenericVO;
+    use crate::Proof;
 
+    use crate::turbo_plonk::TurboPlonk;
     use crate::vo::query::VirtualQuery;
     use crate::vo::virtual_expression::VirtualExpression;
     use crate::vo::{LookupVirtualOracle, VirtualOracle};
@@ -38,7 +40,7 @@ mod test {
     type FS = SimpleHashFiatShamirRng<Blake2s, ChaChaRng>;
     type PC = KZG10<Bls12_381>;
 
-    type PilInstance = PIL<F, PC, FS>;
+    type PilInstance = TurboPlonk<F, PC, FS>;
 
     fn get_lookup_expressions_and_queries() -> (
         Vec<VirtualExpression<F>>,

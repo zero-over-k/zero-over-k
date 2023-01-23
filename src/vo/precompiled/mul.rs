@@ -54,6 +54,7 @@ mod test {
 
     use crate::oracles::witness::{WitnessProverOracle, WitnessVerifierOracle};
     use crate::rng::SimpleHashFiatShamirRng;
+    use crate::turbo_plonk::TurboPlonk;
     use crate::vo::generic_vo::GenericVO;
     use crate::vo::precompiled::PrecompiledVO;
     use crate::PIL;
@@ -66,7 +67,7 @@ mod test {
     type FS = SimpleHashFiatShamirRng<Blake2s, ChaChaRng>;
     type PC = KZG10<Bls12_381>;
 
-    type PilInstance = PIL<F, PC, FS>;
+    type PilInstance = TurboPlonk<F, PC, FS>;
 
     #[test]
     fn test_simple_mul() {
